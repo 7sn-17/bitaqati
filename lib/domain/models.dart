@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'fsrs.dart';
 
 enum SubjectId { physics, chemistry, biology, historyOfMedicine, english1 }
 enum DeckPrivacy { private, unlisted, public }
@@ -35,40 +36,42 @@ IconData getDeckIcon(String iconKey) {
 class DeckSummary {
   const DeckSummary({
     required this.id, required this.title, required this.subjectId,
-    this.description = '', this.parentId, this.colorHex = '#163300', this.iconKey = 'folder',
+    this.summary = '', // The repository uses 'summary'
+    this.parentId, this.colorHex = '#163300', this.iconKey = 'folder',
     this.privacy = DeckPrivacy.private, this.tags = const [], this.isPublic = false,
     this.isStarter = false, this.isArchived = false, this.position = 0, this.depth = 0,
     this.createdAt, this.updatedAt, this.publishedAt, this.sourceTemplateId,
-    this.directCardCount = 0, this.subdeckCount = 0, this.descendantDeckCount = 0,
+    this.cardCount = 0, this.dueCount = 0, this.retention = 0.0, // The repository uses these exact names
+    this.subdeckCount = 0, this.descendantDeckCount = 0,
     this.newCount = 0, this.learningCount = 0, this.reviewStateCount = 0,
-    this.dueReviewCount = 0, this.masteredCount = 0, this.suspendedCount = 0, this.retentionSample = 0.0,
+    this.masteredCount = 0, this.suspendedCount = 0,
     this.author, this.rating, this.children = const [],
   });
   
-  final String id; final String title; final String description; final String? parentId;
+  final String id; final String title; final String summary; final String? parentId;
   final SubjectId subjectId; final String colorHex; final String iconKey; final DeckPrivacy privacy;
   final List<String> tags; final bool isPublic; final bool isStarter; final bool isArchived;
   final int position; final int depth; final DateTime? createdAt; final DateTime? updatedAt;
   final DateTime? publishedAt; final String? sourceTemplateId;
-  final int directCardCount; final int subdeckCount; final int descendantDeckCount;
+  final int cardCount; final int dueCount; final double retention; // Exact names
+  final int subdeckCount; final int descendantDeckCount;
   final int newCount; final int learningCount; final int reviewStateCount;
-  final int dueReviewCount; final int masteredCount; final int suspendedCount; final double retentionSample;
+  final int masteredCount; final int suspendedCount;
   final String? author; final double? rating;
   final List<DeckSummary> children;
 
   Subject get subject => subjectById(subjectId);
   Color get color => Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
   IconData get deckIcon => getDeckIcon(iconKey);
-  double get progress => (retentionSample / 100).clamp(0.0, 1.0);
+  double get progress => (retention / 100).clamp(0.0, 1.0);
   
-  // Aliases for UI compatibility
-  String get summary => description;
-  int get cardCount => directCardCount;
-  int get dueCount => dueReviewCount;
-  double get retention => retentionSample;
+  // UI Aliases (to keep the UI working)
+  String get description => summary;
+  int get directCardCount => cardCount;
+  int get dueReviewCount => dueCount;
+  double get retentionSample => retention;
 }
 
-// Alias to fix DeckNode missing error
 typedef DeckNode = DeckSummary;
 
 @immutable
@@ -81,7 +84,7 @@ class ReviewCard {
   final String id; final String deckId; final SubjectId subjectId; final String front; final String back;
   final String? hint; final String? note; final String? notes; final List<String> tags;
   final CardKind kind; final int position; final DateTime? createdAt; final DateTime? updatedAt;
-  final String? fsrs; final bool isSuspended; final bool isBuried;
+  final FsrsCard? fsrs; final bool isSuspended; final bool isBuried;
 }
 
 typedef CardSummary = ReviewCard;
@@ -109,18 +112,39 @@ class DashboardStats {
 }
 
 @immutable
+class ReviewEvent {
+  const ReviewEvent({
+    required this.id, required this.deckId, required this.cardId, required this.rating,
+    required this.reviewedAt, this.scheduledDays = 0, this.stability = 0.0, this.difficulty = 0.0, this.elapsedMs = 0,
+  });
+  final String id; final String deckId; final String cardId; final FsrsRating rating;
+  final DateTime reviewedAt; final int scheduledDays; final double stability; final double difficulty; final int elapsedMs;
+}
+
+@immutable
 class LibraryItem {
   const LibraryItem({
-    required this.id, required this.sourceTemplateId, required this.title, required this.description,
-    required this.colorHex, required this.iconKey, required this.tags, required this.cardCount,
-    required this.subdeckCount, this.isOfficial = false, this.isInstalled = false, required this.deck,
+    required this.deck, // UI expects 'deck'
+    this.authorName = 'مجهول', // UI expects 'authorName'
+    this.rating = 0.0, // UI expects 'rating'
+    this.isOfficial = false,
   });
-  final String id; final String sourceTemplateId; final String title; final String description;
-  final String colorHex; final String iconKey; final List<String> tags; final int cardCount;
-  final int subdeckCount; final bool isOfficial; final bool isInstalled; final DeckSummary deck;
+  final DeckSummary deck;
+  final String authorName;
+  final double rating;
+  final bool isOfficial;
 
+  // UI Aliases
+  String get title => deck.title;
+  String get description => deck.summary;
   String get deckId => deck.id;
+  String get colorHex => deck.colorHex;
+  String get iconKey => deck.iconKey;
   IconData get deckIcon => getDeckIcon(iconKey);
+  int get cardCount => deck.cardCount;
+  int get subdeckCount => deck.subdeckCount;
+  List<String> get tags => deck.tags;
+  String? get sourceTemplateId => deck.sourceTemplateId;
 }
 
 @immutable
@@ -133,20 +157,20 @@ class Catalog {
   });
   final List<DeckNode> roots; final List<DeckNode> allDecks; final Map<String, DeckNode> deckById;
   final Map<String, List<ReviewCard>> cardsByDeck; final Map<String, ReviewCard> cardById;
-  final List<dynamic> reviews; final DateTime? generatedAt; final String displayName;
+  final List<ReviewEvent> reviews; final DateTime? generatedAt; final String displayName;
   final DashboardStats dashboard; final List<String> popularTags;
   final List<LibraryItem> communityLibraryItems; final List<LibraryItem> officialLibraryItems;
 }
 
-// --- MOCK DATA TO PREVENT UI CRASHES ---
+// --- MOCK DATA ---
 const List<DeckSummary> kMyDecks = <DeckSummary>[
-  DeckSummary(id: 'biology-cell', title: 'البيولوجيا · الخلية', subjectId: SubjectId.biology, directCardCount: 120, dueReviewCount: 9, retentionSample: 91, isPublic: false),
-  DeckSummary(id: 'chemistry-organic', title: 'الكيمياء العضوية', subjectId: SubjectId.chemistry, directCardCount: 86, dueReviewCount: 6, retentionSample: 76, isPublic: true),
-  DeckSummary(id: 'physics-motion', title: 'الفيزياء · الحركة', subjectId: SubjectId.physics, directCardCount: 48, dueReviewCount: 0, retentionSample: 88, isPublic: false),
+  DeckSummary(id: 'biology-cell', title: 'البيولوجيا · الخلية', subjectId: SubjectId.biology, cardCount: 120, dueCount: 9, retention: 91, isPublic: false),
+  DeckSummary(id: 'chemistry-organic', title: 'الكيمياء العضوية', subjectId: SubjectId.chemistry, cardCount: 86, dueCount: 6, retention: 76, isPublic: true),
+  DeckSummary(id: 'physics-motion', title: 'الفيزياء · الحركة', subjectId: SubjectId.physics, cardCount: 48, dueCount: 0, retention: 88, isPublic: false),
 ];
 
 const List<DeckSummary> kLibraryDecks = <DeckSummary>[
-  DeckSummary(id: 'public-biology', title: 'البيولوجيا · الخلية كاملة', subjectId: SubjectId.biology, directCardCount: 120, dueReviewCount: 0, retentionSample: 0, isPublic: true, author: 'عبدالله', rating: 4.8),
+  DeckSummary(id: 'public-biology', title: 'البيولوجيا · الخلية كاملة', subjectId: SubjectId.biology, cardCount: 120, dueCount: 0, retention: 0, isPublic: true, author: 'عبدالله', rating: 4.8),
 ];
 
 const List<ReviewCard> kSampleCards = <ReviewCard>[
