@@ -4,18 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [ "**" ]
-    paths:
-      - 'lib/**'
-      - 'assets/**'
-      - 'android/**'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - '.github/workflows/build_android.yml'
   pull_request:
-    paths:
-      - 'lib/**'
-      - 'android/**'
-      - 'pubspec.yaml'
 
 permissions:
   contents: read
@@ -85,18 +74,14 @@ jobs:
             echo "No release keystore configured; skipping key.properties."
           fi
 
-      - name: Build release APK
-        run: flutter build apk --release
+      # هذا هو السطر السحري الذي يقلل الحجم
+      - name: Build release APK (Split per ABI)
+        run: flutter build apk --release --split-per-abi
 
-      - name: Rename artifact
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk bitaqati-signed.apk
-          ls -lh bitaqati-signed.apk
-
-      - name: Upload APK
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: bitaqati-signed-apk
-          path: bitaqati-signed.apk
+          name: bitaqati-split-apks
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 30
