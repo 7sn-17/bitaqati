@@ -1,55 +1,142 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../data/models.dart';
+import '../data/auth_service.dart';
+import '../data/content_repository.dart';
+import '../domain/models.dart';
+import 'config/app_config.dart';
+import 'preferences/app_preferences.dart';
 
-final Provider<SharedPreferences> sharedPreferencesProvider =
-    Provider<SharedPreferences>(
-      (Ref ref) => throw UnimplementedError('Override in main()'),
+final Provider<AppPreferences> appPreferencesProvider =
+    Provider<AppPreferences>(
+      (Ref ref) => throw UnimplementedError('Override in bootstrap'),
     );
 
-final StateProvider<bool> onboardingCompletedProvider = StateProvider<bool>((
+final Provider<ContentRepository> contentRepositoryProvider =
+    Provider<ContentRepository>((Ref ref) => ContentRepository());
+
+final Provider<AuthService> authServiceProvider = Provider<AuthService>(
+  (Ref ref) => AuthService(),
+);
+
+final StreamProvider<AuthUser?> authUserProvider = StreamProvider<AuthUser?>((
   Ref ref,
 ) {
-  return ref.watch(sharedPreferencesProvider).getBool('onboarding_done') ??
-      false;
+  return ref.watch(authServiceProvider).userChanges;
 });
 
-final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((
+final Provider<bool> supabaseConfiguredProvider = Provider<bool>(
+  (Ref ref) => AppConfig.hasSupabase,
+);
+
+final FutureProvider<Catalog> catalogProvider = FutureProvider<Catalog>((
   Ref ref,
-) {
-  return ref.watch(sharedPreferencesProvider).getBool('notifications') ?? true;
+) async {
+  final AuthUser? user = ref.watch(authUserProvider).valueOrNull;
+  final AppPreferences prefs = ref.watch(appPreferencesProvider);
+  return ref
+      .watch(contentRepositoryProvider)
+      .loadCatalog(displayName: user?.displayName ?? prefs.displayName);
 });
 
-final StateProvider<SubjectId?> selectedSubjectProvider =
-    StateProvider<SubjectId?>((Ref ref) => null);
+final FutureProvider<int> pendingOutboxProvider = FutureProvider<int>((
+  Ref ref,
+) async {
+  ref.watch(catalogProvider);
+  return ref.watch(contentRepositoryProvider).pendingOutboxCount();
+});
 
-final StateProvider<SubjectId?> librarySubjectProvider =
-    StateProvider<SubjectId?>((Ref ref) => null);
+final NotifierProvider<LocaleNotifier, Locale> localeProvider =
+    NotifierProvider<LocaleNotifier, Locale>(LocaleNotifier.new);
+
+class LocaleNotifier extends Notifier<Locale> {
+  @override
+  Locale build() {
+    final String code = ref.watch(appPreferencesProvider).languageCode;
+    return Locale(code == 'en' ? 'en' : 'ar');
+  }
+
+  Future<void> setLanguage(String code) async {
+    final String safe = code == 'en' ? 'en' : 'ar';
+    state = Locale(safe);
+    await ref.read(appPreferencesProvider).setLanguageCode(safe);
+  }
+}
 
 final NotifierProvider<ThemeModeNotifier, ThemeMode> themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
 
 class ThemeModeNotifier extends Notifier<ThemeMode> {
-  static const String _key = 'theme_mode';
-
   @override
   ThemeMode build() {
-    final String? saved = ref.watch(sharedPreferencesProvider).getString(_key);
-    return switch (saved) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+    return ref.watch(appPreferencesProvider).themeMode;
   }
 
   Future<void> setMode(ThemeMode mode) async {
     state = mode;
-    await ref.read(sharedPreferencesProvider).setString(_key, mode.name);
-  }
-
-  Future<void> toggleDark() async {
-    await setMode(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+    await ref.read(appPreferencesProvider).setThemeMode(mode);
   }
 }
+
+final NotifierProvider<OnboardingNotifier, bool> onboardingCompletedProvider =
+    NotifierProvider<OnboardingNotifier, bool>(OnboardingNotifier.new);
+
+class OnboardingNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return ref.watch(appPreferencesProvider).onboardingComplete;
+  }
+
+  Future<void> complete() async {
+    state = true;
+    await ref.read(appPreferencesProvider).setOnboardingComplete(true);
+  }
+}
+
+final NotifierProvider<GuestModeNotifier, bool> guestModeProvider =
+    NotifierProvider<GuestModeNotifier, bool>(GuestModeNotifier.new);
+
+class GuestModeNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return ref.watch(appPreferencesProvider).guestMode;
+  }
+
+  Future<void> enterAsGuest() async {
+    state = true;
+    await ref.read(appPreferencesProvider).setGuestMode(true);
+  }
+
+  Future<void> leaveGuest() async {
+    state = false;
+    await ref.read(appPreferencesProvider).setGuestMode(false);
+  }
+}
+
+final StateProvider<String?> selectedTagProvider = StateProvider<String?>(
+  (Ref ref) => null,
+);
+
+final StateProvider<String> deckSortProvider = StateProvider<String>(
+  (Ref ref) => 'due',
+);
+
+final StateProvider<bool> includeSubdecksProvider = StateProvider<bool>(
+  (Ref ref) => true,
+);
+
+final StateProvider<String> searchQueryProvider = StateProvider<String>(
+  (Ref ref) => '',
+);
+
+final StateProvider<int> librarySegmentProvider = StateProvider<int>(
+  (Ref ref) => 0,
+);
+
+final StateProvider<int> progressRangeProvider = StateProvider<int>(
+  (Ref ref) => 30,
+);
+
+final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>(
+  (Ref ref) => null,
+);

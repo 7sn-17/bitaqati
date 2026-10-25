@@ -1,8 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/i18n/app_strings.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -16,28 +16,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _controller = PageController();
-  int _page = 0;
-
-  static const List<_OnboardingPage> _pages = <_OnboardingPage>[
-    _OnboardingPage(
-      title: 'راجع أقل، تذكّر أكثر',
-      body: 'بطاقاتي يستخدم التكرار المتباعد ليعرض لك البطاقة المناسبة في الوقت المناسب، لا أكثر ولا أقل.',
-      icon: CupertinoIcons.clock,
-      accent: AppColors.accent,
-    ),
-    _OnboardingPage(
-      title: 'حوّل أي ملف إلى بطاقات',
-      body: 'الصق نصاً أو أضف صورة أو ملفاً، وسنحوّله إلى بطاقات مراجعة جاهزة يمكنك تعديلها قبل الحفظ.',
-      icon: CupertinoIcons.sparkles,
-      accent: AppColors.accentSoft,
-    ),
-    _OnboardingPage(
-      title: 'مكتبة من الطلاب',
-      body: 'اكتشف مجموعات جاهزة في الفيزياء والكيمياء والبيولوجيا وتاريخ الطب والانكليزية 1.',
-      icon: CupertinoIcons.book,
-      accent: Color(0xFFCFE8C0),
-    ),
-  ];
+  int _index = 0;
 
   @override
   void dispose() {
@@ -46,267 +25,182 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _finish() async {
-    await ref.read(sharedPreferencesProvider).setBool('onboarding_done', true);
-    ref.read(onboardingCompletedProvider.notifier).state = true;
-    if (!mounted) {
+    await ref.read(onboardingCompletedProvider.notifier).complete();
+  }
+
+  void _next() {
+    if (_index == 2) {
+      _finish();
       return;
     }
-    context.go('/home');
+    _controller.nextPage(
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isLast = _page == _pages.length - 1;
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-          child: Column(
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: context.colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      'بطاقاتي',
-                      style: context.texts.labelLarge?.copyWith(
-                        fontFamily: 'ReadexPro',
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  if (!isLast)
-                    TextButton(onPressed: _finish, child: const Text('تخطي')),
-                ],
-              ),
-              Expanded(
-                child: PageView.builder(
-                  controller: _controller,
-                  itemCount: _pages.length,
-                  onPageChanged: (int value) => setState(() => _page = value),
-                  itemBuilder: (BuildContext context, int index) {
-                    return _PageContent(page: _pages[index]);
-                  },
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  for (int index = 0; index < _pages.length; index++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: index == _page ? 22 : 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: index == _page
-                            ? context.colors.primary
-                            : context.colors.outlineVariant,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    if (isLast) {
-                      _finish();
-                    } else {
-                      _controller.nextPage(
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.easeOutCubic,
-                      );
-                    }
-                  },
-                  child: Text(isLast ? 'ابدأ الآن' : 'التالي'),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'بالمتابعة أنت توافق على سياسة الخصوصية وشروط الاستخدام',
-                textAlign: TextAlign.center,
-                style: context.texts.bodySmall?.copyWith(fontSize: 10.5),
-              ),
-            ],
-          ),
-        ),
+    final AppStrings strings = context.strings;
+    final List<_OnboardingPageData> pages = <_OnboardingPageData>[
+      _OnboardingPageData(
+        asset: 'assets/illustrations/onboarding_focus.svg',
+        title: strings.onboardingTitle1,
+        body: strings.onboardingBody1,
+        accent: AppColors.lime,
       ),
-    );
-  }
-}
-
-class _PageContent extends StatelessWidget {
-  const _PageContent({required this.page});
-
-  final _OnboardingPage page;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        _Illustration(page: page),
-        const SizedBox(height: 38),
-        Text(
-          page.title,
-          textAlign: TextAlign.center,
-          style: context.texts.displaySmall,
-        ),
-        const SizedBox(height: 12),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 330),
-          child: Text(
-            page.body,
-            textAlign: TextAlign.center,
-            style: context.texts.bodyLarge?.copyWith(
-              color: context.texts.bodySmall?.color,
-              height: 1.8,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Illustration extends StatelessWidget {
-  const _Illustration({required this.page});
-
-  final _OnboardingPage page;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 260,
-      width: 300,
-      child: Stack(
-        alignment: Alignment.center,
+      _OnboardingPageData(
+        asset: 'assets/illustrations/onboarding_structure.svg',
+        title: strings.onboardingTitle2,
+        body: strings.onboardingBody2,
+        accent: AppColors.lavender,
+      ),
+      _OnboardingPageData(
+        asset: 'assets/illustrations/onboarding_sync.svg',
+        title: strings.onboardingTitle3,
+        body: strings.onboardingBody3,
+        accent: AppColors.sky,
+      ),
+    ];
+    return Scaffold(
+      body: Stack(
         children: <Widget>[
-          Positioned(
-            top: 34,
-            child: Transform.rotate(
-              angle: -0.09,
-              child: Container(
-                width: 190,
-                height: 136,
-                decoration: BoxDecoration(
-                  color: page.accent.withValues(alpha: 0.62),
-                  borderRadius: BorderRadius.circular(24),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.8),
+                  radius: 1.1,
+                  colors: <Color>[
+                    pages[_index].accent.withValues(
+                      alpha: context.isDark ? 0.14 : 0.18,
+                    ),
+                    context.pageBackground,
+                  ],
                 ),
               ),
             ),
           ),
-          Positioned(
-            top: 42,
-            child: Transform.rotate(
-              angle: 0.07,
-              child: Container(
-                width: 196,
-                height: 140,
-                decoration: BoxDecoration(
-                  color: page.accent,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-              ),
-            ),
-          ),
-          Container(
-            width: 206,
-            height: 150,
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.22),
-                  blurRadius: 28,
-                  offset: const Offset(0, 14),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
                   children: <Widget>[
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: const BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        page.icon,
-                        size: 18,
-                        color: AppColors.primary,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+                      child: Row(
+                        children: <Widget>[
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: context.colors.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.style_rounded,
+                              color: context.colors.onPrimary,
+                              size: 21,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            strings.appName,
+                            style: context.texts.titleLarge,
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: _finish,
+                            child: Text(strings.skip),
+                          ),
+                        ],
                       ),
                     ),
-                    const Spacer(),
-                    const Icon(
-                      CupertinoIcons.sparkles,
-                      size: 16,
-                      color: AppColors.accent,
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _controller,
+                        itemCount: pages.length,
+                        onPageChanged: (int value) =>
+                            setState(() => _index = value),
+                        itemBuilder: (BuildContext context, int index) {
+                          final _OnboardingPageData page = pages[index];
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(26, 8, 26, 10),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: <Widget>[
+                                Flexible(
+                                  child: SvgPicture.asset(
+                                    page.asset,
+                                    height: 310,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  page.title,
+                                  style: context.texts.headlineLarge,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  page.body,
+                                  style: context.texts.bodyLarge?.copyWith(
+                                    color: context.colors.onSurfaceVariant,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 22),
+                      child: Column(
+                        children: <Widget>[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List<Widget>.generate(pages.length, (
+                              int index,
+                            ) {
+                              final bool active = index == _index;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 240),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 3,
+                                ),
+                                width: active ? 24 : 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  color: active
+                                      ? context.colors.primary
+                                      : context.colors.outlineVariant,
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton(
+                              onPressed: _next,
+                              child: Text(
+                                _index == pages.length - 1
+                                    ? strings.getStarted
+                                    : strings.next,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const Spacer(),
-                Container(
-                  height: 8,
-                  width: 128,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.88),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  height: 8,
-                  width: 92,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  height: 8,
-                  width: 108,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.28),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 24,
-            left: 34,
-            child: _FloatingBadge(
-              icon: CupertinoIcons.checkmark,
-              color: AppColors.accent,
-              iconColor: AppColors.primary,
-            ),
-          ),
-          Positioned(
-            top: 18,
-            right: 32,
-            child: _FloatingBadge(
-              icon: CupertinoIcons.flame,
-              color: Colors.white,
-              iconColor: AppColors.danger,
+              ),
             ),
           ),
         ],
@@ -315,48 +209,16 @@ class _Illustration extends StatelessWidget {
   }
 }
 
-class _FloatingBadge extends StatelessWidget {
-  const _FloatingBadge({
-    required this.icon,
-    required this.color,
-    required this.iconColor,
-  });
-
-  final IconData icon;
-  final Color color;
-  final Color iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Icon(icon, size: 20, color: iconColor),
-    );
-  }
-}
-
-class _OnboardingPage {
-  const _OnboardingPage({
+class _OnboardingPageData {
+  const _OnboardingPageData({
+    required this.asset,
     required this.title,
     required this.body,
-    required this.icon,
     required this.accent,
   });
 
+  final String asset;
   final String title;
   final String body;
-  final IconData icon;
   final Color accent;
 }

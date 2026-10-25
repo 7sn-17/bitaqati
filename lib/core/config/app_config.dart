@@ -1,22 +1,30 @@
-/// Build-time configuration.
-///
-/// The Supabase publishable key is safe to ship in the client. Never put a
-/// service-role key or an AI provider key in the app.
-abstract final class AppConfig {
-  static const String appNameAr = 'بطاقاتي';
-  static const String appNameEn = 'Bitaqati';
-  static const String appVersion = '0.1.0';
+class AppConfig {
+  const AppConfig._();
+
+  static const String appVersion = '0.2.0+2';
+  static const String appLinkScheme = 'com.bitaqati.app';
+  static const String appLinkHost = 'login-callback';
+  static const String oauthRedirect = '$appLinkScheme://$appLinkHost';
 
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://mftghnvtdryxzochquee.supabase.co',
   );
 
-  static const String supabasePublishableKey = String.fromEnvironment(
-    'SUPABASE_PUBLISHABLE_KEY',
-    defaultValue: '',
+  static const String supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue:
+        'sb_publishable_S057e6nIkK3vxrcvcUmZEw_tIKEM83W',
+  );
+
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue:
+        '610940162017-ohe2ei9dkkj96cai8gqu0i2jmgbspd8b.apps.googleusercontent.com',
   );
 
   static bool get hasSupabase =>
-      supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty;
+      supabaseUrl.startsWith('https://') && supabaseAnonKey.isNotEmpty;
+
+  static bool get hasNativeGoogleClient => googleWebClientId.isNotEmpty;
 }

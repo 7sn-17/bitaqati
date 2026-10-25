@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 360" fill="none">
+  <defs>
+    <linearGradient id="treeGrad" x1="70" y1="50" x2="360" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C9F56D"/>
+      <stop offset="1" stop-color="#66B58C"/>
+    </linearGradient>
+    <filter id="treeShadow" x="30" y="40" width="370" height="300" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0A1A0B" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <circle cx="210" cy="180" r="148" fill="url(#treeGrad)" opacity="0.12"/>
+  <g filter="url(#treeShadow)">
+    <rect x="62" y="62" width="296" height="236" rx="30" fill="#F7F9F3"/>
+    <rect x="84" y="86" width="118" height="40" rx="12" fill="#C9F56D"/>
+    <rect x="96" y="100" width="70" height="11" rx="5.5" fill="#163300"/>
+    <path d="M138 126v22" stroke="#9AA79A" stroke-width="3" stroke-linecap="round"/>
+    <path d="M138 148h48" stroke="#9AA79A" stroke-width="3" stroke-linecap="round"/>
+    <path d="M186 148v30M186 178h36M186 208v28" stroke="#9AA79A" stroke-width="3" stroke-linecap="round"/>
+    <rect x="106" y="152" width="50" height="30" rx="9" fill="#D8F3E5"/>
+    <rect x="116" y="164" width="30" height="7" rx="3.5" fill="#2C7A57"/>
+    <rect x="222" y="148" width="104" height="52" rx="13" fill="#F2F4EC" stroke="#E1E5DA"/>
+    <rect x="236" y="164" width="54" height="8" rx="4" fill="#1D6FD1"/>
+    <rect x="236" y="180" width="34" height="6" rx="3" fill="#9AA79A"/>
+    <rect x="222" y="214" width="104" height="52" rx="13" fill="#F2F4EC" stroke="#E1E5DA"/>
+    <rect x="236" y="230" width="62" height="8" rx="4" fill="#A65A3A"/>
+    <rect x="236" y="246" width="40" height="6" rx="3" fill="#9AA79A"/>
+    <rect x="106" y="200" width="80" height="52" rx="13" fill="#F2F4EC" stroke="#E1E5DA"/>
+    <rect x="120" y="216" width="46" height="8" rx="4" fill="#0B7A5A"/>
+    <rect x="120" y="232" width="28" height="6" rx="3" fill="#9AA79A"/>
+  </g>
+  <circle cx="72" cy="286" r="18" fill="#BDB7FF"/>
+  <path d="M65 286l5 5 9-10" stroke="#3F347A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="352" cy="90" r="12" fill="#F6C86B"/>
+  <circle cx="352" cy="90" r="4.5" fill="#8A5B09"/>
+</svg>

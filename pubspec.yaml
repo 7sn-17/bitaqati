@@ -45,8 +45,10 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
+    - assets/icon.png
     - assets/fonts/
     - assets/branding/
+    - assets/icons/
     - assets/illustrations/
   fonts:
     - family: ReadexPro

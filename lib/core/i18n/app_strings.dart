@@ -1,0 +1,497 @@
+import 'package:flutter/material.dart';
+
+class AppStrings {
+  const AppStrings(this.locale);
+
+  final Locale locale;
+
+  bool get isArabic => locale.languageCode == 'ar';
+
+  String _t(String ar, String en) => isArabic ? ar : en;
+
+  static AppStrings of(BuildContext context) {
+    return Localizations.of<AppStrings>(context, AppStrings) ??
+        const AppStrings(Locale('ar'));
+  }
+
+  String get appName => _t('بطاقاتي', 'Bitaqati');
+  String get tagline => _t(
+    'مساحة هادئة للحفظ والمراجعة',
+    'A calm place for memory and review',
+  );
+  String get continueLabel => _t('متابعة', 'Continue');
+  String get getStarted => _t('ابدأ الآن', 'Get started');
+  String get skip => _t('تخطي', 'Skip');
+  String get next => _t('التالي', 'Next');
+  String get back => _t('رجوع', 'Back');
+  String get done => _t('تم', 'Done');
+  String get cancel => _t('إلغاء', 'Cancel');
+  String get save => _t('حفظ', 'Save');
+  String get delete => _t('حذف', 'Delete');
+  String get edit => _t('تعديل', 'Edit');
+  String get add => _t('إضافة', 'Add');
+  String get create => _t('إنشاء', 'Create');
+  String get search => _t('بحث', 'Search');
+  String get settings => _t('الإعدادات', 'Settings');
+  String get profile => _t('حسابي', 'Profile');
+  String get home => _t('الرئيسية', 'Home');
+  String get library => _t('المكتبة', 'Library');
+  String get progress => _t('تقدمي', 'Progress');
+  String get review => _t('مراجعة', 'Review');
+  String get decks => _t('المجلدات', 'Decks');
+  String get deck => _t('مجلد', 'Deck');
+  String get subdeck => _t('مجلد فرعي', 'Sub-deck');
+  String get lessons => _t('الدروس', 'Lessons');
+  String get cards => _t('البطاقات', 'Cards');
+  String get card => _t('بطاقة', 'Card');
+  String get due => _t('مستحقة', 'Due');
+  String get newCards => _t('جديدة', 'New');
+  String get learning => _t('قيد التعلم', 'Learning');
+  String get reviewState => _t('مراجعة', 'Review');
+  String get mastered => _t('متقنة', 'Mastered');
+  String get suspended => _t('موقوفة', 'Suspended');
+  String get retention => _t('الاسترجاع', 'Retention');
+  String get reviews => _t('المراجعات', 'Reviews');
+  String get streak => _t('السلسلة', 'Streak');
+  String get days => _t('أيام', 'days');
+  String get today => _t('اليوم', 'Today');
+  String get study => _t('ادرس', 'Study');
+  String get reviewNow => _t('راجع الآن', 'Review now');
+  String get noDecksTitle => _t('لا توجد مجلدات بعد', 'No decks yet');
+  String get noDecksBody => _t(
+    'أنشئ مجلدك الأول، أو ابدأ من قالب جاهز في المكتبة.',
+    'Create your first deck, or start from a template in the library.',
+  );
+  String get createDeck => _t('مجلد جديد', 'New deck');
+  String get createLesson => _t('درس جديد', 'New lesson');
+  String get deckTitle => _t('اسم المجلد', 'Deck name');
+  String get deckTitleHint => _t('مثلاً: الفيزياء', 'e.g. Physics');
+  String get description => _t('الوصف', 'Description');
+  String get tags => _t('الوسوم', 'Tags');
+  String get tagsHint => _t('افصل بينها بفاصلة', 'Separate with commas');
+  String get color => _t('اللون', 'Color');
+  String get icon => _t('الأيقونة', 'Icon');
+  String get privacyPrivate => _t('خاص', 'Private');
+  String get privacyUnlisted => _t('غير مدرج', 'Unlisted');
+  String get privacyPublic => _t('عام', 'Public');
+  String get privacyPrivateHelp => _t(
+    'لا يراه أحد غيرك.',
+    'Only you can see it.',
+  );
+  String get privacyUnlistedHelp => _t(
+    'يمكن الوصول إليه بالرابط فقط.',
+    'Reachable by link only.',
+  );
+  String get privacyPublicHelp => _t(
+    'يظهر في مكتبة المجتمع، وتمتد الخصوصية إلى المجلدات الفرعية.',
+    'Appears in the community library; privacy cascades to sub-decks.',
+  );
+  String get publish => _t('نشر', 'Publish');
+  String get unpublish => _t('إلغاء النشر', 'Unpublish');
+  String get published => _t('منشور', 'Published');
+  String get privateLabel => _t('خاص', 'Private');
+  String get unlistedLabel => _t('غير مدرج', 'Unlisted');
+  String get publicLabel => _t('عام', 'Public');
+  String get share => _t('مشاركة', 'Share');
+  String get copyLink => _t('نسخ الرابط', 'Copy link');
+  String get linkCopied => _t('تم نسخ الرابط', 'Link copied');
+  String get libraryTitle => _t('مكتبة المحتوى', 'Content library');
+  String get official => _t('رسمي', 'Official');
+  String get community => _t('المجتمع', 'Community');
+  String get installed => _t('مثبت', 'Installed');
+  String get addToLibrary => _t('أضف إلى مكتبتي', 'Add to my library');
+  String get install => _t('تثبيت', 'Install');
+  String get installing => _t('جارٍ التثبيت…', 'Installing…');
+  String get installedSuccess => _t('تمت الإضافة إلى مجلداتك', 'Added to your decks');
+  String get noPublicDecks => _t('لا يوجد محتوى عام بعد', 'No public content yet');
+  String get noPublicDecksBody => _t(
+    'انشر أحد مجلداتك ليظهر هنا، أو ثبّت قالباً رسمياً.',
+    'Publish one of your decks to appear here, or install an official template.',
+  );
+  String get author => _t('المؤلف', 'Author');
+  String get you => _t('أنت', 'You');
+  String get rating => _t('التقييم', 'Rating');
+  String get searchHint => _t('ابحث في المجلدات والبطاقات', 'Search decks and cards');
+  String get searchEmpty => _t('ابحث عن أي شيء', 'Search for anything');
+  String get searchNoResults => _t('لا توجد نتائج مطابقة', 'No matching results');
+  String get folders => _t('المجلدات', 'Folders');
+  String get all => _t('الكل', 'All');
+  String get dueOnly => _t('المستحقة فقط', 'Due only');
+  String get filters => _t('تصفية', 'Filters');
+  String get sort => _t('ترتيب', 'Sort');
+  String get newest => _t('الأحدث', 'Newest');
+  String get alphabetical => _t('أبجدياً', 'A–Z');
+  String get mostDue => _t('الأكثر استحقاقاً', 'Most due');
+  String get deckEmpty => _t('هذا المجلد فارغ', 'This deck is empty');
+  String get deckEmptyBody => _t(
+    'أضف بطاقة، أو أنشئ درساً فرعياً لتنظيم المحتوى.',
+    'Add a card, or create a sub-deck to organize the content.',
+  );
+  String get addCard => _t('بطاقة جديدة', 'New card');
+  String get editCard => _t('تعديل البطاقة', 'Edit card');
+  String get front => _t('الوجه', 'Front');
+  String get back => _t('الظهر', 'Back');
+  String get hint => _t('تلميح', 'Hint');
+  String get notes => _t('ملاحظات', 'Notes');
+  String get cardFrontHint => _t('السؤال أو المفهوم', 'Question or concept');
+  String get cardBackHint => _t('الإجابة المختصرة', 'Short answer');
+  String get hintHint => _t('تلميح اختياري', 'Optional hint');
+  String get notesHint => _t('شرح إضافي اختياري', 'Optional extra explanation');
+  String get cardAdded => _t('أُضيفت البطاقة', 'Card added');
+  String get cardUpdated => _t('حُدّثت البطاقة', 'Card updated');
+  String get cardDeleted => _t('حُذفت البطاقة', 'Card deleted');
+  String get deckDeleted => _t('حُذف المجلد', 'Deck deleted');
+  String get deckUpdated => _t('حُدّث المجلد', 'Deck updated');
+  String get deckCreated => _t('أُنشئ المجلد', 'Deck created');
+  String get import => _t('استيراد', 'Import');
+  String get importTitle => _t('استيراد بطاقات', 'Import cards');
+  String get importHint => _t(
+    'كل سطر: السؤال | الإجابة | تلميح اختياري',
+    'One card per line: front | back | optional hint',
+  );
+  String get importFormatHelp => _t(
+    'استخدم الفاصلة المنقوطة أو العلامة | للفصل.',
+    'Use a semicolon or | as the separator.',
+  );
+  String get importSuccess => _t('تم استيراد البطاقات', 'Cards imported');
+  String get importEmpty => _t('لا توجد أسطر صالحة', 'No valid lines found');
+  String get invalidImport => _t('صيغة غير صالحة', 'Invalid format');
+  String get studyTitle => _t('جلسة مراجعة', 'Review session');
+  String get showAnswer => _t('أظهر الإجابة', 'Show answer');
+  String get again => _t('أعد', 'Again');
+  String get hard => _t('صعب', 'Hard');
+  String get good => _t('جيد', 'Good');
+  String get easy => _t('سهل', 'Easy');
+  String get answer => _t('الإجابة', 'Answer');
+  String get question => _t('السؤال', 'Question');
+  String get tapToReveal => _t('اضغط لإظهار الإجابة', 'Tap to reveal the answer');
+  String get sessionComplete => _t('انتهت الجلسة', 'Session complete');
+  String get sessionSummary => _t('ملخص الجلسة', 'Session summary');
+  String get cardsReviewed => _t('بطاقات راجعتها', 'Cards reviewed');
+  String get correctRate => _t('نسبة الإجابات الجيدة', 'Successful rate');
+  String get keepGoing => _t('واصل التقدم', 'Keep going');
+  String get backToDeck => _t('العودة إلى المجلد', 'Back to deck');
+  String get noDueCards => _t('لا توجد بطاقات مستحقة', 'No cards due');
+  String get noDueCardsBody => _t(
+    'أحسنت. عد لاحقاً أو راجع بطاقات إضافية.',
+    'Well done. Come back later or review extra cards.',
+  );
+  String get studyAll => _t('ادرس كل البطاقات', 'Study all cards');
+  String get suspend => _t('إيقاف مؤقت', 'Suspend');
+  String get unsuspend => _t('استئناف', 'Unsuspend');
+  String get resetProgress => _t('إعادة ضبط التقدم', 'Reset progress');
+  String get resetProgressConfirm => _t(
+    'ستُعاد البطاقة إلى حالة جديدة. سجل المراجعات يبقى محفوظاً.',
+    'The card returns to new. Review history is kept.',
+  );
+  String get reset => _t('إعادة ضبط', 'Reset');
+  String get deleteCardConfirm => _t(
+    'هل تريد حذف هذه البطاقة؟',
+    'Delete this card?',
+  );
+  String get deleteDeckConfirm => _t('حذف المجلد؟', 'Delete this deck?');
+  String get deleteDeckBody => _t(
+    'سيُخفى المجلد وكل مجلداته الفرعية وبطاقاته. لا يمكن التراجع حالياً.',
+    'The deck, its sub-decks and cards will be hidden. This cannot be undone yet.',
+  );
+  String get deleteCardBody => _t(
+    'ستُخفى البطاقة من المراجعة والمجلد.',
+    'The card will be hidden from review and the deck.',
+  );
+  String get yesDelete => _t('نعم، احذف', 'Yes, delete');
+  String get progressTitle => _t('تقدمي', 'My progress');
+  String get overview => _t('نظرة عامة', 'Overview');
+  String get forecast => _t('توقع المراجعات', 'Review forecast');
+  String get next30Days => _t('30 يوماً القادمة', 'Next 30 days');
+  String get heatmap => _t('نشاط المراجعة', 'Review activity');
+  String get activity => _t('النشاط', 'Activity');
+  String get topDecks => _t('أكثر المجلدات مراجعة', 'Most reviewed decks');
+  String get leeches => _t('بطاقات تحتاج انتباهاً', 'Cards that need attention');
+  String get leechesEmpty => _t('لا توجد بطاقات صعبة بعد.', 'No difficult cards yet.');
+  String get noReviewsYet => _t('لا توجد مراجعات بعد', 'No reviews yet');
+  String get thisMonth => _t('هذا الشهر', 'This month');
+  String lastNDays(int count) =>
+      isArabic ? 'آخر $count يوماً' : 'Last $count days';
+  String get totalReviews => _t('إجمالي المراجعات', 'Total reviews');
+  String get retentionRate => _t('نسبة الاسترجاع', 'Retention rate');
+  String get bestStreak => _t('أفضل سلسلة', 'Best streak');
+  String get settingsTitle => _t('الإعدادات', 'Settings');
+  String get appearance => _t('المظهر', 'Appearance');
+  String get language => _t('اللغة', 'Language');
+  String get arabic => _t('العربية', 'Arabic');
+  String get english => _t('الإنجليزية', 'English');
+  String get theme => _t('السمة', 'Theme');
+  String get system => _t('النظام', 'System');
+  String get light => _t('فاتح', 'Light');
+  String get dark => _t('داكن', 'Dark');
+  String get account => _t('الحساب', 'Account');
+  String get signIn => _t('تسجيل الدخول', 'Sign in');
+  String get signOut => _t('تسجيل الخروج', 'Sign out');
+  String get guest => _t('زائر', 'Guest');
+  String get guestMode => _t('وضع الضيف', 'Guest mode');
+  String get signedInAs => _t('مسجّل الدخول باسم', 'Signed in as');
+  String get sync => _t('المزامنة', 'Sync');
+  String get offline => _t('دون اتصال', 'Offline');
+  String get syncNow => _t('زامن الآن', 'Sync now');
+  String get lastSynced => _t('آخر مزامنة', 'Last synced');
+  String get never => _t('أبداً', 'Never');
+  String get pendingChanges => _t('تغييرات معلّقة', 'Pending changes');
+  String get about => _t('حول التطبيق', 'About');
+  String get version => _t('الإصدار', 'Version');
+  String get privacyPolicy => _t('سياسة الخصوصية', 'Privacy policy');
+  String get terms => _t('شروط الاستخدام', 'Terms of use');
+  String get madeWith => _t('صُنع بعناية للطلاب', 'Made with care for students');
+  String get onboardingTitle1 => _t('تعلّم أقل، وتذكّر أكثر', 'Learn less, remember more');
+  String get onboardingBody1 => _t(
+    'بطاقات قصيرة ومراجعة ذكية تجعل المعرفة تبقى، لا تمر.',
+    'Short cards and smart review make knowledge stay, not pass.',
+  );
+  String get onboardingTitle2 => _t('نظّم كل شيء كما تفكر', 'Organize the way you think');
+  String get onboardingBody2 => _t(
+    'مجلدات ودروس فرعية، مع إمكانية مشاركة درس واحد فقط.',
+    'Decks and sub-decks, with the option to share a single lesson.',
+  );
+  String get onboardingTitle3 => _t('تقدمك معك، دائماً', 'Your progress, always with you');
+  String get onboardingBody3 => _t(
+    'يعمل دون اتصال، ويتزامن عندما تعود الشبكة.',
+    'Works offline and syncs when the network returns.',
+  );
+  String get loginTitle => _t('أهلاً بك في بطاقاتي', 'Welcome to Bitaqati');
+  String get loginBody => _t(
+    'سجّل الدخول لمزامنة مجلداتك بين الأجهزة، أو ابدأ كضيف.',
+    'Sign in to sync your decks across devices, or start as a guest.',
+  );
+  String get continueWithGoogle => _t('المتابعة باستخدام Google', 'Continue with Google');
+  String get continueAsGuest => _t('المتابعة كضيف', 'Continue as guest');
+  String get loginError => _t('تعذر إكمال تسجيل الدخول', 'Could not complete sign-in');
+  String get authNotConfigured => _t(
+    'تسجيل الدخول غير مهيأ في هذه النسخة. يمكنك المتابعة كضيف.',
+    'Sign-in is not configured in this build. You can continue as a guest.',
+  );
+  String get profileTitle => _t('حسابي', 'My account');
+  String get displayName => _t('الاسم', 'Name');
+  String get email => _t('البريد الإلكتروني', 'Email');
+  String get memberSince => _t('عضو منذ', 'Member since');
+  String get yourDecks => _t('مجلداتك', 'Your decks');
+  String get publicDecks => _t('مجلداتك العامة', 'Your public decks');
+  String get reviewsCount => _t('مراجعاتك', 'Your reviews');
+  String get signOutConfirm => _t(
+    'ستبقى بياناتك المحلية على هذا الجهاز.',
+    'Your local data stays on this device.',
+  );
+  String get copyDeck => _t('نسخ المجلد', 'Copy deck');
+  String get copyDeckSuffix => _t('نسخة', 'copy');
+  String get moveTo => _t('نقل إلى', 'Move to');
+  String get parentDeck => _t('المجلد الأب', 'Parent deck');
+  String get rootLevel => _t('المستوى الرئيسي', 'Top level');
+  String get noParent => _t('بدون مجلد أب', 'No parent');
+  String get selectParent => _t('اختر المجلد الأب', 'Choose parent deck');
+  String get move => _t('نقل', 'Move');
+  String get deckMoved => _t('نُقل المجلد', 'Deck moved');
+  String get folder => _t('مجلد', 'Folder');
+  String get addSubdeck => _t('مجلد فرعي', 'Sub-deck');
+  String get addLesson => _t('إضافة درس', 'Add lesson');
+  String get studyLesson => _t('ادرس الدرس', 'Study lesson');
+  String get publishDeck => _t('نشر المجلد', 'Publish deck');
+  String get makePrivate => _t('اجعله خاصاً', 'Make private');
+  String get makeUnlisted => _t('اجعله غير مدرج', 'Make unlisted');
+  String get makePublic => _t('اجعله عاماً', 'Make public');
+  String get publishConfirmTitle => _t('نشر هذا المجلد؟', 'Publish this deck?');
+  String get publishConfirmBody => _t(
+    'سيصبح المجلد وكل محتواه العام متاحاً في مكتبة المجتمع. يمكنك إلغاء النشر لاحقاً.',
+    'The deck and all its public content will be available in the community library. You can unpublish later.',
+  );
+  String get privacyUpdated => _t('حُدّثت الخصوصية', 'Privacy updated');
+  String get errorGeneric => _t('حدث خطأ. حاول مرة أخرى.', 'Something went wrong. Try again.');
+  String get retry => _t('إعادة المحاولة', 'Retry');
+  String get loading => _t('جارٍ التحميل…', 'Loading…');
+  String get close => _t('إغلاق', 'Close');
+  String get more => _t('المزيد', 'More');
+  String get menu => _t('القائمة', 'Menu');
+  String get favorites => _t('المفضلة', 'Favorites');
+  String get archive => _t('الأرشيف', 'Archive');
+  String get archived => _t('مؤرشف', 'Archived');
+  String get restore => _t('استعادة', 'Restore');
+  String get newBadge => _t('جديد', 'New');
+  String get dueBadge => _t('مستحق', 'Due');
+  String get selectDeck => _t('اختر مجلداً', 'Choose a deck');
+  String get selectDeckTitle => _t('إلى أين نضيف البطاقة؟', 'Where should this card go?');
+  String get searchDecks => _t('ابحث في المجلدات', 'Search decks');
+  String get noResults => _t('لا توجد نتائج', 'No results');
+  String get typeAnswer => _t('اكتب إجابتك…', 'Type your answer…');
+  String get reveal => _t('إظهار', 'Reveal');
+  String get rate => _t('قيّم إجابتك', 'Rate your recall');
+  String get keyboardHint => _t(
+    'اختصارات: 1 أعد، 2 صعب، 3 جيد، 4 سهل',
+    'Shortcuts: 1 again, 2 hard, 3 good, 4 easy',
+  );
+  String get includeSubdecks => _t('تضمين المجلدات الفرعية', 'Include sub-decks');
+  String get onlyThisDeck => _t('هذا المجلد فقط', 'This deck only');
+  String get allDecks => _t('كل المجلدات', 'All decks');
+  String get syncPending => _t('تغييرات بانتظار المزامنة', 'Changes waiting to sync');
+  String get localOnly => _t('محلي فقط', 'Local only');
+  String get cloud => _t('سحابي', 'Cloud');
+  String get guestDataNote => _t(
+    'بياناتك محفوظة على هذا الجهاز. سجّل الدخول للمزامنة.',
+    'Your data is saved on this device. Sign in to sync.',
+  );
+  String get signInToSync => _t('سجّل الدخول للمزامنة', 'Sign in to sync');
+  String get welcomeBack => _t('مرحباً بعودتك', 'Welcome back');
+  String get tag => _t('وسم', 'Tag');
+  String get tagsFilter => _t('تصفية بالوسوم', 'Filter by tags');
+  String get clearFilters => _t('مسح التصفية', 'Clear filters');
+  String get todayGoal => _t('هدف اليوم', 'Today’s goal');
+  String get dailyGoal => _t('الهدف اليومي', 'Daily goal');
+  String get ofGoal => _t('من الهدف', 'of goal');
+  String get cardOf => _t('بطاقة', 'card');
+  String get sessionProgress => _t('تقدم الجلسة', 'Session progress');
+  String get reviewAgain => _t('مراجعة أخرى', 'Review again');
+  String get finish => _t('إنهاء', 'Finish');
+  String get submit => _t('تحقق', 'Check');
+  String get skipCard => _t('تخطي البطاقة', 'Skip card');
+  String get hintLabel => _t('تلميح', 'Hint');
+  String get notesLabel => _t('ملاحظات', 'Notes');
+  String get addTag => _t('أضف وسماً', 'Add tag');
+  String get noTags => _t('لا توجد وسوم', 'No tags');
+  String get publicLibraryNote => _t(
+    'كل ما تنشره يظهر باسمك. يمكنك إلغاء النشر في أي وقت.',
+    'Everything you publish appears under your name. You can unpublish anytime.',
+  );
+  String get officialLibraryNote => _t(
+    'قوالب جاهزة من فريق بطاقاتي. التثبيت ينسخ المحتوى إلى مجلداتك.',
+    'Ready-made templates from the Bitaqati team. Installing copies them to your decks.',
+  );
+  String get installedBadge => _t('مثبت', 'Installed');
+  String get addToMyDecks => _t('أضف إلى مجلداتي', 'Add to my decks');
+  String get copied => _t('نُسخ', 'Copied');
+  String get duplicate => _t('تكرار', 'Duplicate');
+  String get export => _t('تصدير', 'Export');
+  String get notImplemented => _t('قريباً', 'Coming soon');
+  String get comingSoon => _t('هذه الميزة قادمة في تحديث لاحق.', 'This feature is coming in a later update.');
+  String get allCaughtUp => _t('كل شيء محدّث', 'All caught up');
+  String get noCardsInSession => _t('لا توجد بطاقات في هذه الجلسة', 'No cards in this session');
+  String get reviewHint => _t('اختر تقييماً بعد إظهار الإجابة', 'Rate after revealing the answer');
+  String get streakDays => _t('يوم متتالٍ', 'day streak');
+  String get todayReviews => _t('مراجعات اليوم', 'Reviews today');
+  String get dueToday => _t('مستحقة اليوم', 'Due today');
+  String get cardsDueNow => _t('بطاقة مستحقة الآن', 'cards due now');
+  String get openDeck => _t('افتح المجلد', 'Open deck');
+  String get noDescription => _t('لا يوجد وصف', 'No description');
+  String get optional => _t('اختياري', 'Optional');
+  String get required => _t('مطلوب', 'Required');
+  String get savedLocally => _t('محفوظ محلياً', 'Saved locally');
+  String get sessionSaved => _t('حُفظت المراجعة', 'Review saved');
+  String get continueStudying => _t('متابعة الدراسة', 'Continue studying');
+  String get finishSession => _t('إنهاء الجلسة', 'Finish session');
+  String get showHint => _t('أظهر التلميح', 'Show hint');
+  String get hideHint => _t('أخفِ التلميح', 'Hide hint');
+  String get goodAnswer => _t('إجابة جيدة', 'Good answer');
+  String get wrongAnswer => _t('تحتاج مراجعة', 'Needs review');
+  String get deckPublished => _t('نُشر المجلد', 'Deck published');
+  String get deckUnpublished => _t('أُلغي نشر المجلد', 'Deck unpublished');
+  String get copyDeckBody => _t(
+    'سيتم إنشاء نسخة جديدة دون تقدم المراجعة.',
+    'A new copy will be created without review progress.',
+  );
+  String get moveDeckBody => _t(
+    'اختر مجلداً أباً جديداً أو المستوى الرئيسي.',
+    'Choose a new parent deck or the top level.',
+  );
+  String get chooseColor => _t('اختر لوناً', 'Choose a color');
+  String get chooseIcon => _t('اختر أيقونة', 'Choose an icon');
+  String get noInternet => _t('لا يوجد اتصال', 'No internet connection');
+  String get deleteAccount => _t('حذف الحساب', 'Delete account');
+  String get deleteAccountBody => _t(
+    'سيُحذف حسابك السحابي. البيانات المحلية تبقى على الجهاز.',
+    'Your cloud account will be deleted. Local data stays on the device.',
+  );
+  String get signOutBody => _t(
+    'يمكنك متابعة الدراسة كضيف على هذا الجهاز.',
+    'You can continue studying as a guest on this device.',
+  );
+  String get libraryEmpty => _t('لا توجد قوالب بعد', 'No templates yet');
+  String get libraryEmptyBody => _t(
+    'ستظهر هنا القوالب الرسمية ومجلدات المجتمع العامة.',
+    'Official templates and public community decks will appear here.',
+  );
+  String get shareDeck => _t('شارك المجلد', 'Share deck');
+  String get shareLesson => _t('شارك الدرس', 'Share lesson');
+  String get publishLesson => _t('نشر الدرس', 'Publish lesson');
+  String get publishLessonBody => _t(
+    'سيُنشر هذا الدرس فقط، وليس المجلد كله.',
+    'Only this lesson will be published, not the whole deck.',
+  );
+  String get standalonePublic => _t('درس عام مستقل', 'Standalone public lesson');
+  String get yourPublicLibrary => _t('مكتبتك العامة', 'Your public library');
+
+  String cardsCount(int count) =>
+      isArabic ? '$count ${count == 1 ? 'بطاقة' : 'بطاقات'}' : '$count cards';
+  String lessonsCount(int count) =>
+      isArabic ? '$count ${count == 1 ? 'درس' : 'دروس'}' : '$count lessons';
+  String subdecksCount(int count) =>
+      isArabic ? '$count ${count == 1 ? 'مجلد فرعي' : 'مجلدات فرعية'}' : '$count sub-decks';
+  String reviewsCountLabel(int count) =>
+      isArabic ? '$count مراجعة' : '$count reviews';
+  String dueCount(int count) => isArabic ? '$count مستحقة' : '$count due';
+  String newCount(int count) => isArabic ? '$count جديدة' : '$count new';
+  String percent(int value) => '$value%';
+  String ofTotal(int done, int total) => '$done / $total';
+  String get streakLabel => _t('سلسلة', 'Streak');
+  String get dayShort => _t('ي', 'd');
+  String shortDate(DateTime date) {
+    final int day = date.day;
+    final int month = date.month;
+    return isArabic ? '$day/$month' : '$month/$day';
+  }
+
+  String longDate(DateTime date) {
+    const List<String> arMonths = <String>[
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
+    const List<String> enMonths = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final List<String> months = isArabic ? arMonths : enMonths;
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+}
+
+class AppStringsDelegate extends LocalizationsDelegate<AppStrings> {
+  const AppStringsDelegate();
+
+  @override
+  bool isSupported(Locale locale) =>
+      locale.languageCode == 'ar' || locale.languageCode == 'en';
+
+  @override
+  Future<AppStrings> load(Locale locale) async => AppStrings(locale);
+
+  @override
+  bool shouldReload(covariant LocalizationsDelegate<AppStrings> old) => false;
+}
+
+extension AppStringsContext on BuildContext {
+  AppStrings get strings => AppStrings.of(this);
+}

@@ -1,334 +1,332 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/i18n/app_strings.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_surface.dart';
 import '../../core/widgets/deck_card.dart';
-import '../../data/models.dart';
+import '../../core/widgets/editor_sheets.dart';
+import '../../data/starter_content.dart';
+import '../../domain/models.dart';
+import '../common/catalog_view.dart';
 
-class LibraryScreen extends ConsumerStatefulWidget {
+class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
+  Future<void> _createDeck(BuildContext context, WidgetRef ref) async {
+    final DeckDraft? draft = await showDeckEditor(context);
+    if (draft == null || !context.mounted) {
+      return;
+    }
+    try {
+      final String id = await ref
+          .read(contentRepositoryProvider)
+          .createDeck(
+            title: draft.title,
+            description: draft.description,
+            colorHex: draft.colorHex,
+            iconKey: draft.iconKey,
+            tags: draft.tags,
+            privacy: draft.privacy,
+          );
+      ref.invalidate(catalogProvider);
+      if (context.mounted) {
+        showAppSnack(context, context.strings.deckCreated);
+        context.go('/deck/$id');
+      }
+    } on Object catch (error) {
+      if (context.mounted) {
+        showAppSnack(context, error.toString(), error: true);
+      }
+    }
+  }
+
+  Future<void> _install(
+    BuildContext context,
+    WidgetRef ref,
+    LibraryItem item,
+  ) async {
+    final String? templateId = item.sourceTemplateId;
+    if (templateId == null) {
+      return;
+    }
+    try {
+      final String id = await ref
+          .read(contentRepositoryProvider)
+          .installStarter(
+            templateId,
+            languageCode: ref.read(localeProvider).languageCode,
+          );
+      ref.invalidate(catalogProvider);
+      if (context.mounted) {
+        showAppSnack(context, context.strings.installedSuccess);
+        context.go('/deck/$id');
+      }
+    } on Object catch (error) {
+      if (context.mounted) {
+        showAppSnack(context, error.toString(), error: true);
+      }
+    }
+  }
+
   @override
-  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppStrings strings = context.strings;
+    final int segment = ref.watch(librarySegmentProvider);
+    return CatalogView(
+      builder: (BuildContext context, Catalog catalog) {
+        final bool isArabic = ref.watch(localeProvider).languageCode == 'ar';
+        final List<LibraryItem> official = StarterCatalog.libraryItems(
+          isArabic: isArabic,
+        );
+        final Set<String> installedTemplates = catalog.allDecks
+            .map((DeckNode node) => node.summary.sourceTemplateId)
+            .whereType<String>()
+            .toSet();
+        final List<LibraryItem> community = catalog.communityLibraryItems;
+        return RefreshIndicator(
+          onRefresh: () => refreshCatalog(ref),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.paddingOf(context).top + 12,
+              20,
+              132,
+            ),
+            children: <Widget>[
+              maxWidth(
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            strings.libraryTitle,
+                            style: context.texts.headlineMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            segment == 0
+                                ? strings.officialLibraryNote
+                                : strings.publicLibraryNote,
+                            style: context.texts.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: () => _createDeck(context, ref),
+                      icon: const Icon(Icons.add_rounded),
+                      tooltip: strings.createDeck,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              maxWidth(
+                Row(
+                  children: <Widget>[
+                    AppChip(
+                      label: strings.official,
+                      icon: Icons.verified_rounded,
+                      selected: segment == 0,
+                      onTap: () =>
+                          ref.read(librarySegmentProvider.notifier).state = 0,
+                    ),
+                    const SizedBox(width: 8),
+                    AppChip(
+                      label: strings.community,
+                      icon: Icons.groups_rounded,
+                      selected: segment == 1,
+                      onTap: () =>
+                          ref.read(librarySegmentProvider.notifier).state = 1,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (segment == 0)
+                ...official.map(
+                  (LibraryItem item) => maxWidth(
+                    _LibraryCard(
+                      item: item,
+                      isInstalled: installedTemplates.contains(item.title),
+                      actionLabel: strings.install,
+                      onAction: () => _install(context, ref, item),
+                    ),
+                  ),
+                )
+              else if (community.isEmpty)
+                maxWidth(
+                  SurfaceCard(
+                    child: EmptyState(
+                      icon: Icons.public_off_rounded,
+                      title: strings.noPublicDecks,
+                      body: strings.noPublicDecksBody,
+                    ),
+                  ),
+                )
+              else
+                ...community.map(
+                  (LibraryItem item) => maxWidth(
+                    _LibraryCard(
+                      item: item,
+                      isInstalled: true,
+                      actionLabel: strings.installed,
+                      onAction: item.deckId == null
+                          ? null
+                          : () => context.go('/deck/${item.deckId}'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen> {
-  int _sort = 0;
+class _LibraryCard extends StatelessWidget {
+  const _LibraryCard({
+    required this.item,
+    required this.isInstalled,
+    required this.actionLabel,
+    this.onAction,
+  });
+
+  final LibraryItem item;
+  final bool isInstalled;
+  final String actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
-    final SubjectId? selected = ref.watch(librarySubjectProvider);
-    final List<DeckSummary> decks = selected == null
-        ? kLibraryDecks
-        : kLibraryDecks
-              .where((DeckSummary deck) => deck.subjectId == selected)
-              .toList(growable: false);
-
-    return SafeArea(
-      bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 118),
+    final AppStrings strings = context.strings;
+    final Color accent = AppColors.fromHex(item.colorHex);
+    return SurfaceCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        'المكتبة العامة',
-                        style: context.texts.headlineLarge,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'مجموعات جاهزة من طلاب مثلك',
-                        style: context.texts.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: context.colors.surfaceContainerHighest,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(CupertinoIcons.globe, size: 21),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(26),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              AppIconBadge(
+                icon: deckIcon(item.iconKey),
+                color: accent,
+                size: 52,
+                radius: 16,
               ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
                       children: <Widget>[
-                        const Text(
-                          'تعلّم من مكتبة الطلاب',
-                          style: TextStyle(
-                            fontFamily: 'ReadexPro',
-                            color: Colors.white,
-                            fontSize: 19,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: context.texts.titleMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'أضف أي مجموعة إلى مساحتك الخاصة وعدّلها كما تشاء.',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.72),
-                            fontSize: 12,
-                            height: 1.6,
+                        if (item.isOfficial)
+                          PrivacyBadge(
+                            label: strings.official,
+                            color: AppColors.mint,
                           ),
-                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(
-                    CupertinoIcons.book,
-                    color: AppColors.accent,
-                    size: 38,
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    Text(
+                      item.authorName.isEmpty ? strings.you : item.authorName,
+                      style: context.texts.labelSmall,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.style_rounded,
+                          size: 13,
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          strings.cardsCount(item.cardCount),
+                          style: context.texts.labelSmall,
+                        ),
+                        const SizedBox(width: 10),
+                        Icon(
+                          Icons.layers_rounded,
+                          size: 13,
+                          color: context.colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          strings.subdecksCount(item.subdeckCount),
+                          style: context.texts.labelSmall,
+                        ),
+                        if (item.rating > 0) ...<Widget>[
+                          const SizedBox(width: 10),
+                          Icon(
+                            Icons.star_rounded,
+                            size: 14,
+                            color: AppColors.amber,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            item.rating.toStringAsFixed(1),
+                            style: context.texts.labelSmall,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: <Widget>[
-                for (final Subject subject in kSubjects)
-                  _SubjectTile(
-                    subject: subject,
-                    count: kLibraryDecks
-                        .where(
-                          (DeckSummary deck) => deck.subjectId == subject.id,
-                        )
-                        .length,
-                    selected: selected == subject.id,
-                    onTap: () {
-                      ref.read(librarySubjectProvider.notifier).state =
-                          selected == subject.id ? null : subject.id;
-                    },
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    selected == null
-                        ? 'الأكثر استخداماً'
-                        : subjectById(selected).nameAr,
-                    style: context.texts.titleLarge,
-                  ),
-                ),
-                _SortButton(
-                  label: 'الأكثر استخداماً',
-                  selected: _sort == 0,
-                  onTap: () => setState(() => _sort = 0),
-                ),
-                _SortButton(
-                  label: 'الأعلى تقييماً',
-                  selected: _sort == 1,
-                  onTap: () => setState(() => _sort = 1),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          for (final DeckSummary deck in decks)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
-              child: DeckCard(
-                deck: deck,
-                showAuthor: true,
-                onTap: () => context.push('/deck/${deck.id}'),
-                trailing: _AddButton(onTap: () => _addDeck(context, deck)),
-              ),
-            ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'المحتوى من الطلاب · يمكنك الإبلاغ عن أي بطاقة',
-              textAlign: TextAlign.center,
+          if (item.description.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Text(
+              item.description,
               style: context.texts.bodySmall,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (item.tags.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 10),
+            AppTagWrap(tags: item.tags, maxTags: 4),
+          ],
+          const SizedBox(height: 14),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: FilledButton.tonalIcon(
+              onPressed: onAction,
+              icon: Icon(
+                isInstalled
+                    ? Icons.check_rounded
+                    : Icons.download_rounded,
+                size: 18,
+              ),
+              label: Text(actionLabel),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                backgroundColor: accent.withValues(alpha: 0.14),
+                foregroundColor: accent,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _addDeck(BuildContext context, DeckSummary deck) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('أُضيفت نسخة من «${deck.title}» إلى مجموعاتك.'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(18, 0, 18, 100),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      );
-  }
-}
-
-class _SubjectTile extends StatelessWidget {
-  const _SubjectTile({
-    required this.subject,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final Subject subject;
-  final int count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: (MediaQuery.sizeOf(context).width - 50) / 2,
-        height: 74,
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: selected
-              ? subject.color
-              : subject.color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? subject.color : Colors.transparent,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(
-                  subject.icon,
-                  size: 17,
-                  color: selected ? Colors.white : subject.color,
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    subject.nameAr,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'ReadexPro',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: selected ? Colors.white : subject.color,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              '$count مجموعات',
-              style: TextStyle(
-                fontSize: 11,
-                color: selected
-                    ? Colors.white.withValues(alpha: 0.7)
-                    : subject.color.withValues(alpha: 0.7),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SortButton extends StatelessWidget {
-  const _SortButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onTap,
-      style: TextButton.styleFrom(
-        foregroundColor: selected
-            ? context.colors.primary
-            : context.texts.bodySmall?.color,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: const Size(0, 34),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-        ),
-      ),
-    );
-  }
-}
-
-class _AddButton extends StatelessWidget {
-  const _AddButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 42,
-      height: 30,
-      child: FilledButton(
-        onPressed: onTap,
-        style: FilledButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(42, 30),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.accent,
-          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        ),
-        child: const Text('أضف'),
       ),
     );
   }
