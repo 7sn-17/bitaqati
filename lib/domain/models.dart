@@ -26,53 +26,56 @@ IconData getDeckIcon(String iconKey) {
     case 'bolt': return Icons.bolt_rounded;
     case 'science': return Icons.science_rounded;
     case 'biotech': return Icons.biotech_rounded;
-    case 'history': return Icons.history_edu_rounded;
+    case 'history_edu': return Icons.history_edu_rounded;
     case 'translate': return Icons.translate_rounded;
+    case 'layers': return Icons.layers_rounded;
     default: return Icons.folder_rounded;
   }
+}
+
+@immutable
+class DeckNode {
+  const DeckNode({required this.summary, required this.children});
+  final DeckSummary summary;
+  final List<DeckNode> children;
 }
 
 @immutable
 class DeckSummary {
   const DeckSummary({
     required this.id, required this.title, required this.subjectId,
-    this.summary = '', // The repository uses 'summary'
+    this.summary = '', this.description = '',
     this.parentId, this.colorHex = '#163300', this.iconKey = 'folder',
     this.privacy = DeckPrivacy.private, this.tags = const [], this.isPublic = false,
     this.isStarter = false, this.isArchived = false, this.position = 0, this.depth = 0,
     this.createdAt, this.updatedAt, this.publishedAt, this.sourceTemplateId,
-    this.cardCount = 0, this.dueCount = 0, this.retention = 0.0, // The repository uses these exact names
+    this.directCardCount = 0, this.cardCount = 0,
     this.subdeckCount = 0, this.descendantDeckCount = 0,
     this.newCount = 0, this.learningCount = 0, this.reviewStateCount = 0,
+    this.dueReviewCount = 0, this.dueCount = 0,
     this.masteredCount = 0, this.suspendedCount = 0,
-    this.author, this.rating, this.children = const [],
+    this.retentionSample = 0.0, this.retention = 0.0,
+    this.author, this.rating,
   });
   
-  final String id; final String title; final String summary; final String? parentId;
-  final SubjectId subjectId; final String colorHex; final String iconKey; final DeckPrivacy privacy;
-  final List<String> tags; final bool isPublic; final bool isStarter; final bool isArchived;
+  final String id; final String title; final String summary; final String description;
+  final String? parentId; final SubjectId subjectId; final String colorHex; final String iconKey;
+  final DeckPrivacy privacy; final List<String> tags; final bool isPublic; final bool isStarter; final bool isArchived;
   final int position; final int depth; final DateTime? createdAt; final DateTime? updatedAt;
   final DateTime? publishedAt; final String? sourceTemplateId;
-  final int cardCount; final int dueCount; final double retention; // Exact names
+  final int directCardCount; final int cardCount;
   final int subdeckCount; final int descendantDeckCount;
   final int newCount; final int learningCount; final int reviewStateCount;
+  final int dueReviewCount; final int dueCount;
   final int masteredCount; final int suspendedCount;
+  final double retentionSample; final double retention;
   final String? author; final double? rating;
-  final List<DeckSummary> children;
 
   Subject get subject => subjectById(subjectId);
   Color get color => Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
   IconData get deckIcon => getDeckIcon(iconKey);
   double get progress => (retention / 100).clamp(0.0, 1.0);
-  
-  // UI Aliases (to keep the UI working)
-  String get description => summary;
-  int get directCardCount => cardCount;
-  int get dueReviewCount => dueCount;
-  double get retentionSample => retention;
 }
-
-typedef DeckNode = DeckSummary;
 
 @immutable
 class ReviewCard {
@@ -124,27 +127,28 @@ class ReviewEvent {
 @immutable
 class LibraryItem {
   const LibraryItem({
-    required this.deck, // UI expects 'deck'
-    this.authorName = 'مجهول', // UI expects 'authorName'
-    this.rating = 0.0, // UI expects 'rating'
-    this.isOfficial = false,
+    required this.id,
+    required this.sourceTemplateId,
+    required this.title,
+    required this.description,
+    required this.colorHex,
+    required this.iconKey,
+    required this.tags,
+    required this.cardCount,
+    required this.subdeckCount,
+    required this.authorName,
+    required this.rating,
+    required this.isOfficial,
+    required this.isInstalled,
+    required this.deck,
   });
-  final DeckSummary deck;
-  final String authorName;
-  final double rating;
-  final bool isOfficial;
+  final String id; final String sourceTemplateId; final String title; final String description;
+  final String colorHex; final String iconKey; final List<String> tags; final int cardCount;
+  final int subdeckCount; final String authorName; final double rating;
+  final bool isOfficial; final bool isInstalled; final DeckSummary deck;
 
-  // UI Aliases
-  String get title => deck.title;
-  String get description => deck.summary;
   String get deckId => deck.id;
-  String get colorHex => deck.colorHex;
-  String get iconKey => deck.iconKey;
   IconData get deckIcon => getDeckIcon(iconKey);
-  int get cardCount => deck.cardCount;
-  int get subdeckCount => deck.subdeckCount;
-  List<String> get tags => deck.tags;
-  String? get sourceTemplateId => deck.sourceTemplateId;
 }
 
 @immutable
@@ -160,30 +164,4 @@ class Catalog {
   final List<ReviewEvent> reviews; final DateTime? generatedAt; final String displayName;
   final DashboardStats dashboard; final List<String> popularTags;
   final List<LibraryItem> communityLibraryItems; final List<LibraryItem> officialLibraryItems;
-}
-
-// --- MOCK DATA ---
-const List<DeckSummary> kMyDecks = <DeckSummary>[
-  DeckSummary(id: 'biology-cell', title: 'البيولوجيا · الخلية', subjectId: SubjectId.biology, cardCount: 120, dueCount: 9, retention: 91, isPublic: false),
-  DeckSummary(id: 'chemistry-organic', title: 'الكيمياء العضوية', subjectId: SubjectId.chemistry, cardCount: 86, dueCount: 6, retention: 76, isPublic: true),
-  DeckSummary(id: 'physics-motion', title: 'الفيزياء · الحركة', subjectId: SubjectId.physics, cardCount: 48, dueCount: 0, retention: 88, isPublic: false),
-];
-
-const List<DeckSummary> kLibraryDecks = <DeckSummary>[
-  DeckSummary(id: 'public-biology', title: 'البيولوجيا · الخلية كاملة', subjectId: SubjectId.biology, cardCount: 120, dueCount: 0, retention: 0, isPublic: true, author: 'عبدالله', rating: 4.8),
-];
-
-const List<ReviewCard> kSampleCards = <ReviewCard>[
-  ReviewCard(id: 'card-1', deckId: 'biology-cell', subjectId: SubjectId.biology, front: 'ما وظيفة الميتوكوندريا؟', back: 'إنتاج الطاقة ATP.', hint: 'بيت الطاقة.'),
-  ReviewCard(id: 'card-2', deckId: 'physics-motion', subjectId: SubjectId.physics, front: 'قانون نيوتن الثاني؟', back: 'F = ma.'),
-];
-
-List<ReviewCard> cardsForDeck(DeckSummary deck) {
-  final exact = kSampleCards.where((c) => c.deckId == deck.id).toList();
-  if (exact.isNotEmpty) return exact;
-  return kSampleCards.where((c) => c.subjectId == deck.subjectId).toList();
-}
-
-DeckSummary findDeck(String id) {
-  return [...kMyDecks, ...kLibraryDecks].firstWhere((d) => d.id == id, orElse: () => kMyDecks.first);
 }

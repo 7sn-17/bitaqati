@@ -19,7 +19,7 @@ class HomeScreen extends ConsumerWidget {
     return CatalogView(
       builder: (BuildContext context, Catalog catalog) {
         final AppStrings strings = context.strings;
-        final DashboardStats stats = catalog.dashboard();
+        final DashboardStats stats = catalog.dashboard;
         final String? selectedTag = ref.watch(selectedTagProvider);
         final String sort = ref.watch(deckSortProvider);
         final List<DeckNode> roots = List<DeckNode>.of(catalog.roots);
