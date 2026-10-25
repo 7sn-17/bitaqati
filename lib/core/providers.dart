@@ -73,4 +73,6 @@ final StateProvider<int> progressRangeProvider = StateProvider<int>((ref) => 30)
 final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>((ref) => null);
 final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError());
 final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((ref) => true);
+
+// Restored to SubjectId? as expected by the UI
 final StateProvider<SubjectId?> selectedSubjectProvider = StateProvider<SubjectId?>((ref) => null);

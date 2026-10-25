@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 enum SubjectId { physics, chemistry, biology, historyOfMedicine, english1 }
+enum FsrsRating { again, hard, good, easy }
 
 @immutable
 class Subject {
@@ -19,8 +20,8 @@ const List<Subject> kSubjects = <Subject>[
 Subject subjectById(SubjectId id) => kSubjects.firstWhere((s) => s.id == id);
 
 @immutable
-class DeckNode {
-  const DeckNode({
+class DeckSummary {
+  const DeckSummary({
     required this.id, required this.title, required this.subjectId,
     this.description = '', this.parentId, this.colorHex = '#163300', this.iconKey = 'folder',
     this.privacy = 'private', this.tags = const [], this.isPublic = false,
@@ -29,6 +30,7 @@ class DeckNode {
     this.directCardCount = 0, this.subdeckCount = 0, this.descendantDeckCount = 0,
     this.newCount = 0, this.learningCount = 0, this.reviewStateCount = 0,
     this.dueReviewCount = 0, this.masteredCount = 0, this.suspendedCount = 0, this.retentionSample = 0.0,
+    this.children = const [],
   });
   final String id; final String title; final String description; final String? parentId;
   final SubjectId subjectId; final String colorHex; final String iconKey; final String privacy;
@@ -38,6 +40,7 @@ class DeckNode {
   final int directCardCount; final int subdeckCount; final int descendantDeckCount;
   final int newCount; final int learningCount; final int reviewStateCount;
   final int dueReviewCount; final int masteredCount; final int suspendedCount; final double retentionSample;
+  final List<DeckSummary> children;
 
   Subject get subject => subjectById(subjectId);
   Color get color => Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
@@ -52,18 +55,28 @@ class DeckNode {
     }
   }
   double get progress => (retentionSample / 100).clamp(0.0, 1.0);
+  String get summary => description; // Added to fix 'summary' getter error
 }
 
 @immutable
-class CardSummary {
-  const CardSummary({required this.id, required this.deckId, required this.front, required this.back, this.hint, this.note, this.tags = const []});
-  final String id; final String deckId; final String front; final String back; final String? hint; final String? note; final List<String> tags;
+class ReviewCard {
+  const ReviewCard({
+    required this.id, required this.deckId, required this.front, required this.back,
+    this.hint, this.note, this.notes, this.tags = const [], this.kind = 'basic',
+    this.position = 0, this.createdAt, this.updatedAt, this.fsrs, this.isSuspended = false, this.isBuried = false,
+  });
+  final String id; final String deckId; final String front; final String back;
+  final String? hint; final String? note; final String? notes; final List<String> tags;
+  final String kind; final int position; final DateTime? createdAt; final DateTime? updatedAt;
+  final String? fsrs; final bool isSuspended; final bool isBuried;
 }
+
+typedef CardSummary = ReviewCard;
 
 @immutable
 class ImportedCard {
-  const ImportedCard({required this.front, required this.back, this.hint, this.note});
-  final String front; final String back; final String? hint; final String? note;
+  const ImportedCard({required this.front, required this.back, this.hint, this.note, this.notes, this.tags = const []});
+  final String front; final String back; final String? hint; final String? note; final String? notes; final List<String> tags;
 }
 
 @immutable
@@ -74,24 +87,51 @@ class DailyCount {
 
 @immutable
 class DashboardStats {
-  const DashboardStats({this.dueToday = 0, this.newToday = 0, this.streak = 0, this.totalReviews = 0});
-  final int dueToday; final int newToday; final int streak; final int totalReviews;
+  const DashboardStats({
+    this.dueCount = 0, this.newCount = 0, this.streak = 0, this.reviewsToday = 0,
+    this.retention = 0.0, this.totalCards = 0, this.totalReviews = 0,
+  });
+  final int dueCount; final int newCount; final int streak; final int reviewsToday;
+  final double retention; final int totalCards; final int totalReviews;
 }
 
 @immutable
 class ReviewEvent {
-  const ReviewEvent({required this.cardId, required this.rating, required this.timestamp});
-  final String cardId; final int rating; final DateTime timestamp;
+  const ReviewEvent({
+    required this.id, required this.deckId, required this.cardId, required this.rating,
+    required this.reviewedAt, this.scheduledDays = 0, this.stability = 0.0, this.difficulty = 0.0, this.elapsedMs = 0,
+  });
+  final String id; final String deckId; final String cardId; final FsrsRating rating;
+  final DateTime reviewedAt; final int scheduledDays; final double stability; final double difficulty; final int elapsedMs;
 }
 
 @immutable
 class LibraryItem {
-  const LibraryItem({required this.deck, this.authorName = 'مجهول', this.rating = 0.0});
-  final DeckNode deck; final String authorName; final double rating;
+  const LibraryItem({required this.deck, this.authorName = 'مجهول', this.rating = 0.0, this.isOfficial = false});
+  final DeckSummary deck; final String authorName; final double rating; final bool isOfficial;
+  
+  String get title => deck.title;
+  String get description => deck.description;
+  String get deckId => deck.id;
+  String get colorHex => deck.colorHex;
+  String get iconKey => deck.iconKey;
+  int get cardCount => deck.directCardCount;
+  int get subdeckCount => deck.subdeckCount;
+  List<String> get tags => deck.tags;
+  String? get sourceTemplateId => deck.sourceTemplateId;
 }
 
 @immutable
 class Catalog {
-  const Catalog({this.myDecks = const [], this.libraryDecks = const [], this.stats = const DashboardStats(), this.dailyCounts = const []});
-  final List<DeckNode> myDecks; final List<LibraryItem> libraryDecks; final DashboardStats stats; final List<DailyCount> dailyCounts;
+  const Catalog({
+    this.roots = const [], this.allDecks = const [], this.deckById = const {},
+    this.cardsByDeck = const {}, this.cardById = const {}, this.reviews = const [],
+    this.generatedAt, this.displayName = 'مستخدم', this.dashboard = const DashboardStats(),
+    this.popularTags = const [], this.communityLibraryItems = const [], this.officialLibraryItems = const [],
+  });
+  final List<DeckSummary> roots; final List<DeckSummary> allDecks; final Map<String, DeckSummary> deckById;
+  final Map<String, List<ReviewCard>> cardsByDeck; final Map<String, ReviewCard> cardById;
+  final List<ReviewEvent> reviews; final DateTime? generatedAt; final String displayName;
+  final DashboardStats dashboard; final List<String> popularTags;
+  final List<LibraryItem> communityLibraryItems; final List<LibraryItem> officialLibraryItems;
 }
