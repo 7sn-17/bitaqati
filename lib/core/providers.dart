@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../data/auth_service.dart';
 import '../data/content_repository.dart';
 import '../domain/models.dart';
@@ -11,9 +10,7 @@ import 'preferences/app_preferences.dart';
 final Provider<AppPreferences> appPreferencesProvider = Provider<AppPreferences>((Ref ref) => throw UnimplementedError());
 final Provider<ContentRepository> contentRepositoryProvider = Provider<ContentRepository>((Ref ref) => ContentRepository());
 final Provider<AuthService> authServiceProvider = Provider<AuthService>((Ref ref) => AuthService());
-
 final StreamProvider<AuthUser?> authUserProvider = StreamProvider<AuthUser?>((Ref ref) => ref.watch(authServiceProvider).userChanges);
-
 final Provider<bool> supabaseConfiguredProvider = Provider<bool>((Ref ref) => AppConfig.hasSupabase);
 
 final FutureProvider<Catalog> catalogProvider = FutureProvider<Catalog>((Ref ref) async {
@@ -28,7 +25,6 @@ final FutureProvider<int> pendingOutboxProvider = FutureProvider<int>((Ref ref) 
 });
 
 final NotifierProvider<LocaleNotifier, Locale> localeProvider = NotifierProvider<LocaleNotifier, Locale>(LocaleNotifier.new);
-
 class LocaleNotifier extends Notifier<Locale> {
   @override
   Locale build() => Locale(ref.watch(appPreferencesProvider).languageCode == 'en' ? 'en' : 'ar');
@@ -40,7 +36,6 @@ class LocaleNotifier extends Notifier<Locale> {
 }
 
 final NotifierProvider<ThemeModeNotifier, ThemeMode> themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
-
 class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
   ThemeMode build() => ref.watch(appPreferencesProvider).themeMode;
@@ -85,5 +80,5 @@ final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>((Ref 
 final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>((Ref ref) => throw UnimplementedError());
 final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((Ref ref) => true);
 
-// Changed to String? since we removed SubjectId
+// Restored to String? because the UI expects it
 final StateProvider<String?> selectedSubjectProvider = StateProvider<String?>((Ref ref) => null);

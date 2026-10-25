@@ -81,7 +81,7 @@ class CardSummary {
   const CardSummary({
     required this.id,
     required this.deckId,
-    required this.cardFront,
+    required this.front,
     required this.back,
     required this.hint,
     required this.notes,
@@ -127,7 +127,7 @@ class CardSummary {
     return CardSummary(
       id: id,
       deckId: deckId,
-      front: front ?? this.cardFront,
+      front: front ?? this.front,
       back: back ?? this.back,
       hint: hint ?? this.hint,
       notes: notes ?? this.notes,
@@ -179,7 +179,7 @@ class ReviewEvent {
 
 class ImportedCard {
   const ImportedCard({
-    required this.cardFront,
+    required this.front,
     required this.back,
     this.hint = '',
     this.notes = '',
@@ -487,7 +487,7 @@ class Catalog {
     final List<CardSummary> cards = allCards
         .where(
           (CardSummary card) =>
-              card.cardFront.toLowerCase().contains(q) ||
+              card.front.toLowerCase().contains(q) ||
               card.back.toLowerCase().contains(q) ||
               card.hint.toLowerCase().contains(q) ||
               card.notes.toLowerCase().contains(q) ||

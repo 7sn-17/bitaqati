@@ -40,7 +40,7 @@ class _SearchScreenState extends State<SearchScreen> {
         : kSampleCards
               .where(
                 (ReviewCard card) =>
-                    card.cardFront.contains(query) ||
+                    card.front.contains(query) ||
                     card.back.contains(query) ||
                     card.tags.any((String tag) => tag.contains(query)),
               )
@@ -153,7 +153,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: <Widget>[
                                     Text(
-                                      card.cardFront,
+                                      card.front,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: context.texts.titleSmall,

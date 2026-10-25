@@ -34,6 +34,12 @@ abstract final class AppColors {
   static const Color warningInk = Color(0xFF5C4011);
   static const Color blue = sky;
 
+  static const Color physics = Color(0xFF0B4C72);
+  static const Color chemistry = Color(0xFF054D28);
+  static const Color biology = forest;
+  static const Color medicineHistory = Color(0xFF7A3E2F);
+  static const Color english = Color(0xFF4A3F7A);
+
   static const List<Color> deckPalette = <Color>[
     Color(0xFF1D6FD1), Color(0xFF0B7A5A), Color(0xFF3B7A1F),
     Color(0xFFA65A3A), Color(0xFF6B5BC9), Color(0xFFC25B8A),

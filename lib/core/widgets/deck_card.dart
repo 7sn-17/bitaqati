@@ -4,14 +4,13 @@ import '../theme/app_colors.dart';
 
 class DeckCard extends StatelessWidget {
   const DeckCard({super.key, required this.deck, this.onTap});
-
-  final Deck deck;
+  final DeckSummary deck;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color cardColor = deck.color ?? AppColors.primary;
+    final Color cardColor = deck.subject.color;
 
     return Card(
       elevation: 0,
@@ -36,7 +35,7 @@ class DeckCard extends StatelessWidget {
                       color: cardColor.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(deck.icon ?? Icons.folder, color: cardColor),
+                    child: Icon(deck.subject.icon, color: cardColor),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

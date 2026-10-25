@@ -34,7 +34,7 @@ class DeckDraft {
 
 class CardDraft {
   const CardDraft({
-    required this.cardFront,
+    required this.front,
     required this.back,
     required this.hint,
     required this.notes,
@@ -661,7 +661,7 @@ class _CardEditorState extends State<_CardEditor> {
   void initState() {
     super.initState();
     final CardSummary? initial = widget.initial;
-    _front = TextEditingController(text: initial?.cardFront ?? '');
+    _front = TextEditingController(text: initial?.front ?? '');
     _back = TextEditingController(text: initial?.back ?? '');
     _hint = TextEditingController(text: initial?.hint ?? '');
     _notes = TextEditingController(text: initial?.notes ?? '');
@@ -726,8 +726,8 @@ class _CardEditorState extends State<_CardEditor> {
               minLines: 2,
               maxLines: 5,
               decoration: InputDecoration(
-                labelText: strings.cardFront,
-                hintText: strings.cardFrontHint,
+                labelText: strings.front,
+                hintText: strings.frontHint,
               ),
             ),
             const SizedBox(height: 12),
@@ -737,7 +737,7 @@ class _CardEditorState extends State<_CardEditor> {
               maxLines: 5,
               decoration: InputDecoration(
                 labelText: strings.back,
-                hintText: strings.cardBackHint,
+                hintText: strings.backHint,
               ),
             ),
             const SizedBox(height: 12),

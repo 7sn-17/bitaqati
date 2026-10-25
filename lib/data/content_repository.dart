@@ -131,7 +131,7 @@ class ContentRepository {
                 id: Value<String>(_uuid.v4()),
                 deckId: Value<String>(lessonId),
                 kind: const Value<CardKind>(CardKind.basic),
-                front: Value<String>(card.cardFront),
+                front: Value<String>(card.front),
                 back: Value<String>(card.back),
                 hint: Value<String>(card.hint),
                 notes: Value<String>(card.notes),
@@ -202,7 +202,7 @@ class ContentRepository {
       final CardSummary card = CardSummary(
         id: row.id,
         deckId: row.deckId,
-        front: row.cardFront,
+        front: row.front,
         back: row.back,
         hint: row.hint,
         notes: row.notes,
@@ -679,7 +679,7 @@ class ContentRepository {
       final int now = DateTime.now().toUtc().millisecondsSinceEpoch;
       int count = 0;
       for (final ImportedCard input in cards) {
-        final String front = input.cardFront.trim();
+        final String front = input.front.trim();
         final String back = input.back.trim();
         if (front.isEmpty || back.isEmpty) {
           continue;
@@ -849,7 +849,7 @@ class ContentRepository {
             id: cardId,
             deckId: lessonId,
             kind: CardKind.basic,
-            front: card.cardFront,
+            front: card.front,
             back: card.back,
             hint: card.hint,
             notes: card.notes,
@@ -867,7 +867,7 @@ class ContentRepository {
                   id: Value<String>(cardId),
                   deckId: Value<String>(lessonId),
                   kind: const Value<CardKind>(CardKind.basic),
-                  front: Value<String>(card.cardFront),
+                  front: Value<String>(card.front),
                   back: Value<String>(card.back),
                   hint: Value<String>(card.hint),
                   notes: Value<String>(card.notes),
@@ -1008,7 +1008,7 @@ class ContentRepository {
             id: newCardId,
             deckId: record.id,
             kind: card.kind,
-            front: card.cardFront,
+            front: card.front,
             back: card.back,
             hint: card.hint,
             notes: card.notes,
@@ -1026,7 +1026,7 @@ class ContentRepository {
                   id: Value<String>(newCardId),
                   deckId: Value<String>(record.id),
                   kind: Value<CardKind>(card.kind),
-                  front: Value<String>(card.cardFront),
+                  front: Value<String>(card.front),
                   back: Value<String>(card.back),
                   hint: Value<String>(card.hint),
                   notes: Value<String>(card.notes),
@@ -1547,7 +1547,7 @@ class ContentRepository {
       'id': record.id,
       'deck_id': record.deckId,
       'kind': record.kind.name,
-      'front': record.cardFront,
+      'front': record.front,
       'back': record.back,
       'hint': record.hint,
       'notes': record.notes,
