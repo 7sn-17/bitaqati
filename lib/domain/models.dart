@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'fsrs.dart';
+import 'enums.dart';
 
 enum SubjectId { physics, chemistry, biology, historyOfMedicine, english1 }
-enum DeckPrivacy { private, unlisted, public }
-enum CardKind { basic, cloze }
 
 @immutable
 class Subject {
@@ -127,20 +126,10 @@ class ReviewEvent {
 @immutable
 class LibraryItem {
   const LibraryItem({
-    required this.id,
-    required this.sourceTemplateId,
-    required this.title,
-    required this.description,
-    required this.colorHex,
-    required this.iconKey,
-    required this.tags,
-    required this.cardCount,
-    required this.subdeckCount,
-    required this.authorName,
-    required this.rating,
-    required this.isOfficial,
-    required this.isInstalled,
-    required this.deck,
+    required this.id, required this.sourceTemplateId, required this.title, required this.description,
+    required this.colorHex, required this.iconKey, required this.tags, required this.cardCount,
+    required this.subdeckCount, required this.authorName, required this.rating,
+    required this.isOfficial, required this.isInstalled, required this.deck,
   });
   final String id; final String sourceTemplateId; final String title; final String description;
   final String colorHex; final String iconKey; final List<String> tags; final int cardCount;
@@ -164,4 +153,30 @@ class Catalog {
   final List<ReviewEvent> reviews; final DateTime? generatedAt; final String displayName;
   final DashboardStats dashboard; final List<String> popularTags;
   final List<LibraryItem> communityLibraryItems; final List<LibraryItem> officialLibraryItems;
+}
+
+// --- MOCK DATA ---
+const List<DeckSummary> kMyDecks = <DeckSummary>[
+  DeckSummary(id: 'biology-cell', title: 'البيولوجيا · الخلية', subjectId: SubjectId.biology, cardCount: 120, dueCount: 9, retention: 91, isPublic: false),
+  DeckSummary(id: 'chemistry-organic', title: 'الكيمياء العضوية', subjectId: SubjectId.chemistry, cardCount: 86, dueCount: 6, retention: 76, isPublic: true),
+  DeckSummary(id: 'physics-motion', title: 'الفيزياء · الحركة', subjectId: SubjectId.physics, cardCount: 48, dueCount: 0, retention: 88, isPublic: false),
+];
+
+const List<DeckSummary> kLibraryDecks = <DeckSummary>[
+  DeckSummary(id: 'public-biology', title: 'البيولوجيا · الخلية كاملة', subjectId: SubjectId.biology, cardCount: 120, dueCount: 0, retention: 0, isPublic: true, author: 'عبدالله', rating: 4.8),
+];
+
+const List<ReviewCard> kSampleCards = <ReviewCard>[
+  ReviewCard(id: 'card-1', deckId: 'biology-cell', subjectId: SubjectId.biology, front: 'ما وظيفة الميتوكوندريا؟', back: 'إنتاج الطاقة ATP.', hint: 'بيت الطاقة.'),
+  ReviewCard(id: 'card-2', deckId: 'physics-motion', subjectId: SubjectId.physics, front: 'قانون نيوتن الثاني؟', back: 'F = ma.'),
+];
+
+List<ReviewCard> cardsForDeck(DeckSummary deck) {
+  final exact = kSampleCards.where((c) => c.deckId == deck.id).toList();
+  if (exact.isNotEmpty) return exact;
+  return kSampleCards.where((c) => c.subjectId == deck.subjectId).toList();
+}
+
+DeckSummary findDeck(String id) {
+  return [...kMyDecks, ...kLibraryDecks].firstWhere((d) => d.id == id, orElse: () => kMyDecks.first);
 }

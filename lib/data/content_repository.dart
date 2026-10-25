@@ -200,6 +200,7 @@ class ContentRepository {
     for (final CardRecord row in cardRows) {
       final CardStateRecord? state = states[row.id];
       final CardSummary card = CardSummary(
+        subjectId: SubjectId.biology,
         id: row.id,
         deckId: row.deckId,
         front: row.front,
@@ -281,7 +282,8 @@ class ContentRepository {
       final int ratingIndex = (row.rating - 1).clamp(0, 3).toInt();
       reviews.add(
         ReviewEvent(
-          id: row.id,
+          subjectId: SubjectId.biology,
+        id: row.id,
           cardId: row.cardId,
           deckId: card.deckId,
           rating: FsrsRating.values[ratingIndex],
@@ -289,7 +291,7 @@ class ContentRepository {
           scheduledDays: row.scheduledDays,
           stability: row.stability ?? 0,
           difficulty: row.difficulty ?? 0,
-          elapsedMs: row.elapsedMs,
+          elapsedMs: row.elapsedMs ?? 0,
         ),
       );
     }
@@ -302,7 +304,7 @@ class ContentRepository {
       cardById: cardById,
       reviews: reviews,
       generatedAt: now,
-      displayName: displayName,
+      displayName: displayName ?? "مستخدم",
     );
   }
 
@@ -315,7 +317,7 @@ class ContentRepository {
     List<String> tags = const <String>[],
     DeckPrivacy? privacy,
   }) async {
-    final String cleanTitle = title?.trim() ?? "";
+    final String cleanTitle = title??.trim() ?? "" ?? "";
     if (cleanTitle.isEmpty) {
       throw const ContentFailure('العنوان مطلوب.');
     }
@@ -336,7 +338,7 @@ class ContentRepository {
         id: id,
         parentId: parentId,
         title: cleanTitle,
-        description: description?.trim() ?? "",
+        description: description??.trim() ?? "" ?? "",
         colorHex: colorHex,
         iconKey: iconKey,
         privacy: actualPrivacy,
@@ -359,7 +361,7 @@ class ContentRepository {
               id: Value<String>(id),
               parentId: Value<String?>(parentId),
               title: Value<String>(cleanTitle),
-              description: Value<String>(description?.trim() ?? ""),
+              description: Value<String>(description??.trim() ?? "" ?? ""),
               colorHex: Value<String>(colorHex),
               iconKey: Value<String>(iconKey),
               privacy: Value<DeckPrivacy>(actualPrivacy),
@@ -391,7 +393,7 @@ class ContentRepository {
     DeckPrivacy? privacy,
     bool? isArchived,
   }) async {
-    final String? cleanTitle = title??.trim() ?? "";
+    final String? cleanTitle = title???.trim() ?? "" ?? "";
     if (title != null && cleanTitle!.isEmpty) {
       throw const ContentFailure('العنوان مطلوب.');
     }
@@ -408,7 +410,7 @@ class ContentRepository {
               : Value<String>(cleanTitle!),
           description: description == null
               ? const Value<String>.absent()
-              : Value<String>(description?.trim() ?? ""),
+              : Value<String>(description??.trim() ?? "" ?? ""),
           colorHex: colorHex == null
               ? const Value<String>.absent()
               : Value<String>(colorHex),
@@ -534,8 +536,8 @@ class ContentRepository {
     List<String> tags = const <String>[],
     CardKind kind = CardKind.basic,
   }) async {
-    final String cleanFront = front?.trim() ?? "";
-    final String cleanBack = back?.trim() ?? "";
+    final String cleanFront = front??.trim() ?? "" ?? "";
+    final String cleanBack = back??.trim() ?? "" ?? "";
     if (cleanFront.isEmpty || cleanBack.isEmpty) {
       throw const ContentFailure('وجه البطاقة وظهرها مطلوبان.');
     }
@@ -553,8 +555,8 @@ class ContentRepository {
         kind: kind,
         front: cleanFront,
         back: cleanBack,
-        hint: hint?.trim() ?? "",
-        notes: notes?.trim() ?? "",
+        hint: hint??.trim() ?? "" ?? "",
+        notes: notes??.trim() ?? "" ?? "",
         tagsJson: _encodeTags(tags),
         position: position,
         createdAtMs: now,
@@ -571,8 +573,8 @@ class ContentRepository {
               kind: Value<CardKind>(kind),
               front: Value<String>(cleanFront),
               back: Value<String>(cleanBack),
-              hint: Value<String>(hint?.trim() ?? ""),
-              notes: Value<String>(notes?.trim() ?? ""),
+              hint: Value<String>(hint??.trim() ?? "" ?? ""),
+              notes: Value<String>(notes??.trim() ?? "" ?? ""),
               tagsJson: Value<String>(_encodeTags(tags)),
               position: Value<int>(position),
               createdAtMs: Value<int>(now),
@@ -595,8 +597,8 @@ class ContentRepository {
     List<String>? tags,
     CardKind? kind,
   }) async {
-    final String? cleanFront = front??.trim() ?? "";
-    final String? cleanBack = back??.trim() ?? "";
+    final String? cleanFront = front???.trim() ?? "" ?? "";
+    final String? cleanBack = back???.trim() ?? "" ?? "";
     if (front != null && cleanFront!.isEmpty) {
       throw const ContentFailure('وجه البطاقة مطلوب.');
     }
@@ -619,10 +621,10 @@ class ContentRepository {
               : Value<String>(cleanBack!),
           hint: hint == null
               ? const Value<String>.absent()
-              : Value<String>(hint?.trim() ?? ""),
+              : Value<String>(hint??.trim() ?? "" ?? ""),
           notes: notes == null
               ? const Value<String>.absent()
-              : Value<String>(notes?.trim() ?? ""),
+              : Value<String>(notes??.trim() ?? "" ?? ""),
           tagsJson: tags == null
               ? const Value<String>.absent()
               : Value<String>(_encodeTags(tags)),
@@ -679,8 +681,8 @@ class ContentRepository {
       final int now = DateTime.now().toUtc().millisecondsSinceEpoch;
       int count = 0;
       for (final ImportedCard input in cards) {
-        final String front = input.front?.trim() ?? "";
-        final String back = input.back?.trim() ?? "";
+        final String front = input.front??.trim() ?? "" ?? "";
+        final String back = input.back??.trim() ?? "" ?? "";
         if (front.isEmpty || back.isEmpty) {
           continue;
         }
@@ -691,8 +693,8 @@ class ContentRepository {
           kind: CardKind.basic,
           front: front,
           back: back,
-          hint: input.hint?.trim() ?? "",
-          notes: input.notes?.trim() ?? "",
+          hint: input.hint??.trim() ?? "" ?? "",
+          notes: input.notes??.trim() ?? "" ?? "",
           tagsJson: _encodeTags(input.tags),
           position: position,
           createdAtMs: now,
@@ -709,8 +711,8 @@ class ContentRepository {
                 kind: const Value<CardKind>(CardKind.basic),
                 front: Value<String>(front),
                 back: Value<String>(back),
-                hint: Value<String>(input.hint?.trim() ?? ""),
-                notes: Value<String>(input.notes?.trim() ?? ""),
+                hint: Value<String>(input.hint??.trim() ?? "" ?? ""),
+                notes: Value<String>(input.notes??.trim() ?? "" ?? ""),
                 tagsJson: Value<String>(_encodeTags(input.tags)),
                 position: Value<int>(position),
                 createdAtMs: Value<int>(now),
@@ -1635,7 +1637,7 @@ class ContentRepository {
       if (decoded is List) {
         return decoded
             .whereType<String>()
-            .map((String tag) => tag?.trim() ?? "")
+            .map((String tag) => tag??.trim() ?? "" ?? "")
             .where((String tag) => tag.isNotEmpty)
             .toList(growable: false);
       }
@@ -1647,7 +1649,7 @@ class ContentRepository {
 
   static String _encodeTags(List<String> tags) {
     final List<String> clean = tags
-        .map((String tag) => tag?.trim() ?? "")
+        .map((String tag) => tag??.trim() ?? "" ?? "")
         .where((String tag) => tag.isNotEmpty)
         .toSet()
         .toList(growable: false);

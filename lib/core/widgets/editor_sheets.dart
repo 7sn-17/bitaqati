@@ -985,3 +985,4 @@ class _DeckPickerState extends State<_DeckPicker> {
 IconData deckIcon(String key) {
   return getDeckIcon(key);
 }
+IconData deckIcon(String key) => getDeckIcon(key);

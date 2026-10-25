@@ -9,6 +9,18 @@ class DeckCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return DeckSummaryCard(deck: deck, onTap: onTap);
+  }
+}
+
+class DeckSummaryCard extends StatelessWidget {
+  const DeckSummaryCard({super.key, required this.deck, this.onTap, this.label});
+  final DeckSummary deck;
+  final VoidCallback? onTap;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = deck.color;
 
@@ -62,18 +74,10 @@ class DeckCard extends StatelessWidget {
   }
 }
 
-class DeckSummaryCard extends StatelessWidget {
-  const DeckSummaryCard({super.key, required this.deck, this.onTap});
-  final DeckSummary deck;
-  final VoidCallback? onTap;
-  @override
-  Widget build(BuildContext context) => DeckCard(deck: deck, onTap: onTap);
-}
-
 class DeckTile extends StatelessWidget {
   const DeckTile({super.key, required this.deck, this.onTap});
   final DeckSummary deck;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => DeckCard(deck: deck, onTap: onTap);
+  Widget build(BuildContext context) => DeckSummaryCard(deck: deck, onTap: onTap);
 }

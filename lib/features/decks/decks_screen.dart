@@ -148,3 +148,9 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
     );
   }
 }
+
+class SubjectFilterBar extends StatelessWidget {
+  const SubjectFilterBar({super.key});
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
