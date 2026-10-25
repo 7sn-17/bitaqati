@@ -154,3 +154,11 @@ class SubjectFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const SizedBox.shrink();
 }
+
+class SubjectFilterBar extends StatelessWidget {
+  const SubjectFilterBar({super.key, this.selected, this.onChanged});
+  final SubjectId? selected;
+  final ValueChanged<SubjectId?>? onChanged;
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}

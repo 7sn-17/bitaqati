@@ -42,7 +42,8 @@ class DeckNode {
 @immutable
 class DeckSummary {
   const DeckSummary({
-    required this.id, required this.title, required this.subjectId,
+    required this.id, required this.title,
+    this.subjectId,
     this.summary = '', this.description = '',
     this.parentId, this.colorHex = '#163300', this.iconKey = 'folder',
     this.privacy = DeckPrivacy.private, this.tags = const [], this.isPublic = false,
@@ -58,7 +59,7 @@ class DeckSummary {
   });
   
   final String id; final String title; final String summary; final String description;
-  final String? parentId; final SubjectId subjectId; final String colorHex; final String iconKey;
+  final String? parentId; final SubjectId? subjectId; final String colorHex; final String iconKey;
   final DeckPrivacy privacy; final List<String> tags; final bool isPublic; final bool isStarter; final bool isArchived;
   final int position; final int depth; final DateTime? createdAt; final DateTime? updatedAt;
   final DateTime? publishedAt; final String? sourceTemplateId;
@@ -70,7 +71,7 @@ class DeckSummary {
   final double retentionSample; final double retention;
   final String? author; final double? rating;
 
-  Subject get subject => subjectById(subjectId);
+  Subject get subject => subjectId != null ? subjectById(subjectId!) : kSubjects.first;
   Color get color => Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
   IconData get deckIcon => getDeckIcon(iconKey);
   double get progress => (retention / 100).clamp(0.0, 1.0);
@@ -79,11 +80,13 @@ class DeckSummary {
 @immutable
 class ReviewCard {
   const ReviewCard({
-    required this.id, required this.deckId, required this.subjectId, required this.front, required this.back,
+    required this.id, required this.deckId,
+    this.subjectId,
+    required this.front, required this.back,
     this.hint, this.note, this.notes, this.tags = const [], this.kind = CardKind.basic,
     this.position = 0, this.createdAt, this.updatedAt, this.fsrs, this.isSuspended = false, this.isBuried = false,
   });
-  final String id; final String deckId; final SubjectId subjectId; final String front; final String back;
+  final String id; final String deckId; final SubjectId? subjectId; final String front; final String back;
   final String? hint; final String? note; final String? notes; final List<String> tags;
   final CardKind kind; final int position; final DateTime? createdAt; final DateTime? updatedAt;
   final FsrsCard? fsrs; final bool isSuspended; final bool isBuried;
@@ -93,8 +96,8 @@ typedef CardSummary = ReviewCard;
 
 @immutable
 class ImportedCard {
-  const ImportedCard({required this.front, required this.back, this.hint, this.note, this.notes, this.tags = const []});
-  final String front; final String back; final String? hint; final String? note; final String? notes; final List<String> tags;
+  const ImportedCard({required this.front, required this.back, this.hint = '', this.note = '', this.notes = '', this.tags = const []});
+  final String front; final String back; final String hint; final String note; final String notes; final List<String> tags;
 }
 
 @immutable
@@ -129,14 +132,14 @@ class LibraryItem {
     required this.id, required this.sourceTemplateId, required this.title, required this.description,
     required this.colorHex, required this.iconKey, required this.tags, required this.cardCount,
     required this.subdeckCount, required this.authorName, required this.rating,
-    required this.isOfficial, required this.isInstalled, required this.deck,
+    required this.isOfficial, required this.isInstalled,
   });
   final String id; final String sourceTemplateId; final String title; final String description;
   final String colorHex; final String iconKey; final List<String> tags; final int cardCount;
   final int subdeckCount; final String authorName; final double rating;
-  final bool isOfficial; final bool isInstalled; final DeckSummary deck;
+  final bool isOfficial; final bool isInstalled;
 
-  String get deckId => deck.id;
+  String get deckId => id;
   IconData get deckIcon => getDeckIcon(iconKey);
 }
 
@@ -155,26 +158,25 @@ class Catalog {
   final List<LibraryItem> communityLibraryItems; final List<LibraryItem> officialLibraryItems;
 }
 
-// --- MOCK DATA ---
 const List<DeckSummary> kMyDecks = <DeckSummary>[
-  DeckSummary(id: 'biology-cell', title: 'البيولوجيا · الخلية', subjectId: SubjectId.biology, cardCount: 120, dueCount: 9, retention: 91, isPublic: false),
-  DeckSummary(id: 'chemistry-organic', title: 'الكيمياء العضوية', subjectId: SubjectId.chemistry, cardCount: 86, dueCount: 6, retention: 76, isPublic: true),
-  DeckSummary(id: 'physics-motion', title: 'الفيزياء · الحركة', subjectId: SubjectId.physics, cardCount: 48, dueCount: 0, retention: 88, isPublic: false),
+  DeckSummary(id: 'biology-cell', title: 'البيولوجيا · الخلية', cardCount: 120, dueCount: 9, retention: 91, isPublic: false),
+  DeckSummary(id: 'chemistry-organic', title: 'الكيمياء العضوية', cardCount: 86, dueCount: 6, retention: 76, isPublic: true),
+  DeckSummary(id: 'physics-motion', title: 'الفيزياء · الحركة', cardCount: 48, dueCount: 0, retention: 88, isPublic: false),
 ];
 
 const List<DeckSummary> kLibraryDecks = <DeckSummary>[
-  DeckSummary(id: 'public-biology', title: 'البيولوجيا · الخلية كاملة', subjectId: SubjectId.biology, cardCount: 120, dueCount: 0, retention: 0, isPublic: true, author: 'عبدالله', rating: 4.8),
+  DeckSummary(id: 'public-biology', title: 'البيولوجيا · الخلية كاملة', cardCount: 120, dueCount: 0, retention: 0, isPublic: true, author: 'عبدالله', rating: 4.8),
 ];
 
 const List<ReviewCard> kSampleCards = <ReviewCard>[
-  ReviewCard(id: 'card-1', deckId: 'biology-cell', subjectId: SubjectId.biology, front: 'ما وظيفة الميتوكوندريا؟', back: 'إنتاج الطاقة ATP.', hint: 'بيت الطاقة.'),
-  ReviewCard(id: 'card-2', deckId: 'physics-motion', subjectId: SubjectId.physics, front: 'قانون نيوتن الثاني؟', back: 'F = ma.'),
+  ReviewCard(id: 'card-1', deckId: 'biology-cell', front: 'ما وظيفة الميتوكوندريا؟', back: 'إنتاج الطاقة ATP.', hint: 'بيت الطاقة.'),
+  ReviewCard(id: 'card-2', deckId: 'physics-motion', front: 'قانون نيوتن الثاني؟', back: 'F = ma.'),
 ];
 
 List<ReviewCard> cardsForDeck(DeckSummary deck) {
   final exact = kSampleCards.where((c) => c.deckId == deck.id).toList();
   if (exact.isNotEmpty) return exact;
-  return kSampleCards.where((c) => c.subjectId == deck.subjectId).toList();
+  return kSampleCards;
 }
 
 DeckSummary findDeck(String id) {
