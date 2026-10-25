@@ -7,19 +7,19 @@ import '../domain/models.dart';
 import 'config/app_config.dart';
 import 'preferences/app_preferences.dart';
 
-final Provider<AppPreferences> appPreferencesProvider = Provider<AppPreferences>((Ref ref) => throw UnimplementedError());
-final Provider<ContentRepository> contentRepositoryProvider = Provider<ContentRepository>((Ref ref) => ContentRepository());
-final Provider<AuthService> authServiceProvider = Provider<AuthService>((Ref ref) => AuthService());
-final StreamProvider<AuthUser?> authUserProvider = StreamProvider<AuthUser?>((Ref ref) => ref.watch(authServiceProvider).userChanges);
-final Provider<bool> supabaseConfiguredProvider = Provider<bool>((Ref ref) => AppConfig.hasSupabase);
+final Provider<AppPreferences> appPreferencesProvider = Provider<AppPreferences>((ref) => throw UnimplementedError());
+final Provider<ContentRepository> contentRepositoryProvider = Provider<ContentRepository>((ref) => ContentRepository());
+final Provider<AuthService> authServiceProvider = Provider<AuthService>((ref) => AuthService());
+final StreamProvider<AuthUser?> authUserProvider = StreamProvider<AuthUser?>((ref) => ref.watch(authServiceProvider).userChanges);
+final Provider<bool> supabaseConfiguredProvider = Provider<bool>((ref) => AppConfig.hasSupabase);
 
-final FutureProvider<Catalog> catalogProvider = FutureProvider<Catalog>((Ref ref) async {
-  final AuthUser? user = ref.watch(authUserProvider).valueOrNull;
-  final AppPreferences prefs = ref.watch(appPreferencesProvider);
+final FutureProvider<Catalog> catalogProvider = FutureProvider<Catalog>((ref) async {
+  final user = ref.watch(authUserProvider).valueOrNull;
+  final prefs = ref.watch(appPreferencesProvider);
   return ref.watch(contentRepositoryProvider).loadCatalog(displayName: user?.displayName ?? prefs.displayName);
 });
 
-final FutureProvider<int> pendingOutboxProvider = FutureProvider<int>((Ref ref) async {
+final FutureProvider<int> pendingOutboxProvider = FutureProvider<int>((ref) async {
   ref.watch(catalogProvider);
   return ref.watch(contentRepositoryProvider).pendingOutboxCount();
 });
@@ -29,7 +29,7 @@ class LocaleNotifier extends Notifier<Locale> {
   @override
   Locale build() => Locale(ref.watch(appPreferencesProvider).languageCode == 'en' ? 'en' : 'ar');
   Future<void> setLanguage(String code) async {
-    final String safe = code == 'en' ? 'en' : 'ar';
+    final safe = code == 'en' ? 'en' : 'ar';
     state = Locale(safe);
     await ref.read(appPreferencesProvider).setLanguageCode(safe);
   }
@@ -60,25 +60,17 @@ final NotifierProvider<GuestModeNotifier, bool> guestModeProvider = NotifierProv
 class GuestModeNotifier extends Notifier<bool> {
   @override
   bool build() => ref.watch(appPreferencesProvider).guestMode;
-  Future<void> enterAsGuest() async {
-    state = true;
-    await ref.read(appPreferencesProvider).setGuestMode(true);
-  }
-  Future<void> leaveGuest() async {
-    state = false;
-    await ref.read(appPreferencesProvider).setGuestMode(false);
-  }
+  Future<void> enterAsGuest() async { state = true; await ref.read(appPreferencesProvider).setGuestMode(true); }
+  Future<void> leaveGuest() async { state = false; await ref.read(appPreferencesProvider).setGuestMode(false); }
 }
 
-final StateProvider<String?> selectedTagProvider = StateProvider<String?>((Ref ref) => null);
-final StateProvider<String> deckSortProvider = StateProvider<String>((Ref ref) => 'due');
-final StateProvider<bool> includeSubdecksProvider = StateProvider<bool>((Ref ref) => true);
-final StateProvider<String> searchQueryProvider = StateProvider<String>((Ref ref) => '');
-final StateProvider<int> librarySegmentProvider = StateProvider<int>((Ref ref) => 0);
-final StateProvider<int> progressRangeProvider = StateProvider<int>((Ref ref) => 30);
-final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>((Ref ref) => null);
-final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>((Ref ref) => throw UnimplementedError());
-final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((Ref ref) => true);
-
-// تم إرجاع SubjectId?
-final StateProvider<SubjectId?> selectedSubjectProvider = StateProvider<SubjectId?>((Ref ref) => null);
+final StateProvider<String?> selectedTagProvider = StateProvider<String?>((ref) => null);
+final StateProvider<String> deckSortProvider = StateProvider<String>((ref) => 'due');
+final StateProvider<bool> includeSubdecksProvider = StateProvider<bool>((ref) => true);
+final StateProvider<String> searchQueryProvider = StateProvider<String>((ref) => '');
+final StateProvider<int> librarySegmentProvider = StateProvider<int>((ref) => 0);
+final StateProvider<int> progressRangeProvider = StateProvider<int>((ref) => 30);
+final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>((ref) => null);
+final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError());
+final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((ref) => true);
+final StateProvider<SubjectId?> selectedSubjectProvider = StateProvider<SubjectId?>((ref) => null);
