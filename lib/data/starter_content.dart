@@ -12,10 +12,8 @@ class StarterCatalog {
       id: 'physics',
       titleAr: 'الفيزياء',
       titleEn: 'Physics',
-      descriptionAr:
-          'أساسيات الحركة والقوى والطاقة والكهرباء والموجات، منظمة في دروس قصيرة قابلة للمراجعة.',
-      descriptionEn:
-          'Motion, forces, energy, electricity and waves, organized into focused lessons.',
+      descriptionAr: 'أساسيات الحركة والقوى والطاقة والكهرباء والموجات، منظمة في دروس قصيرة قابلة للمراجعة.',
+      descriptionEn: 'Motion, forces, energy, electricity and waves, organized into focused lessons.',
       colorHex: '#1D6FD1',
       iconKey: 'bolt',
       tags: <String>['فيزياء', 'علوم', 'Physics'],
@@ -35,8 +33,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما الفرق بين السرعة والتسارع؟',
-              back:
-                  'السرعة معدل تغير الموقع، أما التسارع فهو معدل تغير السرعة مع الزمن.',
+              back: 'السرعة معدل تغير الموقع، أما التسارع فهو معدل تغير السرعة مع الزمن.',
               notes: 'يمكن أن يكون التسارع سالباً عند التباطؤ.',
               tags: <String>['السرعة', 'التسارع'],
             ),
@@ -46,9 +43,9 @@ class StarterCatalog {
               tags: <String>['وحدات'],
             ),
             StarterCard(
-              front: 'لماذا يصل الجسم الساقط حراً إلى تسارع ثابت قرب سطح الأرض؟',
-              back:
-                  'بسبب الجاذبية الأرضية، ويكون التسارع نحو 9.8 m/s² بإهمال مقاومة الهواء.',
+              front:
+                  'لماذا يصل الجسم الساقط حراً إلى تسارع ثابت قرب سطح الأرض؟',
+              back: 'بسبب الجاذبية الأرضية، ويكون التسارع نحو 9.8 m/s² بإهمال مقاومة الهواء.',
               hint: 'قيمة g قريبة من 10 للتبسيط.',
               tags: <String>['الجاذبية', 'السقوط الحر'],
             ),
@@ -61,8 +58,7 @@ class StarterCatalog {
           cards: <StarterCard>[
             StarterCard(
               front: 'ما مبدأ حفظ الطاقة؟',
-              back:
-                  'الطاقة لا تفنى ولا تُستحدث من العدم، بل تتحول من شكل إلى آخر.',
+              back: 'الطاقة لا تفنى ولا تُستحدث من العدم، بل تتحول من شكل إلى آخر.',
               tags: <String>['الطاقة'],
             ),
             StarterCard(
@@ -73,8 +69,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما الفرق بين طاقة الوضع والطاقة الحركية؟',
-              back:
-                  'طاقة الوضع تعتمد على الموقع أو الحالة، والطاقة الحركية تعتمد على الحركة والكتلة والسرعة.',
+              back: 'طاقة الوضع تعتمد على الموقع أو الحالة، والطاقة الحركية تعتمد على الحركة والكتلة والسرعة.',
               tags: <String>['طاقة الوضع', 'الطاقة الحركية'],
             ),
             StarterCard(
@@ -107,8 +102,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما الفرق بين الانعكاس والانكسار؟',
-              back:
-                  'الانعكاس ارتداد الموجة عن سطح، والانكسار تغير اتجاهها عند دخول وسط جديد.',
+              back: 'الانعكاس ارتداد الموجة عن سطح، والانكسار تغير اتجاهها عند دخول وسط جديد.',
               tags: <String>['الانعكاس', 'الانكسار'],
             ),
           ],
@@ -119,10 +113,8 @@ class StarterCatalog {
       id: 'chemistry',
       titleAr: 'الكيمياء',
       titleEn: 'Chemistry',
-      descriptionAr:
-          'من بنية الذرة إلى الروابط والتفاعلات والعضوية، بطاقات مختصرة للمراجعة السريعة.',
-      descriptionEn:
-          'Atomic structure, bonding, reactions and organic chemistry in concise cards.',
+      descriptionAr: 'من بنية الذرة إلى الروابط والتفاعلات والعضوية، بطاقات مختصرة للمراجعة السريعة.',
+      descriptionEn: 'Atomic structure, bonding, reactions and organic chemistry in concise cards.',
       colorHex: '#0B7A5A',
       iconKey: 'science',
       tags: <String>['كيمياء', 'علوم', 'Chemistry'],
@@ -140,8 +132,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما الفرق بين النظائر؟',
-              back:
-                  'ذرات للعنصر نفسه تختلف في عدد النيوترونات، وبالتالي في الكتلة الذرية.',
+              back: 'ذرات للعنصر نفسه تختلف في عدد النيوترونات، وبالتالي في الكتلة الذرية.',
               tags: <String>['النظائر'],
             ),
             StarterCard(
@@ -151,8 +142,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'لماذا يزداد الجذب النووي نحو اليمين في الدورة؟',
-              back:
-                  'لأن عدد البروتونات يزداد مع بقاء مستوى الطاقة الرئيسي نفسه تقريباً.',
+              back: 'لأن عدد البروتونات يزداد مع بقاء مستوى الطاقة الرئيسي نفسه تقريباً.',
               tags: <String>['الجدول الدوري'],
             ),
           ],
@@ -164,14 +154,12 @@ class StarterCatalog {
           cards: <StarterCard>[
             StarterCard(
               front: 'ما الفرق بين الرابطة الأيونية والتساهمية؟',
-              back:
-                  'الأيونية انتقال إلكترونات بين ذرتين، والتساهمية مشاركة إلكترونات.',
+              back: 'الأيونية انتقال إلكترونات بين ذرتين، والتساهمية مشاركة إلكترونات.',
               tags: <String>['الروابط'],
             ),
             StarterCard(
               front: 'ما هو المول؟',
-              back:
-                  'كمية المادة التي تحتوي على 6.022 × 10²³ جسيماً (عدد أفوجادرو).',
+              back: 'كمية المادة التي تحتوي على 6.022 × 10²³ جسيماً (عدد أفوجادرو).',
               tags: <String>['المول'],
             ),
             StarterCard(
@@ -209,8 +197,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما المقصود بالمتشكلات؟',
-              back:
-                  'مركبات لها الصيغة الجزيئية نفسها لكن ترتيب الذرات أو الفراغي مختلف.',
+              back: 'مركبات لها الصيغة الجزيئية نفسها لكن ترتيب الذرات أو الفراغي مختلف.',
               tags: <String>['المتشكلات'],
             ),
           ],
@@ -221,10 +208,8 @@ class StarterCatalog {
       id: 'biology',
       titleAr: 'البيولوجيا',
       titleEn: 'Biology',
-      descriptionAr:
-          'الخلية والوراثة والأجهزة الحيوية، مع تركيز على المفاهيم التي تتكرر في الاختبارات.',
-      descriptionEn:
-          'Cells, genetics and body systems with a focus on high-yield concepts.',
+      descriptionAr: 'الخلية والوراثة والأجهزة الحيوية، مع تركيز على المفاهيم التي تتكرر في الاختبارات.',
+      descriptionEn: 'Cells, genetics and body systems with a focus on high-yield concepts.',
       colorHex: '#3B7A1F',
       iconKey: 'biotech',
       tags: <String>['بيولوجيا', 'علوم', 'Biology'],
@@ -254,8 +239,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما الفرق بين الانقسام المتساوي والمنصف؟',
-              back:
-                  'المتساوي ينتج خلايا متماثلة، والمنصف ينتج أمشاجاً بنصف عدد الكروموسومات.',
+              back: 'المتساوي ينتج خلايا متماثلة، والمنصف ينتج أمشاجاً بنصف عدد الكروموسومات.',
               tags: <String>['الانقسام'],
             ),
           ],
@@ -267,14 +251,12 @@ class StarterCatalog {
           cards: <StarterCard>[
             StarterCard(
               front: 'ما هو الحمض النووي DNA؟',
-              back:
-                  'جزيء يحمل المعلومات الوراثية على شكل تسلسل من القواعد النيتروجينية.',
+              back: 'جزيء يحمل المعلومات الوراثية على شكل تسلسل من القواعد النيتروجينية.',
               tags: <String>['DNA'],
             ),
             StarterCard(
               front: 'ما الفرق بين الجين والكروموسوم؟',
-              back:
-                  'الجين قطعة من DNA تصف بروتيناً أو وظيفة، والكروموسوم حزمة من DNA والبروتين.',
+              back: 'الجين قطعة من DNA تصف بروتيناً أو وظيفة، والكروموسوم حزمة من DNA والبروتين.',
               tags: <String>['الجينات'],
             ),
             StarterCard(
@@ -284,7 +266,8 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'ما هو الطفرة الجينية؟',
-              back: 'تغير دائم في تسلسل DNA قد يكون مفيداً أو ضاراً أو محايداً.',
+              back:
+                  'تغير دائم في تسلسل DNA قد يكون مفيداً أو ضاراً أو محايداً.',
               tags: <String>['الطفرات'],
             ),
           ],
@@ -322,10 +305,8 @@ class StarterCatalog {
       id: 'history_of_medicine',
       titleAr: 'تاريخ الطب',
       titleEn: 'History of Medicine',
-      descriptionAr:
-          'محطات الطب من اليونان إلى الطب الإسلامي والثورة الجراحية والمضادات الحيوية.',
-      descriptionEn:
-          'Medicine from ancient Greece to Islamic hospitals, surgical asepsis and antibiotics.',
+      descriptionAr: 'محطات الطب من اليونان إلى الطب الإسلامي والثورة الجراحية والمضادات الحيوية.',
+      descriptionEn: 'Medicine from ancient Greece to Islamic hospitals, surgical asepsis and antibiotics.',
       colorHex: '#A65A3A',
       iconKey: 'history_edu',
       tags: <String>['تاريخ الطب', 'طب', 'History'],
@@ -353,8 +334,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'من هو جالينوس؟',
-              back:
-                  'طبيب يوناني أثّرت نظرياته في التشريح والفسيولوجيا لقرون.',
+              back: 'طبيب يوناني أثّرت نظرياته في التشريح والفسيولوجيا لقرون.',
               tags: <String>['جالينوس'],
             ),
           ],
@@ -399,8 +379,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'لماذا تُعد مقاومة المضادات الحيوية مشكلة صحية عالمية؟',
-              back:
-                  'لأن البكتيريا تتطور وتصبح غير قابلة للعلاج بالمضادات المعروفة.',
+              back: 'لأن البكتيريا تتطور وتصبح غير قابلة للعلاج بالمضادات المعروفة.',
               tags: <String>['المقاومة'],
             ),
             StarterCard(
@@ -424,8 +403,7 @@ class StarterCatalog {
       titleEn: 'English 1',
       descriptionAr:
           'قواعد ومفردات أكاديمية ومهارات قراءة للمستوى الجامعي الأول.',
-      descriptionEn:
-          'Grammar, academic vocabulary and reading skills for first-year university English.',
+      descriptionEn: 'Grammar, academic vocabulary and reading skills for first-year university English.',
       colorHex: '#6B5BC9',
       iconKey: 'translate',
       tags: <String>['انكليزية', 'English', 'لغة'],
@@ -483,8 +461,7 @@ class StarterCatalog {
             ),
             StarterCard(
               front: 'What is a "hypothesis"?',
-              back:
-                  'A testable explanation for an observation, proposed before research.',
+              back: 'A testable explanation for an observation, proposed before research.',
               tags: <String>['research'],
             ),
           ],
@@ -577,8 +554,7 @@ class StarterDeck {
   final double rating;
   final List<StarterLesson> lessons;
 
-  String title(String languageCode) =>
-      languageCode == 'ar' ? titleAr : titleEn;
+  String title(String languageCode) => languageCode == 'ar' ? titleAr : titleEn;
 
   String description(String languageCode) =>
       languageCode == 'ar' ? descriptionAr : descriptionEn;
@@ -602,8 +578,7 @@ class StarterLesson {
   final String titleEn;
   final List<StarterCard> cards;
 
-  String title(String languageCode) =>
-      languageCode == 'ar' ? titleAr : titleEn;
+  String title(String languageCode) => languageCode == 'ar' ? titleAr : titleEn;
 }
 
 class StarterCard {

@@ -10,15 +10,7 @@ import 'deck_card.dart';
 
 enum CreateAction { deck, subdeck, card, importCards }
 
-enum DeckAction {
-  edit,
-  addSubdeck,
-  addCard,
-  privacy,
-  copy,
-  move,
-  delete,
-}
+enum DeckAction { edit, addSubdeck, addCard, privacy, copy, move, delete }
 
 enum CardAction { edit, toggleSuspend, resetProgress, delete }
 
@@ -250,10 +242,7 @@ Future<DeckPrivacy?> showPrivacySheet(
           children: <Widget>[
             Text(strings.share, style: context.texts.titleLarge),
             const SizedBox(height: 6),
-            Text(
-              strings.publishConfirmBody,
-              style: context.texts.bodySmall,
-            ),
+            Text(strings.publishConfirmBody, style: context.texts.bodySmall),
             const SizedBox(height: 14),
             _PrivacyOption(
               value: DeckPrivacy.private,
@@ -323,10 +312,7 @@ class _PrivacyOption extends StatelessWidget {
               ),
             ),
             if (selected)
-              Icon(
-                Icons.check_circle_rounded,
-                color: context.colors.primary,
-              ),
+              Icon(Icons.check_circle_rounded, color: context.colors.primary),
           ],
         ),
       ),
@@ -515,34 +501,36 @@ class _DeckEditorState extends State<_DeckEditor> {
             Wrap(
               spacing: 9,
               runSpacing: 9,
-              children: AppColors.deckPalette.map((Color color) {
-                final String hex = _hex(color);
-                final bool selected = hex == _colorHex.toUpperCase();
-                return GestureDetector(
-                  onTap: () => setState(() => _colorHex = hex),
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: selected
-                            ? context.colors.onSurface
-                            : Colors.transparent,
-                        width: 2.5,
+              children: AppColors.deckPalette
+                  .map((Color color) {
+                    final String hex = _hex(color);
+                    final bool selected = hex == _colorHex.toUpperCase();
+                    return GestureDetector(
+                      onTap: () => setState(() => _colorHex = hex),
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selected
+                                ? context.colors.onSurface
+                                : Colors.transparent,
+                            width: 2.5,
+                          ),
+                        ),
+                        child: selected
+                            ? const Icon(
+                                Icons.check_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
-                    ),
-                    child: selected
-                        ? const Icon(
-                            Icons.check_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          )
-                        : null,
-                  ),
-                );
-              }).toList(growable: false),
+                    );
+                  })
+                  .toList(growable: false),
             ),
             const SizedBox(height: 18),
             Text(strings.icon, style: context.texts.labelLarge),
@@ -550,50 +538,51 @@ class _DeckEditorState extends State<_DeckEditor> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: <String>[
-                'layers',
-                'bolt',
-                'science',
-                'biotech',
-                'history_edu',
-                'translate',
-                'menu_book',
-                'psychology',
-                'calculate',
-                'code',
-                'palette',
-                'medical',
-                'gavel',
-                'public',
-                'school',
-              ]
-                  .map(
-                    (String key) => GestureDetector(
-                      onTap: () => setState(() => _iconKey = key),
-                      child: Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: _iconKey == key
-                              ? context.colors.primaryContainer
-                              : context.colors.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _iconKey == key
-                                ? context.colors.primary
-                                : Colors.transparent,
+              children:
+                  <String>[
+                        'layers',
+                        'bolt',
+                        'science',
+                        'biotech',
+                        'history_edu',
+                        'translate',
+                        'menu_book',
+                        'psychology',
+                        'calculate',
+                        'code',
+                        'palette',
+                        'medical',
+                        'gavel',
+                        'public',
+                        'school',
+                      ]
+                      .map(
+                        (String key) => GestureDetector(
+                          onTap: () => setState(() => _iconKey = key),
+                          child: Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: _iconKey == key
+                                  ? context.colors.primaryContainer
+                                  : context.colors.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: _iconKey == key
+                                    ? context.colors.primary
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            child: Icon(
+                              deckIcon(key),
+                              color: _iconKey == key
+                                  ? context.colors.onPrimaryContainer
+                                  : context.colors.onSurfaceVariant,
+                            ),
                           ),
                         ),
-                        child: Icon(
-                          deckIcon(key),
-                          color: _iconKey == key
-                              ? context.colors.onPrimaryContainer
-                              : context.colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
+                      )
+                      .toList(growable: false),
             ),
             const SizedBox(height: 18),
             TextField(
@@ -629,10 +618,7 @@ class _DeckEditorState extends State<_DeckEditor> {
                   .toList(growable: false),
             ),
             const SizedBox(height: 22),
-            FilledButton(
-              onPressed: _save,
-              child: Text(strings.save),
-            ),
+            FilledButton(onPressed: _save, child: Text(strings.save)),
           ],
         ),
       ),
@@ -781,10 +767,7 @@ class _CardEditorState extends State<_CardEditor> {
               ),
             ),
             const SizedBox(height: 22),
-            FilledButton(
-              onPressed: _save,
-              child: Text(strings.save),
-            ),
+            FilledButton(onPressed: _save, child: Text(strings.save)),
           ],
         ),
       ),
@@ -870,15 +853,10 @@ class _ImportSheetState extends State<_ImportSheet> {
               minLines: 8,
               maxLines: 14,
               textDirection: TextDirection.rtl,
-              decoration: InputDecoration(
-                hintText: strings.importFormatHelp,
-              ),
+              decoration: InputDecoration(hintText: strings.importFormatHelp),
             ),
             const SizedBox(height: 18),
-            FilledButton(
-              onPressed: _save,
-              child: Text(strings.import),
-            ),
+            FilledButton(onPressed: _save, child: Text(strings.import)),
           ],
         ),
       ),
@@ -898,11 +876,7 @@ Future<DeckChoice?> showDeckPicker(
     useSafeArea: true,
     showDragHandle: true,
     builder: (BuildContext context) {
-      return _DeckPicker(
-        decks: decks,
-        excludeIds: excludeIds,
-        title: title,
-      );
+      return _DeckPicker(decks: decks, excludeIds: excludeIds, title: title);
     },
   );
 }
@@ -965,8 +939,7 @@ class _DeckPickerState extends State<_DeckPicker> {
               child: ListView(
                 children: <Widget>[
                   ListTile(
-                    onTap: () =>
-                        Navigator.pop(context, const DeckChoice(null)),
+                    onTap: () => Navigator.pop(context, const DeckChoice(null)),
                     leading: const Icon(Icons.home_work_outlined),
                     title: Text(strings.rootLevel),
                     subtitle: Text(strings.noParent),

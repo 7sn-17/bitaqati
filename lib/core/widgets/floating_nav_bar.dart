@@ -81,10 +81,11 @@ class FloatingNavBar extends StatelessWidget {
                               shape: BoxShape.circle,
                               boxShadow: <BoxShadow>[
                                 BoxShadow(
-                                  color: (isDark
-                                          ? AppColors.lime
-                                          : AppColors.forest)
-                                      .withValues(alpha: 0.32),
+                                  color:
+                                      (isDark
+                                              ? AppColors.lime
+                                              : AppColors.forest)
+                                          .withValues(alpha: 0.32),
                                   blurRadius: 16,
                                   offset: const Offset(0, 6),
                                 ),
@@ -92,9 +93,7 @@ class FloatingNavBar extends StatelessWidget {
                             ),
                             child: Icon(
                               Icons.add_rounded,
-                              color: isDark
-                                  ? AppColors.forest
-                                  : Colors.white,
+                              color: isDark ? AppColors.forest : Colors.white,
                               size: 30,
                             ),
                           ),

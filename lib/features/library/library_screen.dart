@@ -313,9 +313,7 @@ class _LibraryCard extends StatelessWidget {
             child: FilledButton.tonalIcon(
               onPressed: onAction,
               icon: Icon(
-                isInstalled
-                    ? Icons.check_rounded
-                    : Icons.download_rounded,
+                isInstalled ? Icons.check_rounded : Icons.download_rounded,
                 size: 18,
               ),
               label: Text(actionLabel),

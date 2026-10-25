@@ -119,14 +119,7 @@ class Metadata extends Table {
 }
 
 @DriftDatabase(
-  tables: <Type>[
-    Decks,
-    Cards,
-    CardStates,
-    ReviewLogs,
-    SyncOutbox,
-    Metadata,
-  ],
+  tables: <Type>[Decks, Cards, CardStates, ReviewLogs, SyncOutbox, Metadata],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'bitaqati'));

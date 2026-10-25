@@ -132,7 +132,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   height: 20,
                                 ),
                           label: Text(
-                            _busy ? strings.loading : strings.continueWithGoogle,
+                            _busy
+                                ? strings.loading
+                                : strings.continueWithGoogle,
                           ),
                         ),
                       ),

@@ -111,7 +111,8 @@ class CardSummary {
   final bool isBuried;
 
   bool get isNew => fsrs.state == FsrsState.newCard || fsrs.reps == 0;
-  bool get isDue => !isSuspended && !isBuried && fsrs.due.isBefore(DateTime.now().toUtc());
+  bool get isDue =>
+      !isSuspended && !isBuried && fsrs.due.isBefore(DateTime.now().toUtc());
   bool get isLeech => fsrs.lapses >= 8;
 
   CardSummary copyWith({
@@ -172,7 +173,8 @@ class ReviewEvent {
   final double difficulty;
   final int? elapsedMs;
 
-  bool get isSuccessful => rating == FsrsRating.good || rating == FsrsRating.easy;
+  bool get isSuccessful =>
+      rating == FsrsRating.good || rating == FsrsRating.easy;
 }
 
 class ImportedCard {
@@ -496,10 +498,13 @@ class Catalog {
     return SearchResult(decks: decks, cards: cards);
   }
 
-  DashboardStats dashboard() {    final DateTime now = generatedAt.toLocal();
+  DashboardStats dashboard() {
+    final DateTime now = generatedAt.toLocal();
     final DateTime today = DateTime(now.year, now.month, now.day);
     final int reviewsToday = reviews
-        .where((ReviewEvent event) => _sameDay(event.reviewedAt.toLocal(), today))
+        .where(
+          (ReviewEvent event) => _sameDay(event.reviewedAt.toLocal(), today),
+        )
         .length;
     final int dueCount = roots.fold<int>(
       0,
@@ -558,15 +563,18 @@ class Catalog {
   ProgressStats progress({int days = 30}) {
     final DateTime now = generatedAt.toLocal();
     final DateTime today = DateTime(now.year, now.month, now.day);
-    final DateTime start = today.subtract(Duration(days: math.max(0, days - 1)));
+    final DateTime start = today.subtract(
+      Duration(days: math.max(0, days - 1)),
+    );
     final List<ReviewEvent> rangeReviews = reviews
         .where(
-          (ReviewEvent event) =>
-              !event.reviewedAt.toLocal().isBefore(start),
+          (ReviewEvent event) => !event.reviewedAt.toLocal().isBefore(start),
         )
         .toList(growable: false);
     final int reviewsToday = reviews
-        .where((ReviewEvent event) => _sameDay(event.reviewedAt.toLocal(), today))
+        .where(
+          (ReviewEvent event) => _sameDay(event.reviewedAt.toLocal(), today),
+        )
         .length;
     final int successful = rangeReviews
         .where((ReviewEvent event) => event.isSuccessful)
@@ -584,10 +592,9 @@ class Catalog {
         .whereType<DeckNode>()
         .toList(growable: false);
     topDecks.sort(
-      (DeckNode a, DeckNode b) =>
-          (reviewsByDeck[b.summary.id] ?? 0).compareTo(
-            reviewsByDeck[a.summary.id] ?? 0,
-          ),
+      (DeckNode a, DeckNode b) => (reviewsByDeck[b.summary.id] ?? 0).compareTo(
+        reviewsByDeck[a.summary.id] ?? 0,
+      ),
     );
 
     final List<DailyCount> forecast = <DailyCount>[];
@@ -600,7 +607,8 @@ class Catalog {
       }
       final DateTime due = card.fsrs.due.toLocal();
       final DateTime day = DateTime(due.year, due.month, due.day);
-      if (day.isBefore(today) || day.isAfter(today.add(const Duration(days: 29)))) {
+      if (day.isBefore(today) ||
+          day.isAfter(today.add(const Duration(days: 29)))) {
         continue;
       }
       final String key = _dayKey(day);
@@ -621,15 +629,16 @@ class Catalog {
     final DateTime heatmapStart = today.subtract(const Duration(days: 83));
     for (int i = 0; i < 84; i += 1) {
       final DateTime day = heatmapStart.add(Duration(days: i));
-      heatmap.add(DailyCount(date: day, count: reviewsByDay[_dayKey(day)] ?? 0));
+      heatmap.add(
+        DailyCount(date: day, count: reviewsByDay[_dayKey(day)] ?? 0),
+      );
     }
 
     final List<CardSummary> leeches = allCards
         .where((CardSummary card) => card.isLeech)
         .toList(growable: false);
     leeches.sort(
-      (CardSummary a, CardSummary b) =>
-          b.fsrs.lapses.compareTo(a.fsrs.lapses),
+      (CardSummary a, CardSummary b) => b.fsrs.lapses.compareTo(a.fsrs.lapses),
     );
 
     return ProgressStats(

@@ -15,10 +15,8 @@ class AppStrings {
   }
 
   String get appName => _t('بطاقاتي', 'Bitaqati');
-  String get tagline => _t(
-    'مساحة هادئة للحفظ والمراجعة',
-    'A calm place for memory and review',
-  );
+  String get tagline =>
+      _t('مساحة هادئة للحفظ والمراجعة', 'A calm place for memory and review');
   String get continueLabel => _t('متابعة', 'Continue');
   String get getStarted => _t('ابدأ الآن', 'Get started');
   String get skip => _t('تخطي', 'Skip');
@@ -74,14 +72,10 @@ class AppStrings {
   String get privacyPrivate => _t('خاص', 'Private');
   String get privacyUnlisted => _t('غير مدرج', 'Unlisted');
   String get privacyPublic => _t('عام', 'Public');
-  String get privacyPrivateHelp => _t(
-    'لا يراه أحد غيرك.',
-    'Only you can see it.',
-  );
-  String get privacyUnlistedHelp => _t(
-    'يمكن الوصول إليه بالرابط فقط.',
-    'Reachable by link only.',
-  );
+  String get privacyPrivateHelp =>
+      _t('لا يراه أحد غيرك.', 'Only you can see it.');
+  String get privacyUnlistedHelp =>
+      _t('يمكن الوصول إليه بالرابط فقط.', 'Reachable by link only.');
   String get privacyPublicHelp => _t(
     'يظهر في مكتبة المجتمع، وتمتد الخصوصية إلى المجلدات الفرعية.',
     'Appears in the community library; privacy cascades to sub-decks.',
@@ -102,8 +96,10 @@ class AppStrings {
   String get addToLibrary => _t('أضف إلى مكتبتي', 'Add to my library');
   String get install => _t('تثبيت', 'Install');
   String get installing => _t('جارٍ التثبيت…', 'Installing…');
-  String get installedSuccess => _t('تمت الإضافة إلى مجلداتك', 'Added to your decks');
-  String get noPublicDecks => _t('لا يوجد محتوى عام بعد', 'No public content yet');
+  String get installedSuccess =>
+      _t('تمت الإضافة إلى مجلداتك', 'Added to your decks');
+  String get noPublicDecks =>
+      _t('لا يوجد محتوى عام بعد', 'No public content yet');
   String get noPublicDecksBody => _t(
     'انشر أحد مجلداتك ليظهر هنا، أو ثبّت قالباً رسمياً.',
     'Publish one of your decks to appear here, or install an official template.',
@@ -111,9 +107,11 @@ class AppStrings {
   String get author => _t('المؤلف', 'Author');
   String get you => _t('أنت', 'You');
   String get rating => _t('التقييم', 'Rating');
-  String get searchHint => _t('ابحث في المجلدات والبطاقات', 'Search decks and cards');
+  String get searchHint =>
+      _t('ابحث في المجلدات والبطاقات', 'Search decks and cards');
   String get searchEmpty => _t('ابحث عن أي شيء', 'Search for anything');
-  String get searchNoResults => _t('لا توجد نتائج مطابقة', 'No matching results');
+  String get searchNoResults =>
+      _t('لا توجد نتائج مطابقة', 'No matching results');
   String get folders => _t('المجلدات', 'Folders');
   String get all => _t('الكل', 'All');
   String get dueOnly => _t('المستحقة فقط', 'Due only');
@@ -164,7 +162,8 @@ class AppStrings {
   String get easy => _t('سهل', 'Easy');
   String get answer => _t('الإجابة', 'Answer');
   String get question => _t('السؤال', 'Question');
-  String get tapToReveal => _t('اضغط لإظهار الإجابة', 'Tap to reveal the answer');
+  String get tapToReveal =>
+      _t('اضغط لإظهار الإجابة', 'Tap to reveal the answer');
   String get sessionComplete => _t('انتهت الجلسة', 'Session complete');
   String get sessionSummary => _t('ملخص الجلسة', 'Session summary');
   String get cardsReviewed => _t('بطاقات راجعتها', 'Cards reviewed');
@@ -185,10 +184,8 @@ class AppStrings {
     'The card returns to new. Review history is kept.',
   );
   String get reset => _t('إعادة ضبط', 'Reset');
-  String get deleteCardConfirm => _t(
-    'هل تريد حذف هذه البطاقة؟',
-    'Delete this card?',
-  );
+  String get deleteCardConfirm =>
+      _t('هل تريد حذف هذه البطاقة؟', 'Delete this card?');
   String get deleteDeckConfirm => _t('حذف المجلد؟', 'Delete this deck?');
   String get deleteDeckBody => _t(
     'سيُخفى المجلد وكل مجلداته الفرعية وبطاقاته. لا يمكن التراجع حالياً.',
@@ -206,8 +203,10 @@ class AppStrings {
   String get heatmap => _t('نشاط المراجعة', 'Review activity');
   String get activity => _t('النشاط', 'Activity');
   String get topDecks => _t('أكثر المجلدات مراجعة', 'Most reviewed decks');
-  String get leeches => _t('بطاقات تحتاج انتباهاً', 'Cards that need attention');
-  String get leechesEmpty => _t('لا توجد بطاقات صعبة بعد.', 'No difficult cards yet.');
+  String get leeches =>
+      _t('بطاقات تحتاج انتباهاً', 'Cards that need attention');
+  String get leechesEmpty =>
+      _t('لا توجد بطاقات صعبة بعد.', 'No difficult cards yet.');
   String get noReviewsYet => _t('لا توجد مراجعات بعد', 'No reviews yet');
   String get thisMonth => _t('هذا الشهر', 'This month');
   String lastNDays(int count) =>
@@ -240,18 +239,22 @@ class AppStrings {
   String get version => _t('الإصدار', 'Version');
   String get privacyPolicy => _t('سياسة الخصوصية', 'Privacy policy');
   String get terms => _t('شروط الاستخدام', 'Terms of use');
-  String get madeWith => _t('صُنع بعناية للطلاب', 'Made with care for students');
-  String get onboardingTitle1 => _t('تعلّم أقل، وتذكّر أكثر', 'Learn less, remember more');
+  String get madeWith =>
+      _t('صُنع بعناية للطلاب', 'Made with care for students');
+  String get onboardingTitle1 =>
+      _t('تعلّم أقل، وتذكّر أكثر', 'Learn less, remember more');
   String get onboardingBody1 => _t(
     'بطاقات قصيرة ومراجعة ذكية تجعل المعرفة تبقى، لا تمر.',
     'Short cards and smart review make knowledge stay, not pass.',
   );
-  String get onboardingTitle2 => _t('نظّم كل شيء كما تفكر', 'Organize the way you think');
+  String get onboardingTitle2 =>
+      _t('نظّم كل شيء كما تفكر', 'Organize the way you think');
   String get onboardingBody2 => _t(
     'مجلدات ودروس فرعية، مع إمكانية مشاركة درس واحد فقط.',
     'Decks and sub-decks, with the option to share a single lesson.',
   );
-  String get onboardingTitle3 => _t('تقدمك معك، دائماً', 'Your progress, always with you');
+  String get onboardingTitle3 =>
+      _t('تقدمك معك، دائماً', 'Your progress, always with you');
   String get onboardingBody3 => _t(
     'يعمل دون اتصال، ويتزامن عندما تعود الشبكة.',
     'Works offline and syncs when the network returns.',
@@ -261,9 +264,11 @@ class AppStrings {
     'سجّل الدخول لمزامنة مجلداتك بين الأجهزة، أو ابدأ كضيف.',
     'Sign in to sync your decks across devices, or start as a guest.',
   );
-  String get continueWithGoogle => _t('المتابعة باستخدام Google', 'Continue with Google');
+  String get continueWithGoogle =>
+      _t('المتابعة باستخدام Google', 'Continue with Google');
   String get continueAsGuest => _t('المتابعة كضيف', 'Continue as guest');
-  String get loginError => _t('تعذر إكمال تسجيل الدخول', 'Could not complete sign-in');
+  String get loginError =>
+      _t('تعذر إكمال تسجيل الدخول', 'Could not complete sign-in');
   String get authNotConfigured => _t(
     'تسجيل الدخول غير مهيأ في هذه النسخة. يمكنك المتابعة كضيف.',
     'Sign-in is not configured in this build. You can continue as a guest.',
@@ -302,7 +307,8 @@ class AppStrings {
     'The deck and all its public content will be available in the community library. You can unpublish later.',
   );
   String get privacyUpdated => _t('حُدّثت الخصوصية', 'Privacy updated');
-  String get errorGeneric => _t('حدث خطأ. حاول مرة أخرى.', 'Something went wrong. Try again.');
+  String get errorGeneric =>
+      _t('حدث خطأ. حاول مرة أخرى.', 'Something went wrong. Try again.');
   String get retry => _t('إعادة المحاولة', 'Retry');
   String get loading => _t('جارٍ التحميل…', 'Loading…');
   String get close => _t('إغلاق', 'Close');
@@ -315,7 +321,8 @@ class AppStrings {
   String get newBadge => _t('جديد', 'New');
   String get dueBadge => _t('مستحق', 'Due');
   String get selectDeck => _t('اختر مجلداً', 'Choose a deck');
-  String get selectDeckTitle => _t('إلى أين نضيف البطاقة؟', 'Where should this card go?');
+  String get selectDeckTitle =>
+      _t('إلى أين نضيف البطاقة؟', 'Where should this card go?');
   String get searchDecks => _t('ابحث في المجلدات', 'Search decks');
   String get noResults => _t('لا توجد نتائج', 'No results');
   String get typeAnswer => _t('اكتب إجابتك…', 'Type your answer…');
@@ -325,10 +332,12 @@ class AppStrings {
     'اختصارات: 1 أعد، 2 صعب، 3 جيد، 4 سهل',
     'Shortcuts: 1 again, 2 hard, 3 good, 4 easy',
   );
-  String get includeSubdecks => _t('تضمين المجلدات الفرعية', 'Include sub-decks');
+  String get includeSubdecks =>
+      _t('تضمين المجلدات الفرعية', 'Include sub-decks');
   String get onlyThisDeck => _t('هذا المجلد فقط', 'This deck only');
   String get allDecks => _t('كل المجلدات', 'All decks');
-  String get syncPending => _t('تغييرات بانتظار المزامنة', 'Changes waiting to sync');
+  String get syncPending =>
+      _t('تغييرات بانتظار المزامنة', 'Changes waiting to sync');
   String get localOnly => _t('محلي فقط', 'Local only');
   String get cloud => _t('سحابي', 'Cloud');
   String get guestDataNote => _t(
@@ -367,10 +376,15 @@ class AppStrings {
   String get duplicate => _t('تكرار', 'Duplicate');
   String get export => _t('تصدير', 'Export');
   String get notImplemented => _t('قريباً', 'Coming soon');
-  String get comingSoon => _t('هذه الميزة قادمة في تحديث لاحق.', 'This feature is coming in a later update.');
+  String get comingSoon => _t(
+    'هذه الميزة قادمة في تحديث لاحق.',
+    'This feature is coming in a later update.',
+  );
   String get allCaughtUp => _t('كل شيء محدّث', 'All caught up');
-  String get noCardsInSession => _t('لا توجد بطاقات في هذه الجلسة', 'No cards in this session');
-  String get reviewHint => _t('اختر تقييماً بعد إظهار الإجابة', 'Rate after revealing the answer');
+  String get noCardsInSession =>
+      _t('لا توجد بطاقات في هذه الجلسة', 'No cards in this session');
+  String get reviewHint =>
+      _t('اختر تقييماً بعد إظهار الإجابة', 'Rate after revealing the answer');
   String get streakDays => _t('يوم متتالٍ', 'day streak');
   String get todayReviews => _t('مراجعات اليوم', 'Reviews today');
   String get dueToday => _t('مستحقة اليوم', 'Due today');
@@ -421,15 +435,17 @@ class AppStrings {
     'سيُنشر هذا الدرس فقط، وليس المجلد كله.',
     'Only this lesson will be published, not the whole deck.',
   );
-  String get standalonePublic => _t('درس عام مستقل', 'Standalone public lesson');
+  String get standalonePublic =>
+      _t('درس عام مستقل', 'Standalone public lesson');
   String get yourPublicLibrary => _t('مكتبتك العامة', 'Your public library');
 
   String cardsCount(int count) =>
       isArabic ? '$count ${count == 1 ? 'بطاقة' : 'بطاقات'}' : '$count cards';
   String lessonsCount(int count) =>
       isArabic ? '$count ${count == 1 ? 'درس' : 'دروس'}' : '$count lessons';
-  String subdecksCount(int count) =>
-      isArabic ? '$count ${count == 1 ? 'مجلد فرعي' : 'مجلدات فرعية'}' : '$count sub-decks';
+  String subdecksCount(int count) => isArabic
+      ? '$count ${count == 1 ? 'مجلد فرعي' : 'مجلدات فرعية'}'
+      : '$count sub-decks';
   String reviewsCountLabel(int count) =>
       isArabic ? '$count مراجعة' : '$count reviews';
   String dueCount(int count) => isArabic ? '$count مستحقة' : '$count due';

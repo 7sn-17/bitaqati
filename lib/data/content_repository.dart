@@ -49,17 +49,22 @@ class ContentRepository {
       return;
     }
 
-    final DeckRecord? firstDeck = await (_db.select(_db.decks)
-          ..where((Decks t) => t.deletedAtMs.isNull())
-          ..limit(1))
-        .getSingleOrNull();
+    final DeckRecord? firstDeck =
+        await (_db.select(_db.decks)
+              ..where((Decks t) => t.deletedAtMs.isNull())
+              ..limit(1))
+            .getSingleOrNull();
 
     if (firstDeck == null) {
       final int now = DateTime.now().toUtc().millisecondsSinceEpoch;
       final List<DecksCompanion> deckRows = <DecksCompanion>[];
       final List<CardsCompanion> cardRows = <CardsCompanion>[];
 
-      for (int deckIndex = 0; deckIndex < StarterCatalog.decks.length; deckIndex += 1) {
+      for (
+        int deckIndex = 0;
+        deckIndex < StarterCatalog.decks.length;
+        deckIndex += 1
+      ) {
         final StarterDeck template = StarterCatalog.decks[deckIndex];
         final String rootId = _uuid.v4();
         deckRows.add(
@@ -85,7 +90,11 @@ class ContentRepository {
           ),
         );
 
-        for (int lessonIndex = 0; lessonIndex < template.lessons.length; lessonIndex += 1) {
+        for (
+          int lessonIndex = 0;
+          lessonIndex < template.lessons.length;
+          lessonIndex += 1
+        ) {
           final StarterLesson lesson = template.lessons[lessonIndex];
           final String lessonId = _uuid.v4();
           deckRows.add(
@@ -111,7 +120,11 @@ class ContentRepository {
             ),
           );
 
-          for (int cardIndex = 0; cardIndex < lesson.cards.length; cardIndex += 1) {
+          for (
+            int cardIndex = 0;
+            cardIndex < lesson.cards.length;
+            cardIndex += 1
+          ) {
             final StarterCard card = lesson.cards[cardIndex];
             cardRows.add(
               CardsCompanion(
@@ -151,31 +164,37 @@ class ContentRepository {
   }
 
   Future<Catalog> loadCatalog({String? displayName}) async {
-    final List<DeckRecord> deckRows = await (_db.select(_db.decks)
-          ..where((Decks t) => t.deletedAtMs.isNull())
-          ..orderBy(<OrderingTerm Function(Decks)>[
-            (Decks t) => OrderingTerm.asc(t.position),
-            (Decks t) => OrderingTerm.asc(t.title),
-          ]))
+    final List<DeckRecord> deckRows =
+        await (_db.select(_db.decks)
+              ..where((Decks t) => t.deletedAtMs.isNull())
+              ..orderBy(<OrderingTerm Function(Decks)>[
+                (Decks t) => OrderingTerm.asc(t.position),
+                (Decks t) => OrderingTerm.asc(t.title),
+              ]))
+            .get();
+    final List<CardRecord> cardRows =
+        await (_db.select(_db.cards)
+              ..where((Cards t) => t.deletedAtMs.isNull())
+              ..orderBy(<OrderingTerm Function(Cards)>[
+                (Cards t) => OrderingTerm.asc(t.position),
+                (Cards t) => OrderingTerm.asc(t.createdAtMs),
+              ]))
+            .get();
+    final List<CardStateRecord> stateRows = await _db
+        .select(_db.cardStates)
         .get();
-    final List<CardRecord> cardRows = await (_db.select(_db.cards)
-          ..where((Cards t) => t.deletedAtMs.isNull())
-          ..orderBy(<OrderingTerm Function(Cards)>[
-            (Cards t) => OrderingTerm.asc(t.position),
-            (Cards t) => OrderingTerm.asc(t.createdAtMs),
-          ]))
-        .get();
-    final List<CardStateRecord> stateRows = await _db.select(_db.cardStates).get();
-    final List<ReviewLogRecord> logRows = await (_db.select(_db.reviewLogs)
-          ..orderBy(<OrderingTerm Function(ReviewLogs)>[
-            (ReviewLogs t) => OrderingTerm.asc(t.reviewedAtMs),
-          ]))
-        .get();
+    final List<ReviewLogRecord> logRows =
+        await (_db.select(_db.reviewLogs)
+              ..orderBy(<OrderingTerm Function(ReviewLogs)>[
+                (ReviewLogs t) => OrderingTerm.asc(t.reviewedAtMs),
+              ]))
+            .get();
 
     final Map<String, CardStateRecord> states = <String, CardStateRecord>{
       for (final CardStateRecord row in stateRows) row.cardId: row,
     };
-    final Map<String, List<CardSummary>> cardsByDeck = <String, List<CardSummary>>{};
+    final Map<String, List<CardSummary>> cardsByDeck =
+        <String, List<CardSummary>>{};
     final Map<String, CardSummary> cardById = <String, CardSummary>{};
 
     for (final CardRecord row in cardRows) {
@@ -333,28 +352,30 @@ class ContentRepository {
         deletedAtMs: null,
         isDirty: true,
       );
-      await _db.into(_db.decks).insert(
-        DecksCompanion(
-          id: Value<String>(id),
-          parentId: Value<String?>(parentId),
-          title: Value<String>(cleanTitle),
-          description: Value<String>(description.trim()),
-          colorHex: Value<String>(colorHex),
-          iconKey: Value<String>(iconKey),
-          privacy: Value<DeckPrivacy>(actualPrivacy),
-          tagsJson: Value<String>(_encodeTags(tags)),
-          isStarter: const Value<bool>(false),
-          isArchived: const Value<bool>(false),
-          position: Value<int>(position),
-          depth: Value<int>(depth),
-          sourceTemplateId: const Value<String?>(null),
-          createdAtMs: Value<int>(now),
-          updatedAtMs: Value<int>(now),
-          publishedAtMs: const Value<int?>(null),
-          deletedAtMs: const Value<int?>(null),
-          isDirty: const Value<bool>(true),
-        ),
-      );
+      await _db
+          .into(_db.decks)
+          .insert(
+            DecksCompanion(
+              id: Value<String>(id),
+              parentId: Value<String?>(parentId),
+              title: Value<String>(cleanTitle),
+              description: Value<String>(description.trim()),
+              colorHex: Value<String>(colorHex),
+              iconKey: Value<String>(iconKey),
+              privacy: Value<DeckPrivacy>(actualPrivacy),
+              tagsJson: Value<String>(_encodeTags(tags)),
+              isStarter: const Value<bool>(false),
+              isArchived: const Value<bool>(false),
+              position: Value<int>(position),
+              depth: Value<int>(depth),
+              sourceTemplateId: const Value<String?>(null),
+              createdAtMs: Value<int>(now),
+              updatedAtMs: Value<int>(now),
+              publishedAtMs: const Value<int?>(null),
+              deletedAtMs: const Value<int?>(null),
+              isDirty: const Value<bool>(true),
+            ),
+          );
       await _enqueue('deck', id, 'create', _deckPayload(record));
       return id;
     });
@@ -408,12 +429,7 @@ class ContentRepository {
         ),
       );
       if (privacy != null && privacy != existing.privacy) {
-        await _setPrivacySubtree(
-          id,
-          privacy,
-          now,
-          includeSelf: false,
-        );
+        await _setPrivacySubtree(id, privacy, now, includeSelf: false);
       }
       final DeckRecord? updated = await _getDeckRow(id);
       if (updated != null) {
@@ -467,14 +483,15 @@ class ContentRepository {
         if (deck == null) {
           continue;
         }
-        await (_db.update(_db.decks)..where((Decks t) => t.id.equals(deckId)))
-            .write(
-              DecksCompanion(
-                deletedAtMs: Value<int>(now),
-                updatedAtMs: Value<int>(now),
-                isDirty: const Value<bool>(true),
-              ),
-            );
+        await (_db.update(
+          _db.decks,
+        )..where((Decks t) => t.id.equals(deckId))).write(
+          DecksCompanion(
+            deletedAtMs: Value<int>(now),
+            updatedAtMs: Value<int>(now),
+            isDirty: const Value<bool>(true),
+          ),
+        );
         await _enqueue(
           'deck',
           deckId,
@@ -482,21 +499,21 @@ class ContentRepository {
           _deckPayload(deck, deletedAtMs: now),
         );
 
-        final List<CardRecord> cardRows = await (_db.select(_db.cards)
-              ..where(
-                (Cards t) =>
-                    t.deckId.equals(deckId) & t.deletedAtMs.isNull(),
-              ))
-            .get();
+        final List<CardRecord> cardRows =
+            await (_db.select(_db.cards)..where(
+                  (Cards t) => t.deckId.equals(deckId) & t.deletedAtMs.isNull(),
+                ))
+                .get();
         for (final CardRecord card in cardRows) {
-          await (_db.update(_db.cards)..where((Cards t) => t.id.equals(card.id)))
-              .write(
-                CardsCompanion(
-                  deletedAtMs: Value<int>(now),
-                  updatedAtMs: Value<int>(now),
-                  isDirty: const Value<bool>(true),
-                ),
-              );
+          await (_db.update(
+            _db.cards,
+          )..where((Cards t) => t.id.equals(card.id))).write(
+            CardsCompanion(
+              deletedAtMs: Value<int>(now),
+              updatedAtMs: Value<int>(now),
+              isDirty: const Value<bool>(true),
+            ),
+          );
           await _enqueue(
             'card',
             card.id,
@@ -545,23 +562,25 @@ class ContentRepository {
         deletedAtMs: null,
         isDirty: true,
       );
-      await _db.into(_db.cards).insert(
-        CardsCompanion(
-          id: Value<String>(id),
-          deckId: Value<String>(deckId),
-          kind: Value<CardKind>(kind),
-          front: Value<String>(cleanFront),
-          back: Value<String>(cleanBack),
-          hint: Value<String>(hint.trim()),
-          notes: Value<String>(notes.trim()),
-          tagsJson: Value<String>(_encodeTags(tags)),
-          position: Value<int>(position),
-          createdAtMs: Value<int>(now),
-          updatedAtMs: Value<int>(now),
-          deletedAtMs: const Value<int?>(null),
-          isDirty: const Value<bool>(true),
-        ),
-      );
+      await _db
+          .into(_db.cards)
+          .insert(
+            CardsCompanion(
+              id: Value<String>(id),
+              deckId: Value<String>(deckId),
+              kind: Value<CardKind>(kind),
+              front: Value<String>(cleanFront),
+              back: Value<String>(cleanBack),
+              hint: Value<String>(hint.trim()),
+              notes: Value<String>(notes.trim()),
+              tagsJson: Value<String>(_encodeTags(tags)),
+              position: Value<int>(position),
+              createdAtMs: Value<int>(now),
+              updatedAtMs: Value<int>(now),
+              deletedAtMs: const Value<int?>(null),
+              isDirty: const Value<bool>(true),
+            ),
+          );
       await _enqueue('card', id, 'create', _cardPayload(record));
       return id;
     });
@@ -681,23 +700,25 @@ class ContentRepository {
           deletedAtMs: null,
           isDirty: true,
         );
-        await _db.into(_db.cards).insert(
-          CardsCompanion(
-            id: Value<String>(id),
-            deckId: Value<String>(deckId),
-            kind: const Value<CardKind>(CardKind.basic),
-            front: Value<String>(front),
-            back: Value<String>(back),
-            hint: Value<String>(input.hint.trim()),
-            notes: Value<String>(input.notes.trim()),
-            tagsJson: Value<String>(_encodeTags(input.tags)),
-            position: Value<int>(position),
-            createdAtMs: Value<int>(now),
-            updatedAtMs: Value<int>(now),
-            deletedAtMs: const Value<int?>(null),
-            isDirty: const Value<bool>(true),
-          ),
-        );
+        await _db
+            .into(_db.cards)
+            .insert(
+              CardsCompanion(
+                id: Value<String>(id),
+                deckId: Value<String>(deckId),
+                kind: const Value<CardKind>(CardKind.basic),
+                front: Value<String>(front),
+                back: Value<String>(back),
+                hint: Value<String>(input.hint.trim()),
+                notes: Value<String>(input.notes.trim()),
+                tagsJson: Value<String>(_encodeTags(input.tags)),
+                position: Value<int>(position),
+                createdAtMs: Value<int>(now),
+                updatedAtMs: Value<int>(now),
+                deletedAtMs: const Value<int?>(null),
+                isDirty: const Value<bool>(true),
+              ),
+            );
         await _enqueue('card', id, 'create', _cardPayload(record));
         position += 1;
         count += 1;
@@ -738,31 +759,37 @@ class ContentRepository {
         deletedAtMs: null,
         isDirty: true,
       );
-      await _db.into(_db.decks).insert(
-        DecksCompanion(
-          id: Value<String>(rootId),
-          parentId: const Value<String?>(null),
-          title: Value<String>(root.title),
-          description: Value<String>(root.description),
-          colorHex: Value<String>(root.colorHex),
-          iconKey: Value<String>(root.iconKey),
-          privacy: const Value<DeckPrivacy>(DeckPrivacy.private),
-          tagsJson: Value<String>(root.tagsJson),
-          isStarter: const Value<bool>(false),
-          isArchived: const Value<bool>(false),
-          position: Value<int>(rootPosition),
-          depth: const Value<int>(0),
-          sourceTemplateId: Value<String?>(template.id),
-          createdAtMs: Value<int>(now),
-          updatedAtMs: Value<int>(now),
-          publishedAtMs: const Value<int?>(null),
-          deletedAtMs: const Value<int?>(null),
-          isDirty: const Value<bool>(true),
-        ),
-      );
+      await _db
+          .into(_db.decks)
+          .insert(
+            DecksCompanion(
+              id: Value<String>(rootId),
+              parentId: const Value<String?>(null),
+              title: Value<String>(root.title),
+              description: Value<String>(root.description),
+              colorHex: Value<String>(root.colorHex),
+              iconKey: Value<String>(root.iconKey),
+              privacy: const Value<DeckPrivacy>(DeckPrivacy.private),
+              tagsJson: Value<String>(root.tagsJson),
+              isStarter: const Value<bool>(false),
+              isArchived: const Value<bool>(false),
+              position: Value<int>(rootPosition),
+              depth: const Value<int>(0),
+              sourceTemplateId: Value<String?>(template.id),
+              createdAtMs: Value<int>(now),
+              updatedAtMs: Value<int>(now),
+              publishedAtMs: const Value<int?>(null),
+              deletedAtMs: const Value<int?>(null),
+              isDirty: const Value<bool>(true),
+            ),
+          );
       await _enqueue('deck', rootId, 'create', _deckPayload(root));
 
-      for (int lessonIndex = 0; lessonIndex < template.lessons.length; lessonIndex += 1) {
+      for (
+        int lessonIndex = 0;
+        lessonIndex < template.lessons.length;
+        lessonIndex += 1
+      ) {
         final StarterLesson lesson = template.lessons[lessonIndex];
         final String lessonId = _uuid.v4();
         final DeckRecord lessonRecord = DeckRecord(
@@ -785,31 +812,37 @@ class ContentRepository {
           deletedAtMs: null,
           isDirty: true,
         );
-        await _db.into(_db.decks).insert(
-          DecksCompanion(
-            id: Value<String>(lessonId),
-            parentId: Value<String?>(rootId),
-            title: Value<String>(lessonRecord.title),
-            description: const Value<String>(''),
-            colorHex: Value<String>(template.colorHex),
-            iconKey: const Value<String>('layers'),
-            privacy: const Value<DeckPrivacy>(DeckPrivacy.private),
-            tagsJson: Value<String>(lessonRecord.tagsJson),
-            isStarter: const Value<bool>(false),
-            isArchived: const Value<bool>(false),
-            position: Value<int>(lessonIndex),
-            depth: const Value<int>(1),
-            sourceTemplateId: Value<String?>(template.id),
-            createdAtMs: Value<int>(now),
-            updatedAtMs: Value<int>(now),
-            publishedAtMs: const Value<int?>(null),
-            deletedAtMs: const Value<int?>(null),
-            isDirty: const Value<bool>(true),
-          ),
-        );
+        await _db
+            .into(_db.decks)
+            .insert(
+              DecksCompanion(
+                id: Value<String>(lessonId),
+                parentId: Value<String?>(rootId),
+                title: Value<String>(lessonRecord.title),
+                description: const Value<String>(''),
+                colorHex: Value<String>(template.colorHex),
+                iconKey: const Value<String>('layers'),
+                privacy: const Value<DeckPrivacy>(DeckPrivacy.private),
+                tagsJson: Value<String>(lessonRecord.tagsJson),
+                isStarter: const Value<bool>(false),
+                isArchived: const Value<bool>(false),
+                position: Value<int>(lessonIndex),
+                depth: const Value<int>(1),
+                sourceTemplateId: Value<String?>(template.id),
+                createdAtMs: Value<int>(now),
+                updatedAtMs: Value<int>(now),
+                publishedAtMs: const Value<int?>(null),
+                deletedAtMs: const Value<int?>(null),
+                isDirty: const Value<bool>(true),
+              ),
+            );
         await _enqueue('deck', lessonId, 'create', _deckPayload(lessonRecord));
 
-        for (int cardIndex = 0; cardIndex < lesson.cards.length; cardIndex += 1) {
+        for (
+          int cardIndex = 0;
+          cardIndex < lesson.cards.length;
+          cardIndex += 1
+        ) {
           final StarterCard card = lesson.cards[cardIndex];
           final String cardId = _uuid.v4();
           final CardRecord cardRecord = CardRecord(
@@ -827,23 +860,25 @@ class ContentRepository {
             deletedAtMs: null,
             isDirty: true,
           );
-          await _db.into(_db.cards).insert(
-            CardsCompanion(
-              id: Value<String>(cardId),
-              deckId: Value<String>(lessonId),
-              kind: const Value<CardKind>(CardKind.basic),
-              front: Value<String>(card.front),
-              back: Value<String>(card.back),
-              hint: Value<String>(card.hint),
-              notes: Value<String>(card.notes),
-              tagsJson: Value<String>(_encodeTags(card.tags)),
-              position: Value<int>(cardIndex),
-              createdAtMs: Value<int>(now),
-              updatedAtMs: Value<int>(now),
-              deletedAtMs: const Value<int?>(null),
-              isDirty: const Value<bool>(true),
-            ),
-          );
+          await _db
+              .into(_db.cards)
+              .insert(
+                CardsCompanion(
+                  id: Value<String>(cardId),
+                  deckId: Value<String>(lessonId),
+                  kind: const Value<CardKind>(CardKind.basic),
+                  front: Value<String>(card.front),
+                  back: Value<String>(card.back),
+                  hint: Value<String>(card.hint),
+                  notes: Value<String>(card.notes),
+                  tagsJson: Value<String>(_encodeTags(card.tags)),
+                  position: Value<int>(cardIndex),
+                  createdAtMs: Value<int>(now),
+                  updatedAtMs: Value<int>(now),
+                  deletedAtMs: const Value<int?>(null),
+                  isDirty: const Value<bool>(true),
+                ),
+              );
           await _enqueue('card', cardId, 'create', _cardPayload(cardRecord));
         }
       }
@@ -907,7 +942,9 @@ class ContentRepository {
             ? rootDepth
             : (newDepths[deck.parentId] ?? rootDepth) + 1;
         newDepths[deck.id] = depth;
-        final String title = isRoot && rootTitle != null ? rootTitle : deck.title;
+        final String title = isRoot && rootTitle != null
+            ? rootTitle
+            : deck.title;
         final DeckRecord record = DeckRecord(
           id: newIds[deck.id]!,
           parentId: newParentId,
@@ -928,40 +965,43 @@ class ContentRepository {
           deletedAtMs: null,
           isDirty: true,
         );
-        await _db.into(_db.decks).insert(
-          DecksCompanion(
-            id: Value<String>(record.id),
-            parentId: Value<String?>(record.parentId),
-            title: Value<String>(record.title),
-            description: Value<String>(record.description),
-            colorHex: Value<String>(record.colorHex),
-            iconKey: Value<String>(record.iconKey),
-            privacy: const Value<DeckPrivacy>(DeckPrivacy.private),
-            tagsJson: Value<String>(record.tagsJson),
-            isStarter: const Value<bool>(false),
-            isArchived: const Value<bool>(false),
-            position: Value<int>(record.position),
-            depth: Value<int>(record.depth),
-            sourceTemplateId: Value<String?>(record.sourceTemplateId),
-            createdAtMs: Value<int>(now),
-            updatedAtMs: Value<int>(now),
-            publishedAtMs: const Value<int?>(null),
-            deletedAtMs: const Value<int?>(null),
-            isDirty: const Value<bool>(true),
-          ),
-        );
+        await _db
+            .into(_db.decks)
+            .insert(
+              DecksCompanion(
+                id: Value<String>(record.id),
+                parentId: Value<String?>(record.parentId),
+                title: Value<String>(record.title),
+                description: Value<String>(record.description),
+                colorHex: Value<String>(record.colorHex),
+                iconKey: Value<String>(record.iconKey),
+                privacy: const Value<DeckPrivacy>(DeckPrivacy.private),
+                tagsJson: Value<String>(record.tagsJson),
+                isStarter: const Value<bool>(false),
+                isArchived: const Value<bool>(false),
+                position: Value<int>(record.position),
+                depth: Value<int>(record.depth),
+                sourceTemplateId: Value<String?>(record.sourceTemplateId),
+                createdAtMs: Value<int>(now),
+                updatedAtMs: Value<int>(now),
+                publishedAtMs: const Value<int?>(null),
+                deletedAtMs: const Value<int?>(null),
+                isDirty: const Value<bool>(true),
+              ),
+            );
         await _enqueue('deck', record.id, 'create', _deckPayload(record));
 
-        final List<CardRecord> sourceCards = await (_db.select(_db.cards)
-              ..where(
-                (Cards t) =>
-                    t.deckId.equals(deck.id) & t.deletedAtMs.isNull(),
-              )
-              ..orderBy(<OrderingTerm Function(Cards)>[
-                (Cards t) => OrderingTerm.asc(t.position),
-                (Cards t) => OrderingTerm.asc(t.createdAtMs),
-              ]))
-            .get();
+        final List<CardRecord> sourceCards =
+            await (_db.select(_db.cards)
+                  ..where(
+                    (Cards t) =>
+                        t.deckId.equals(deck.id) & t.deletedAtMs.isNull(),
+                  )
+                  ..orderBy(<OrderingTerm Function(Cards)>[
+                    (Cards t) => OrderingTerm.asc(t.position),
+                    (Cards t) => OrderingTerm.asc(t.createdAtMs),
+                  ]))
+                .get();
         for (final CardRecord card in sourceCards) {
           final String newCardId = _uuid.v4();
           final CardRecord copied = CardRecord(
@@ -979,29 +1019,32 @@ class ContentRepository {
             deletedAtMs: null,
             isDirty: true,
           );
-          await _db.into(_db.cards).insert(
-            CardsCompanion(
-              id: Value<String>(newCardId),
-              deckId: Value<String>(record.id),
-              kind: Value<CardKind>(card.kind),
-              front: Value<String>(card.front),
-              back: Value<String>(card.back),
-              hint: Value<String>(card.hint),
-              notes: Value<String>(card.notes),
-              tagsJson: Value<String>(card.tagsJson),
-              position: Value<int>(card.position),
-              createdAtMs: Value<int>(now),
-              updatedAtMs: Value<int>(now),
-              deletedAtMs: const Value<int?>(null),
-              isDirty: const Value<bool>(true),
-            ),
-          );
+          await _db
+              .into(_db.cards)
+              .insert(
+                CardsCompanion(
+                  id: Value<String>(newCardId),
+                  deckId: Value<String>(record.id),
+                  kind: Value<CardKind>(card.kind),
+                  front: Value<String>(card.front),
+                  back: Value<String>(card.back),
+                  hint: Value<String>(card.hint),
+                  notes: Value<String>(card.notes),
+                  tagsJson: Value<String>(card.tagsJson),
+                  position: Value<int>(card.position),
+                  createdAtMs: Value<int>(now),
+                  updatedAtMs: Value<int>(now),
+                  deletedAtMs: const Value<int?>(null),
+                  isDirty: const Value<bool>(true),
+                ),
+              );
           await _enqueue('card', newCardId, 'create', _cardPayload(copied));
 
           if (includeProgress) {
-            final CardStateRecord? state = await (_db.select(_db.cardStates)
-                  ..where((CardStates t) => t.cardId.equals(card.id)))
-                .getSingleOrNull();
+            final CardStateRecord? state =
+                await (_db.select(_db.cardStates)
+                      ..where((CardStates t) => t.cardId.equals(card.id)))
+                    .getSingleOrNull();
             if (state != null) {
               await _db
                   .into(_db.cardStates)
@@ -1050,9 +1093,9 @@ class ContentRepository {
         throw const ContentFailure('البطاقة غير موجودة.');
       }
       final DateTime at = (reviewedAt ?? DateTime.now()).toUtc();
-      final CardStateRecord? existing = await (_db.select(_db.cardStates)
-            ..where((CardStates t) => t.cardId.equals(cardId)))
-          .getSingleOrNull();
+      final CardStateRecord? existing = await (_db.select(
+        _db.cardStates,
+      )..where((CardStates t) => t.cardId.equals(cardId))).getSingleOrNull();
       final FsrsCard previous = existing == null
           ? FsrsCard.newCard(at)
           : _fsrsFromState(existing);
@@ -1074,7 +1117,9 @@ class ContentRepository {
         learningStep: Value<int>(result.card.learningStep),
         reps: Value<int>(result.card.reps),
         lapses: Value<int>(result.card.lapses),
-        lastReviewMs: Value<int?>(result.card.lastReview?.millisecondsSinceEpoch),
+        lastReviewMs: Value<int?>(
+          result.card.lastReview?.millisecondsSinceEpoch,
+        ),
         isSuspended: Value<bool>(existing?.isSuspended ?? false),
         isBuried: Value<bool>(existing?.isBuried ?? false),
         updatedAtMs: Value<int>(now),
@@ -1143,9 +1188,9 @@ class ContentRepository {
       if (card == null) {
         throw const ContentFailure('البطاقة غير موجودة.');
       }
-      await (_db.delete(_db.cardStates)
-            ..where((CardStates t) => t.cardId.equals(cardId)))
-          .go();
+      await (_db.delete(
+        _db.cardStates,
+      )..where((CardStates t) => t.cardId.equals(cardId))).go();
       await _enqueue('card_state', cardId, 'delete', <String, Object?>{
         'card_id': cardId,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -1168,9 +1213,9 @@ class ContentRepository {
       if (card == null) {
         throw const ContentFailure('البطاقة غير موجودة.');
       }
-      final CardStateRecord? existing = await (_db.select(_db.cardStates)
-            ..where((CardStates t) => t.cardId.equals(cardId)))
-          .getSingleOrNull();
+      final CardStateRecord? existing = await (_db.select(
+        _db.cardStates,
+      )..where((CardStates t) => t.cardId.equals(cardId))).getSingleOrNull();
       final int now = DateTime.now().toUtc().millisecondsSinceEpoch;
       if (existing == null) {
         final FsrsCard fresh = FsrsCard.newCard(DateTime.now().toUtc());
@@ -1196,24 +1241,24 @@ class ContentRepository {
               ),
             );
       } else {
-        await (_db.update(_db.cardStates)
-              ..where((CardStates t) => t.cardId.equals(cardId)))
-            .write(
-              CardStatesCompanion(
-                isSuspended: suspended == null
-                    ? const Value<bool>.absent()
-                    : Value<bool>(suspended),
-                isBuried: buried == null
-                    ? const Value<bool>.absent()
-                    : Value<bool>(buried),
-                updatedAtMs: Value<int>(now),
-                isDirty: const Value<bool>(true),
-              ),
-            );
+        await (_db.update(
+          _db.cardStates,
+        )..where((CardStates t) => t.cardId.equals(cardId))).write(
+          CardStatesCompanion(
+            isSuspended: suspended == null
+                ? const Value<bool>.absent()
+                : Value<bool>(suspended),
+            isBuried: buried == null
+                ? const Value<bool>.absent()
+                : Value<bool>(buried),
+            updatedAtMs: Value<int>(now),
+            isDirty: const Value<bool>(true),
+          ),
+        );
       }
-      final CardStateRecord? updated = await (_db.select(_db.cardStates)
-            ..where((CardStates t) => t.cardId.equals(cardId)))
-          .getSingleOrNull();
+      final CardStateRecord? updated = await (_db.select(
+        _db.cardStates,
+      )..where((CardStates t) => t.cardId.equals(cardId))).getSingleOrNull();
       if (updated != null) {
         await _enqueue(
           'card_state',
@@ -1251,17 +1296,18 @@ class ContentRepository {
       ids.remove(rootId);
     }
     for (final String deckId in ids) {
-      await (_db.update(_db.decks)..where((Decks t) => t.id.equals(deckId)))
-          .write(
-            DecksCompanion(
-              privacy: Value<DeckPrivacy>(privacy),
-              publishedAtMs: Value<int?>(
-                privacy == DeckPrivacy.public ? now : null,
-              ),
-              updatedAtMs: Value<int>(now),
-              isDirty: const Value<bool>(true),
-            ),
-          );
+      await (_db.update(
+        _db.decks,
+      )..where((Decks t) => t.id.equals(deckId))).write(
+        DecksCompanion(
+          privacy: Value<DeckPrivacy>(privacy),
+          publishedAtMs: Value<int?>(
+            privacy == DeckPrivacy.public ? now : null,
+          ),
+          updatedAtMs: Value<int>(now),
+          isDirty: const Value<bool>(true),
+        ),
+      );
       final DeckRecord? updated = await (_getDeckRow(deckId));
       if (updated != null) {
         await _enqueue('deck', deckId, 'update', _deckPayload(updated));
@@ -1270,28 +1316,27 @@ class ContentRepository {
   }
 
   Future<DeckRecord?> _getDeckRow(String id) async {
-    return (_db.select(_db.decks)..where(
-          (Decks t) => t.id.equals(id) & t.deletedAtMs.isNull(),
-        ))
+    return (_db.select(_db.decks)
+          ..where((Decks t) => t.id.equals(id) & t.deletedAtMs.isNull()))
         .getSingleOrNull();
   }
 
   Future<CardRecord?> _getCardRow(String id) async {
-    return (_db.select(_db.cards)..where(
-          (Cards t) => t.id.equals(id) & t.deletedAtMs.isNull(),
-        ))
+    return (_db.select(_db.cards)
+          ..where((Cards t) => t.id.equals(id) & t.deletedAtMs.isNull()))
         .getSingleOrNull();
   }
 
   Future<int> _nextDeckPosition(String? parentId) async {
-    final List<DeckRecord> rows = await (_db.select(_db.decks)..where(
-          (Decks t) =>
-              t.deletedAtMs.isNull() &
-              (parentId == null
-                  ? t.parentId.isNull()
-                  : t.parentId.equals(parentId)),
-        ))
-        .get();
+    final List<DeckRecord> rows =
+        await (_db.select(_db.decks)..where(
+              (Decks t) =>
+                  t.deletedAtMs.isNull() &
+                  (parentId == null
+                      ? t.parentId.isNull()
+                      : t.parentId.equals(parentId)),
+            ))
+            .get();
     int max = -1;
     for (final DeckRecord row in rows) {
       if (row.position > max) {
@@ -1302,11 +1347,11 @@ class ContentRepository {
   }
 
   Future<int> _nextCardPosition(String deckId) async {
-    final List<CardRecord> rows = await (_db.select(_db.cards)..where(
-          (Cards t) =>
-              t.deckId.equals(deckId) & t.deletedAtMs.isNull(),
-        ))
-        .get();
+    final List<CardRecord> rows =
+        await (_db.select(_db.cards)..where(
+              (Cards t) => t.deckId.equals(deckId) & t.deletedAtMs.isNull(),
+            ))
+            .get();
     int max = -1;
     for (final CardRecord row in rows) {
       if (row.position > max) {
@@ -1331,7 +1376,8 @@ class ContentRepository {
     int retentionSample = 0;
     double retentionSum = 0;
 
-    for (final CardSummary card in cardsByDeck[builder.record.id] ?? const <CardSummary>[]) {
+    for (final CardSummary card
+        in cardsByDeck[builder.record.id] ?? const <CardSummary>[]) {
       directCardCount += 1;
       if (card.isSuspended || card.isBuried) {
         suspendedCount += 1;
@@ -1350,8 +1396,7 @@ class ContentRepository {
       if (!isNew && !fsrs.due.isAfter(now)) {
         dueReviewCount += 1;
       }
-      if (fsrs.state == FsrsState.review &&
-          (fsrs.stability ?? 0) >= 21) {
+      if (fsrs.state == FsrsState.review && (fsrs.stability ?? 0) >= 21) {
         masteredCount += 1;
       }
       if (fsrs.reps > 0 && fsrs.stability != null) {
@@ -1471,10 +1516,7 @@ class ContentRepository {
         );
   }
 
-  Map<String, Object?> _deckPayload(
-    DeckRecord record, {
-    int? deletedAtMs,
-  }) {
+  Map<String, Object?> _deckPayload(DeckRecord record, {int? deletedAtMs}) {
     return <String, Object?>{
       'id': record.id,
       'parent_id': record.parentId,
@@ -1500,10 +1542,7 @@ class ContentRepository {
     };
   }
 
-  Map<String, Object?> _cardPayload(
-    CardRecord record, {
-    int? deletedAtMs,
-  }) {
+  Map<String, Object?> _cardPayload(CardRecord record, {int? deletedAtMs}) {
     return <String, Object?>{
       'id': record.id,
       'deck_id': record.deckId,
@@ -1653,7 +1692,6 @@ class _Aggregate {
   final double retentionSum;
   final int descendantDeckCount;
 
-  double get retention => retentionSample == 0
-      ? 0
-      : (retentionSum / retentionSample) * 100;
+  double get retention =>
+      retentionSample == 0 ? 0 : (retentionSum / retentionSample) * 100;
 }

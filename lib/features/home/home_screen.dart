@@ -43,13 +43,14 @@ class HomeScreen extends ConsumerWidget {
                   : a.summary.title.compareTo(b.summary.title);
           }
         });
-        final List<DeckNode> dueRoots = catalog.roots
-            .where((DeckNode node) => node.summary.dueCount > 0)
-            .toList(growable: false)
-          ..sort(
-            (DeckNode a, DeckNode b) =>
-                b.summary.dueCount.compareTo(a.summary.dueCount),
-          );
+        final List<DeckNode> dueRoots =
+            catalog.roots
+                .where((DeckNode node) => node.summary.dueCount > 0)
+                .toList(growable: false)
+              ..sort(
+                (DeckNode a, DeckNode b) =>
+                    b.summary.dueCount.compareTo(a.summary.dueCount),
+              );
         final DeckNode? continueDeck = dueRoots.isEmpty
             ? (catalog.roots.isEmpty ? null : catalog.roots.first)
             : dueRoots.first;
@@ -67,10 +68,7 @@ class HomeScreen extends ConsumerWidget {
               maxWidth(
                 _HomeHeader(
                   displayName: catalog.displayName,
-                  avatarUrl: ref
-                      .watch(authUserProvider)
-                      .valueOrNull
-                      ?.avatarUrl,
+                  avatarUrl: ref.watch(authUserProvider).valueOrNull?.avatarUrl,
                 ),
               ),
               const SizedBox(height: 20),
@@ -79,7 +77,9 @@ class HomeScreen extends ConsumerWidget {
                   stats: stats,
                   onReview: continueDeck == null
                       ? null
-                      : () => context.go('/deck/${continueDeck.summary.id}/study'),
+                      : () => context.go(
+                          '/deck/${continueDeck.summary.id}/study',
+                        ),
                   onBrowse: () => context.go('/library'),
                 ),
               ),
@@ -146,7 +146,9 @@ class HomeScreen extends ConsumerWidget {
                 maxWidth(
                   SectionHeader(
                     title: strings.tagsFilter,
-                    actionLabel: selectedTag == null ? null : strings.clearFilters,
+                    actionLabel: selectedTag == null
+                        ? null
+                        : strings.clearFilters,
                     onAction: selectedTag == null
                         ? null
                         : () => ref.read(selectedTagProvider.notifier).state =
@@ -228,10 +230,7 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({
-    required this.displayName,
-    this.avatarUrl,
-  });
+  const _HomeHeader({required this.displayName, this.avatarUrl});
 
   final String? displayName;
   final String? avatarUrl;
@@ -262,10 +261,7 @@ class _HomeHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                strings.welcomeBack,
-                style: context.texts.labelMedium,
-              ),
+              Text(strings.welcomeBack, style: context.texts.labelMedium),
               const SizedBox(height: 2),
               Text(
                 name,
@@ -304,11 +300,7 @@ class _HomeHeader extends StatelessWidget {
 }
 
 class _DueHero extends StatelessWidget {
-  const _DueHero({
-    required this.stats,
-    this.onReview,
-    this.onBrowse,
-  });
+  const _DueHero({required this.stats, this.onReview, this.onBrowse});
 
   final DashboardStats stats;
   final VoidCallback? onReview;

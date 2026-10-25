@@ -13,14 +13,12 @@ class AppConfig {
 
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue:
-        'sb_publishable_S057e6nIkK3vxrcvcUmZEw_tIKEM83W',
+    defaultValue: 'sb_publishable_S057e6nIkK3vxrcvcUmZEw_tIKEM83W',
   );
 
   static const String googleWebClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
-    defaultValue:
-        '610940162017-ohe2ei9dkkj96cai8gqu0i2jmgbspd8b.apps.googleusercontent.com',
+    defaultValue: '610940162017-ohe2ei9dkkj96cai8gqu0i2jmgbspd8b.apps.googleusercontent.com',
   );
 
   static bool get hasSupabase =>

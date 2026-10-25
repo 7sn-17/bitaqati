@@ -108,7 +108,8 @@ class AuthService {
     if (user == null) {
       return null;
     }
-    final Map<String, dynamic> metadata = user.userMetadata ?? <String, dynamic>{};
+    final Map<String, dynamic> metadata =
+        user.userMetadata ?? <String, dynamic>{};
     final String? name =
         metadata['full_name'] as String? ??
         metadata['name'] as String? ??

@@ -21,42 +21,45 @@ abstract final class AppTheme {
     final Color muted = isDark ? AppColors.darkMuted : AppColors.muted;
     final Color line = isDark ? AppColors.darkLine : AppColors.line;
 
-    final ColorScheme scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.lime,
-      brightness: brightness,
-    ).copyWith(
-      primary: isDark ? AppColors.lime : AppColors.forest,
-      onPrimary: isDark ? AppColors.forest : Colors.white,
-      primaryContainer: isDark
-          ? const Color(0xFF2C4512)
-          : const Color(0xFFE3F7C6),
-      onPrimaryContainer: isDark ? AppColors.lime : AppColors.forest,
-      secondary: isDark ? AppColors.mint : const Color(0xFF2C7A57),
-      onSecondary: isDark ? AppColors.forest : Colors.white,
-      secondaryContainer: isDark
-          ? const Color(0xFF1C3A2C)
-          : const Color(0xFFD8F3E5),
-      onSecondaryContainer: isDark ? AppColors.mint : const Color(0xFF0C3B28),
-      tertiary: isDark ? AppColors.lavender : const Color(0xFF5A4FB6),
-      onTertiary: isDark ? AppColors.forest : Colors.white,
-      tertiaryContainer: isDark
-          ? const Color(0xFF322C5C)
-          : const Color(0xFFE7E3FF),
-      onTertiaryContainer: isDark
-          ? AppColors.lavender
-          : const Color(0xFF221B5A),
-      error: isDark ? AppColors.coral : const Color(0xFFB3261E),
-      onError: isDark ? const Color(0xFF3B0A04) : Colors.white,
-      surface: background,
-      onSurface: ink,
-      surfaceContainerLowest: background,
-      surfaceContainerLow: surface,
-      surfaceContainer: surface,
-      surfaceContainerHigh: surfaceHigh,
-      surfaceContainerHighest: surfaceHighest,
-      outline: line,
-      outlineVariant: line.withValues(alpha: isDark ? 0.8 : 1),
-    );
+    final ColorScheme scheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.lime,
+          brightness: brightness,
+        ).copyWith(
+          primary: isDark ? AppColors.lime : AppColors.forest,
+          onPrimary: isDark ? AppColors.forest : Colors.white,
+          primaryContainer: isDark
+              ? const Color(0xFF2C4512)
+              : const Color(0xFFE3F7C6),
+          onPrimaryContainer: isDark ? AppColors.lime : AppColors.forest,
+          secondary: isDark ? AppColors.mint : const Color(0xFF2C7A57),
+          onSecondary: isDark ? AppColors.forest : Colors.white,
+          secondaryContainer: isDark
+              ? const Color(0xFF1C3A2C)
+              : const Color(0xFFD8F3E5),
+          onSecondaryContainer: isDark
+              ? AppColors.mint
+              : const Color(0xFF0C3B28),
+          tertiary: isDark ? AppColors.lavender : const Color(0xFF5A4FB6),
+          onTertiary: isDark ? AppColors.forest : Colors.white,
+          tertiaryContainer: isDark
+              ? const Color(0xFF322C5C)
+              : const Color(0xFFE7E3FF),
+          onTertiaryContainer: isDark
+              ? AppColors.lavender
+              : const Color(0xFF221B5A),
+          error: isDark ? AppColors.coral : const Color(0xFFB3261E),
+          onError: isDark ? const Color(0xFF3B0A04) : Colors.white,
+          surface: background,
+          onSurface: ink,
+          surfaceContainerLowest: background,
+          surfaceContainerLow: surface,
+          surfaceContainer: surface,
+          surfaceContainerHigh: surfaceHigh,
+          surfaceContainerHighest: surfaceHighest,
+          outline: line,
+          outlineVariant: line.withValues(alpha: isDark ? 0.8 : 1),
+        );
 
     final TextTheme textTheme = _textTheme(ink, muted);
     final RoundedRectangleBorder rounded = RoundedRectangleBorder(
@@ -172,11 +175,7 @@ abstract final class AppTheme {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
-      dividerTheme: DividerThemeData(
-        color: line,
-        thickness: 1,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith<Color>(
           (Set<WidgetState> states) => states.contains(WidgetState.selected)
@@ -191,9 +190,7 @@ abstract final class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: isDark
-            ? AppColors.darkSurfaceHighest
-            : AppColors.ink,
+        backgroundColor: isDark ? AppColors.darkSurfaceHighest : AppColors.ink,
         contentTextStyle: TextStyle(
           color: isDark ? AppColors.darkInk : Colors.white,
           fontWeight: FontWeight.w600,

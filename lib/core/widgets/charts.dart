@@ -76,10 +76,7 @@ class ReviewHeatmap extends StatelessWidget {
         const SizedBox(height: 9),
         Row(
           children: <Widget>[
-            Text(
-              context.strings.activity,
-              style: context.texts.labelSmall,
-            ),
+            Text(context.strings.activity, style: context.texts.labelSmall),
             const Spacer(),
             Text('0', style: context.texts.labelSmall),
             const SizedBox(width: 4),
@@ -89,9 +86,7 @@ class ReviewHeatmap extends StatelessWidget {
                 height: 10,
                 margin: const EdgeInsets.only(left: 3),
                 decoration: BoxDecoration(
-                  color: colors.primary.withValues(
-                    alpha: 0.18 + index * 0.22,
-                  ),
+                  color: colors.primary.withValues(alpha: 0.18 + index * 0.22),
                   borderRadius: BorderRadius.circular(3),
                 ),
               );
@@ -178,10 +173,7 @@ class _ForecastPainter extends CustomPainter {
           Rect.fromLTWH(x, topPadding + chartHeight - height, barWidth, height),
           const Radius.circular(5),
         );
-        canvas.drawRRect(
-          barRect,
-          i == 0 || i == 1 ? highlight : bar,
-        );
+        canvas.drawRRect(barRect, i == 0 || i == 1 ? highlight : bar);
       }
       if (i % 5 == 0) {
         final TextPainter painter = TextPainter(
