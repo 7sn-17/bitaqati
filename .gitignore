@@ -27,6 +27,11 @@ android/app/upload-keystore.jks
 *.secret
 !.env.example
 
+# Build outputs
+*.apk
+*.aab
+*.zip
+
 # Generated
 *.g.dart
 *.freezed.dart

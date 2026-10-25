@@ -564,11 +564,14 @@ class _RatingButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool light = spec.color == Colors.white;
     final bool dark = spec.color == const Color(0xFF054D28);
+    final bool danger = spec.color == AppColors.danger;
     final Color background = light ? Colors.white : spec.color;
     final Color foreground = light
         ? AppColors.primary
         : dark
         ? AppColors.accent
+        : danger
+        ? Colors.white
         : AppColors.primary;
 
     return GestureDetector(
