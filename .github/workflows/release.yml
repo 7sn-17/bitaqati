@@ -1,0 +1,68 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Rename artifact
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk bitaqati-phase0.apk
+          ls -lh bitaqati-phase0.apk
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v3
+        with:
+          name: "بطاقاتي ${{ github.ref_name }}"
+          body: |
+            ## بطاقاتي — المرحلة 0
+
+            واجهة كاملة بأسلوب iOS مع دعم RTL، وضع فاتح وداكن، تنقل بأربعة تبويبات
+            وزر إنشاء مركزي، وشاشات المراجعة والمكتبة والتقدّم والإعدادات والبحث.
+
+            ### التثبيت
+            1. نزّل ملف `bitaqati-phase0.apk` من الأسفل.
+            2. افتح الملف على جهاز أندرويد واسمح بتثبيت التطبيقات من هذا المصدر.
+            3. ثبّت التطبيق.
+
+            ### ملاحظات
+            - هذه نسخة تأسيسية (Phase 0) وليست النسخة النهائية.
+            - محرّك المراجعة المحلي والمزامنة والذكاء الاصطناعي في المراحل القادمة.
+            - يعمل التطبيق دون إنترنت.
+          files: bitaqati-phase0.apk
+          prerelease: true
+          generate_release_notes: true
