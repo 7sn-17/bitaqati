@@ -5,7 +5,7 @@
 > **الحالة:** المرحلة 0 — التأسيس. واجهة كاملة قابلة للتصفح + هوية بصرية + مخطط قاعدة البيانات + خط بناء APK.
 > محرّك المراجعة المحلي، الاستيراد، والذكاء الاصطناعي تأتي في المراحل التالية.
 
-**تحميل APK:** [الإصدار v0.1.0-phase0](https://github.com/7sn-17/bitaqati/releases/tag/v0.1.0-phase0)
+**تحميل APK:** [الإصدار v0.1.1-phase0](https://github.com/7sn-17/bitaqati/releases/tag/v0.1.1-phase0)
 
 **المستودع:** <https://github.com/7sn-17/bitaqati> · **التوثيق:** [docs/PHASE_0.md](docs/PHASE_0.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
