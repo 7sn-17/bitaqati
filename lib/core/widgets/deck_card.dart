@@ -9,6 +9,17 @@ class DeckCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return DeckSummaryCard(deck: deck, onTap: onTap);
+  }
+}
+
+class DeckSummaryCard extends StatelessWidget {
+  const DeckSummaryCard({super.key, required this.deck, this.onTap});
+  final DeckSummary deck;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final Color cardColor = deck.subject.color;
 
@@ -31,10 +42,7 @@ class DeckCard extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cardColor.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.2), shape: BoxShape.circle),
                     child: Icon(deck.subject.icon, color: cardColor),
                   ),
                   const SizedBox(width: 16),
@@ -42,16 +50,8 @@ class DeckCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          deck.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          '${deck.cardCount} cards • ${deck.dueCount} due',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted),
-                        ),
+                        Text(deck.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('${deck.cardCount} cards • ${deck.dueCount} due', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.muted)),
                       ],
                     ),
                   ),
@@ -71,4 +71,12 @@ class DeckCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class DeckTile extends StatelessWidget {
+  const DeckTile({super.key, required this.deck, this.onTap});
+  final DeckSummary deck;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) => DeckSummaryCard(deck: deck, onTap: onTap);
 }

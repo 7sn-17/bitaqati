@@ -80,5 +80,5 @@ final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>((Ref 
 final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>((Ref ref) => throw UnimplementedError());
 final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((Ref ref) => true);
 
-// Restored to String? because the UI expects it
-final StateProvider<String?> selectedSubjectProvider = StateProvider<String?>((Ref ref) => null);
+// تم إرجاع SubjectId?
+final StateProvider<SubjectId?> selectedSubjectProvider = StateProvider<SubjectId?>((Ref ref) => null);
