@@ -7,7 +7,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write # تم التغيير إلى write للسماح بإنشاء Releases
 
 jobs:
   build:
@@ -74,14 +74,17 @@ jobs:
             echo "No release keystore configured; skipping key.properties."
           fi
 
-      # هذا هو السطر السحري الذي يقلل الحجم
       - name: Build release APK (Split per ABI)
         run: flutter build apk --release --split-per-abi
 
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
+      - name: Create Release and Upload APKs
+        uses: softprops/action-gh-release@v2
         with:
-          name: bitaqati-split-apks
-          path: build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
-          retention-days: 30
+          # إنشاء Tag فريد يحتوي على اسم الفرع ورقم البناء
+          tag_name: build-${{ github.ref_name }}-${{ github.run_number }}
+          name: "نسخة تجريبية: ${{ github.ref_name }} (بناء ${{ github.run_number }})"
+          # جعله Prerelease (لأنه ليس الإصدار النهائي المستقر بعد)
+          prerelease: true
+          files: build/app/outputs/flutter-apk/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
