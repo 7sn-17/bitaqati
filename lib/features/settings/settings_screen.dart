@@ -108,8 +108,9 @@ class SettingsScreen extends ConsumerWidget {
                 _Row(
                   icon: CupertinoIcons.mail,
                   title: 'البريد الإلكتروني',
-                  subtitle: 'غير مرتبط بعد',
-                  onTap: () => _comingSoon(context, 'ربط الحساب'),
+                  subtitle: ref.watch(authUserProvider).valueOrNull?.email ??
+                      'وضع الضيف — اضغط لتسجيل الدخول',
+                  onTap: () => _openLogin(context, ref),
                 ),
                 _Row(
                   icon: CupertinoIcons.arrow_2_circlepath,
@@ -244,7 +245,7 @@ class SettingsScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: OutlinedButton(
-                onPressed: () => _comingSoon(context, 'تسجيل الخروج'),
+                onPressed: () => _signOut(context, ref),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
                   side: const BorderSide(color: AppColors.danger),
@@ -263,6 +264,24 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openLogin(BuildContext context, WidgetRef ref) async {
+    if (ref.read(authServiceProvider).currentUser != null) {
+      return;
+    }
+    await ref.read(guestModeProvider.notifier).leaveGuest();
+    if (context.mounted) {
+      context.go('/login');
+    }
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    await ref.read(authServiceProvider).signOut();
+    await ref.read(guestModeProvider.notifier).leaveGuest();
+    if (context.mounted) {
+      context.go('/login');
+    }
   }
 
   void _comingSoon(BuildContext context, String feature) {

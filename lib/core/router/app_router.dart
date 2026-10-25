@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/login_screen.dart';
 import '../../features/deck/deck_detail_screen.dart';
 import '../../features/decks/decks_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -19,22 +20,48 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final bool onboarded = ref.read(onboardingCompletedProvider);
 
+  // Re-evaluate redirects whenever onboarding, guest mode or auth changes.
+  final ValueNotifier<int> refresh = ValueNotifier<int>(0);
+  ref.onDispose(refresh.dispose);
+  ref.listen(onboardingCompletedProvider, (_, __) => refresh.value++);
+  ref.listen(guestModeProvider, (_, __) => refresh.value++);
+  ref.listen(authUserProvider, (_, __) => refresh.value++);
+
+  bool signedIn() =>
+      ref.read(authUserProvider).valueOrNull != null ||
+      ref.read(authServiceProvider).currentUser != null;
+
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: onboarded ? '/home' : '/onboarding',
+    refreshListenable: refresh,
     debugLogDiagnostics: false,
     redirect: (BuildContext context, GoRouterState state) {
       final bool done = ref.read(onboardingCompletedProvider);
-      final bool atOnboarding = state.matchedLocation == '/onboarding';
-      if (!done && !atOnboarding) {
-        return '/onboarding';
+      final String at = state.matchedLocation;
+      if (!done) {
+        return at == '/onboarding' ? null : '/onboarding';
       }
-      if (done && atOnboarding) {
+      if (at == '/onboarding') {
+        return '/home';
+      }
+      final bool needsLogin = ref.read(supabaseConfiguredProvider) &&
+          !signedIn() &&
+          !ref.read(guestModeProvider);
+      if (needsLogin) {
+        return at == '/login' ? null : '/login';
+      }
+      if (at == '/login') {
         return '/home';
       }
       return null;
     },
     routes: <RouteBase>[
+      GoRoute(
+        path: '/login',
+        builder: (BuildContext context, GoRouterState state) =>
+            const LoginScreen(),
+      ),
       GoRoute(
         path: '/onboarding',
         builder: (BuildContext context, GoRouterState state) =>

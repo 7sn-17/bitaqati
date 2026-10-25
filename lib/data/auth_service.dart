@@ -41,9 +41,13 @@ class AuthService {
     if (!isConfigured) {
       return Stream<AuthUser?>.value(null);
     }
-    return _client.auth.onAuthStateChange.map(
-      (AuthState state) => _mapUser(state.session?.user),
-    );
+    try {
+      return _client.auth.onAuthStateChange.map(
+        (AuthState state) => _mapUser(state.session?.user),
+      );
+    } on Object {
+      return Stream<AuthUser?>.value(null);
+    }
   }
 
   /// Attempts the native Google account picker first. If Android rejects the
