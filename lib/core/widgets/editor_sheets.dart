@@ -1,3 +1,4 @@
+import '../../data/models.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/enums.dart';

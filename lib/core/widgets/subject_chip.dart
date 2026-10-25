@@ -13,7 +13,7 @@ class SubjectChip extends StatelessWidget {
     super.key,
   });
 
-  final String label;
+  final SubjectId label;
   final bool selected;
   final VoidCallback onTap;
   final Color? color;
@@ -65,8 +65,8 @@ class SubjectFilterBar extends StatelessWidget {
     super.key,
   });
 
-  final String? selected;
-  final ValueChanged<String?> onChanged;
+  final SubjectId? selected;
+  final ValueChanged<SubjectId?> onChanged;
   final bool includeAll;
 
   @override

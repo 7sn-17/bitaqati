@@ -21,7 +21,7 @@ class AppStrings {
   String get getStarted => _t('ابدأ الآن', 'Get started');
   String get skip => _t('تخطي', 'Skip');
   String get next => _t('التالي', 'Next');
-  String get back => _t('رجوع', 'Back'); // Navigation back button
+  String get navBack => _t('رجوع', 'Back'); // Navigation back button (Renamed from back)
   String get done => _t('تم', 'Done');
   String get cancel => _t('إلغاء', 'Cancel');
   String get save => _t('حفظ', 'Save');
@@ -128,15 +128,14 @@ class AppStrings {
   String get addCard => _t('بطاقة جديدة', 'New card');
   String get editCard => _t('تعديل البطاقة', 'Edit card');
   
-  // Fixed: Renamed to cardFront and cardBack to avoid duplicate keys, 
-  // and added front/back aliases for older UI references
+  // Card faces
   String get front => _t('الوجه', 'Front');
-  String get back => _t('الظهر', 'Back');
-  String get frontHint => _t('السؤال أو المفهوم', 'Question or concept');
-  String get backHint => _t('الإجابة المختصرة', 'Short answer');
+  String get back => _t('الظهر', 'Back'); 
   
   String get hint => _t('تلميح', 'Hint');
   String get notes => _t('ملاحظات', 'Notes');
+  String get cardFrontHint => _t('السؤال أو المفهوم', 'Question or concept');
+  String get cardBackHint => _t('الإجابة المختصرة', 'Short answer');
   String get hintHint => _t('تلميح اختياري', 'Optional hint');
   String get notesHint => _t('شرح إضافي اختياري', 'Optional extra explanation');
   String get cardAdded => _t('أُضيفت البطاقة', 'Card added');
