@@ -1,100 +1,34 @@
 import 'package:flutter/material.dart';
-
-import '../../data/models.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_theme.dart';
+import '../../domain/models.dart';
 
 class SubjectChip extends StatelessWidget {
-  const SubjectChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.color,
-    super.key,
-  });
-
-  final SubjectId label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Color? color;
+  const SubjectChip({super.key, required this.subjectId, this.isSelected = false, this.onTap});
+  final SubjectId? subjectId;
+  final bool isSelected;
+  final ValueChanged<SubjectId?>? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final Color accent = color ?? AppColors.primary;
-    final Color background = selected
-        ? (context.isDark ? AppColors.accent : accent)
-        : context.colors.surfaceContainerHighest;
-    final Color foreground = selected
-        ? (context.isDark ? AppColors.primary : Colors.white)
-        : context.colors.onSurface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final subject = subjectId != null ? subjectById(subjectId!) : null;
+    final label = subject?.nameAr ?? 'الكل';
+    final color = subject?.color ?? (isDark ? Colors.white : Colors.black);
 
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              fontSize: 13,
-              height: 1.2,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-              color: foreground,
-            ),
+    return GestureDetector(
+      onTap: () => onTap?.call(subjectId),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color : (isDark ? Colors.grey[800] : Colors.grey[200]),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : (isDark ? Colors.white : Colors.black),
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class SubjectFilterBar extends StatelessWidget {
-  const SubjectFilterBar({
-    required this.selected,
-    required this.onChanged,
-    this.includeAll = true,
-    super.key,
-  });
-
-  final SubjectId? selected;
-  final ValueChanged<SubjectId?> onChanged;
-  final bool includeAll;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 38,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: <Widget>[
-          if (includeAll) ...<Widget>[
-            SubjectChip(
-              label: 'الكل',
-              selected: selected == null,
-              onTap: () => onChanged(null),
-            ),
-            const SizedBox(width: 8),
-          ],
-          for (final Subject subject in kSubjects) ...<Widget>[
-            SubjectChip(
-              label: subject.nameAr,
-              color: subject.color,
-              selected: selected == subject.id,
-              onTap: () => onChanged(subject.id),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ],
       ),
     );
   }

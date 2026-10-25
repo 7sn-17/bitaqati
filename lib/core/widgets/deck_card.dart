@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../data/models.dart';
+import '../../domain/models.dart';
 import '../theme/app_colors.dart';
 
 class DeckCard extends StatelessWidget {
@@ -9,19 +9,8 @@ class DeckCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DeckSummaryCard(deck: deck, onTap: onTap);
-  }
-}
-
-class DeckSummaryCard extends StatelessWidget {
-  const DeckSummaryCard({super.key, required this.deck, this.onTap});
-  final DeckSummary deck;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color cardColor = deck.subject.color;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = deck.color;
 
     return Card(
       elevation: 0,
@@ -43,7 +32,7 @@ class DeckSummaryCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(color: cardColor.withValues(alpha: 0.2), shape: BoxShape.circle),
-                    child: Icon(deck.subject.icon, color: cardColor),
+                    child: Icon(deck.deckIcon, color: cardColor),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -73,10 +62,18 @@ class DeckSummaryCard extends StatelessWidget {
   }
 }
 
+class DeckSummaryCard extends StatelessWidget {
+  const DeckSummaryCard({super.key, required this.deck, this.onTap});
+  final DeckSummary deck;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) => DeckCard(deck: deck, onTap: onTap);
+}
+
 class DeckTile extends StatelessWidget {
   const DeckTile({super.key, required this.deck, this.onTap});
   final DeckSummary deck;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => DeckSummaryCard(deck: deck, onTap: onTap);
+  Widget build(BuildContext context) => DeckCard(deck: deck, onTap: onTap);
 }
