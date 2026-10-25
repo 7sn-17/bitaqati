@@ -4,7 +4,8 @@
 
 - GitHub repository: <https://github.com/7sn-17/bitaqati> (private, `main`).
 - Supabase project: `bitaqati` / `mftghnvtdryxzochquee` / `eu-central-1` / Free.
-- Flutter Android package: `app.bitaqati.cards`.
+- Flutter Android package: `com.bitaqati.app` (renamed from `app.bitaqati.cards`
+  in the Phase 1 infrastructure checkpoint).
 - First installable APK: <https://github.com/7sn-17/bitaqati/releases/tag/v0.1.1-phase0>.
 - CI: `Build Android APK` on every push to `main`; `Release APK` on `v*` tags.
 

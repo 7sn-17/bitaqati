@@ -37,38 +37,67 @@ jobs:
         run: dart run flutter_launcher_icons
 
       - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib
+        run: dart format --output=none --set-exit-if-changed $(git ls-files 'lib/**/*.dart')
 
       - name: Analyze
         run: flutter analyze
+
+      - name: Require release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "KEYSTORE_BASE64 is missing. Refusing to publish a debug-signed release."
+            exit 1
+          fi
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/bitaqati.p12
+          chmod 600 android/app/bitaqati.p12
+
+      - name: Create key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          {
+            echo "storePassword=${KEYSTORE_PASSWORD}"
+            echo "keyPassword=${KEY_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "storeFile=bitaqati.p12"
+          } > android/key.properties
+          chmod 600 android/key.properties
 
       - name: Build release APK
         run: flutter build apk --release
 
       - name: Rename artifact
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk bitaqati-phase0.apk
-          ls -lh bitaqati-phase0.apk
+          cp build/app/outputs/flutter-apk/app-release.apk bitaqati-signed.apk
+          ls -lh bitaqati-signed.apk
 
       - name: Publish prerelease
         uses: softprops/action-gh-release@v3
         with:
           name: "بطاقاتي ${{ github.ref_name }}"
           body: |
-            ## بطاقاتي — المرحلة 0
+            ## بطاقاتي — نسخة موقّعة
 
-            واجهة كاملة بأسلوب iOS مع دعم RTL، وضع فاتح وداكن، تنقل بأربعة تبويبات
-            وزر إنشاء مركزي، وشاشات المراجعة والمكتبة والتقدّم والإعدادات والبحث.
+            هذه نسخة موقّعة بمفتاح الإصدار الرسمي، بحزمة أندرويد
+            `com.bitaqati.app` وأيقونة التطبيق النهائية.
 
             ### التثبيت
-            1. نزّل ملف `bitaqati-phase0.apk` من الأسفل.
+            1. نزّل ملف `bitaqati-signed.apk`.
             2. افتح الملف على جهاز أندرويد واسمح بتثبيت التطبيقات من هذا المصدر.
             3. ثبّت التطبيق.
 
             ### ملاحظات
-            - هذه نسخة تأسيسية (Phase 0) وليست النسخة النهائية.
-            - محرّك المراجعة المحلي والمزامنة والذكاء الاصطناعي في المراحل القادمة.
-            - يعمل التطبيق دون إنترنت.
-          files: bitaqati-phase0.apk
+            - هذه نسخة تحقق من البنية والتوقيع. محرّك FSRS الكامل وواجهة
+              المرحلة الأولى قيد التنفيذ.
+          files: bitaqati-signed.apk
           prerelease: true
           generate_release_notes: true

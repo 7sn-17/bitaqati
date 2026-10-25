@@ -18,8 +18,10 @@ android/app/debug/
 android/app/profile/
 android/app/release/
 android/app/upload-keystore.jks
+android/app/bitaqati.p12
 *.jks
 *.keystore
+*.p12
 
 # Environment and secrets
 .env

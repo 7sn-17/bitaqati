@@ -66,16 +66,16 @@ GitHub Secrets and update `android/app/build.gradle.kts`.
 
 ## APK
 
-Download the latest `bitaqati-phase0-apk` artifact from the **Actions** tab, or
+Download the latest `bitaqati-signed-apk` artifact from the **Actions** tab, or
 run:
 
 ```bash
 gh run download --repo 7sn-17/bitaqati \
-  -n bitaqati-phase0-apk -D ./dist
+  -n bitaqati-signed-apk -D ./dist
 ```
 
 Install on a connected Android device:
 
 ```bash
-adb install -r ./dist/bitaqati-phase0.apk
+adb install -r ./dist/bitaqati-signed.apk
 ```

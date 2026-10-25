@@ -1,4 +1,4 @@
-package app.bitaqati.cards
+package com.bitaqati.app
 
 import io.flutter.embedding.android.FlutterActivity
 

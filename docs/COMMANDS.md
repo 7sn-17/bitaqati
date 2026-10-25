@@ -22,15 +22,15 @@ git pull origin main
 ```bash
 cd ~/cards
 gh release download v0.1.1-phase0 \
-  -p bitaqati-phase0.apk \
-  -O bitaqati-phase0.apk
+  -p bitaqati-signed.apk \
+  -O bitaqati-signed.apk
 ```
 
 ## 3) تثبيت التطبيق
 
 ```bash
 cd ~/cards
-termux-open ./bitaqati-phase0.apk
+termux-open ./bitaqati-signed.apk
 ```
 
 سيطلب أندرويد السماح بتثبيت التطبيقات من هذا المصدر. اسمح مرة واحدة، ثم
@@ -67,7 +67,7 @@ gh run view --log-failed
 
 ```bash
 gh run list --limit 1
-gh run download <RUN_ID> -n bitaqati-phase0-apk -D ./dist
+gh run download <RUN_ID> -n bitaqati-signed-apk -D ./dist
 ```
 
 ## 7) إصدار جديد (لاحقاً)
