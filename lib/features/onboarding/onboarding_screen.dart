@@ -34,7 +34,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _OnboardingPage(
       title: 'مكتبة من الطلاب',
       body: 'اكتشف مجموعات جاهزة في الفيزياء والكيمياء والبيولوجيا وتاريخ الطب والانكليزية 1.',
-      icon: CupertinoIcons.books,
+      icon: CupertinoIcons.book,
       accent: Color(0xFFCFE8C0),
     ),
   ];

@@ -48,8 +48,8 @@ flutter build apk --release
 
 ## GitHub Actions
 
-- `Bootstrap Android Host` يولد مجلد `android/` القياسي من Flutter، يشغّل التحليل، ويبني APK تجريبي.
-- بعد تثبيت مجلد `android/` في المستودع، سيصبح سير البناء الدائم هو `Build Android APK`.
+- `Build Android APK` يشغّل التحليل ويبني APK إصدار قابل للتثبيت عند كل دفعة إلى `main`.
+- يمكن تشغيله يدوياً من تبويب Actions، وتُنزّل الحزمة من قسم Artifacts.
 
 ## البنية
 

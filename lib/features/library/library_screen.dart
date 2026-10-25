@@ -103,7 +103,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ),
                   const SizedBox(width: 12),
                   const Icon(
-                    CupertinoIcons.books,
+                    CupertinoIcons.book,
                     color: AppColors.accent,
                     size: 38,
                   ),
@@ -142,7 +142,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    selected == null ? 'الأكثر استخداماً' : selected.nameAr,
+                    selected == null
+                        ? 'الأكثر استخداماً'
+                        : subjectById(selected).nameAr,
                     style: context.texts.titleLarge,
                   ),
                 ),

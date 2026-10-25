@@ -48,10 +48,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     color: context.colors.surfaceContainerHighest,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    CupertinoIcons.chart_bar_fill,
-                    size: 21,
-                  ),
+                  child: const Icon(CupertinoIcons.chart_bar_fill, size: 21),
                 ),
               ],
             ),
