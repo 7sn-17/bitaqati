@@ -462,7 +462,7 @@ class _CardRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(card.front, style: context.texts.titleSmall),
+                  Text(card.cardFront, style: context.texts.titleSmall),
                   const SizedBox(height: 2),
                   Text(
                     card.back,

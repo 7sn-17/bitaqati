@@ -65,8 +65,8 @@ class SubjectFilterBar extends StatelessWidget {
     super.key,
   });
 
-  final SubjectId? selected;
-  final ValueChanged<SubjectId?> onChanged;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
   final bool includeAll;
 
   @override

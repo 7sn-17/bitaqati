@@ -583,7 +583,7 @@ class StarterLesson {
 
 class StarterCard {
   const StarterCard({
-    required this.front,
+    required this.cardFront,
     required this.back,
     required this.tags,
     this.hint = '',

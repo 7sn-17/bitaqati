@@ -27,7 +27,7 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final SubjectId? selected = ref.watch(selectedSubjectProvider);
+    final String? selected = ref.watch(selectedSubjectProvider);
     final String query = _search.text.trim();
     final List<DeckSummary> decks = kMyDecks
         .where((DeckSummary deck) {
@@ -106,7 +106,7 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
           const SizedBox(height: 14),
           SubjectFilterBar(
             selected: selected,
-            onChanged: (SubjectId? value) {
+            onChanged: (String? value) {
               ref.read(selectedSubjectProvider.notifier).state = value;
             },
           ),

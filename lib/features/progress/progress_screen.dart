@@ -457,13 +457,13 @@ class _SubjectRetention extends StatelessWidget {
     );
   }
 
-  double _retention(SubjectId id) {
+  double _retention(String id) {
     return switch (id) {
-      SubjectId.physics => 88,
-      SubjectId.chemistry => 76,
-      SubjectId.biology => 91,
-      SubjectId.historyOfMedicine => 82,
-      SubjectId.english1 => 74,
+      String.physics => 88,
+      String.chemistry => 76,
+      String.biology => 91,
+      String.historyOfMedicine => 82,
+      String.english1 => 74,
     };
   }
 }

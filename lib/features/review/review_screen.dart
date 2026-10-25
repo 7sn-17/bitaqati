@@ -361,7 +361,7 @@ class _CardBody extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              card.front,
+              card.cardFront,
               style: TextStyle(
                 fontFamily: 'ReadexPro',
                 fontSize: 24,
@@ -423,7 +423,7 @@ class _CardBody extends StatelessWidget {
             ),
           ] else ...<Widget>[
             Text(
-              card.front,
+              card.cardFront,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.62),
                 fontSize: 13,
