@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/auth_service.dart';
 import '../data/content_repository.dart';
@@ -12,8 +13,9 @@ final Provider<AppPreferences> appPreferencesProvider =
       (Ref ref) => throw UnimplementedError('Override in bootstrap'),
     );
 
-final Provider<ContentRepository> contentRepositoryProvider =
-    Provider<ContentRepository>((Ref ref) => ContentRepository());
+final Provider<ContentRepository> contentRepositoryProvider = Provider<ContentRepository>(
+  (Ref ref) => ContentRepository(),
+);
 
 final Provider<AuthService> authServiceProvider = Provider<AuthService>(
   (Ref ref) => AuthService(),
@@ -138,5 +140,21 @@ final StateProvider<int> progressRangeProvider = StateProvider<int>(
 );
 
 final StateProvider<DateTime?> lastSyncProvider = StateProvider<DateTime?>(
+  (Ref ref) => null,
+);
+
+// =========================================================================
+// MISSING PROVIDERS ADDED TO FIX BUILD ERRORS
+// =========================================================================
+
+final Provider<SharedPreferences> sharedPreferencesProvider = Provider<SharedPreferences>(
+  (Ref ref) => throw UnimplementedError('Override in main.dart'),
+);
+
+final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>(
+  (Ref ref) => true,
+);
+
+final StateProvider<String?> selectedSubjectProvider = StateProvider<String?>(
   (Ref ref) => null,
 );
