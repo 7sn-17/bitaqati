@@ -7,7 +7,7 @@
 
 **تحميل APK:** [الإصدار v0.1.1-phase0](https://github.com/7sn-17/bitaqati/releases/tag/v0.1.1-phase0)
 
-**المستودع:** <https://github.com/7sn-17/bitaqati> · **التوثيق:** [docs/PHASE_0.md](docs/PHASE_0.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+**المستودع:** <https://github.com/7sn-17/bitaqati> · **التوثيق:** [docs/PHASE_0.md](docs/PHASE_0.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [أوامر المتابعة](docs/COMMANDS.md)
 
 ---
 
