@@ -143,9 +143,9 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: Row(
                             children: <Widget>[
                               Icon(
-                                subjectById(card.subjectId).icon,
+                                subjectById(card.subjectId ?? SubjectId.biology).icon,
                                 size: 20,
-                                color: subjectById(card.subjectId).color,
+                                color: subjectById(card.subjectId ?? SubjectId.biology).color,
                               ),
                               const SizedBox(width: 10),
                               Expanded(

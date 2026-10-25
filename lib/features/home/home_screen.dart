@@ -33,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
             case 'az':
               return a.summary.title.compareTo(b.summary.title);
             case 'new':
-              return b.summary.createdAt?.compareTo(a.summary.createdAt);
+              return (b.summary.createdAt ?? DateTime(1970)).compareTo(a.summary.createdAt ?? DateTime(1970));
             default:
               final int byDue = b.summary.dueCount.compareTo(
                 a.summary.dueCount,

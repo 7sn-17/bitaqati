@@ -391,7 +391,7 @@ class ContentRepository {
     DeckPrivacy? privacy,
     bool? isArchived,
   }) async {
-    final String? cleanTitle = title??.trim() ?? "";
+    final String? cleanTitle = title?.trim() ?? "";
     if (title != null && cleanTitle!.isEmpty) {
       throw const ContentFailure('العنوان مطلوب.');
     }
@@ -595,8 +595,8 @@ class ContentRepository {
     List<String>? tags,
     CardKind? kind,
   }) async {
-    final String? cleanFront = front??.trim() ?? "";
-    final String? cleanBack = back??.trim() ?? "";
+    final String? cleanFront = front?.trim() ?? "";
+    final String? cleanBack = back?.trim() ?? "";
     if (front != null && cleanFront!.isEmpty) {
       throw const ContentFailure('وجه البطاقة مطلوب.');
     }
@@ -1383,7 +1383,7 @@ class ContentRepository {
         suspendedCount += 1;
         continue;
       }
-      final FsrsCard fsrs = card.fsrs;
+      final FsrsCard fsrs = card.fsrs ?? FsrsCard.newCard(DateTime.now());
       final bool isNew = fsrs.state == FsrsState.newCard || fsrs.reps == 0;
       if (isNew) {
         newCount += 1;
@@ -1475,7 +1475,7 @@ class ContentRepository {
       masteredCount: aggregate.masteredCount,
       suspendedCount: aggregate.suspendedCount,
       retention: aggregate.retention,
-      retentionSample: aggregate.retentionSample,
+      retentionSample: aggregate.retentionSample.toDouble(),
     );
   }
 

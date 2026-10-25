@@ -6,12 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/deck_card.dart';
-import '../../core/widgets/subject_chip.dart';
 import '../../data/models.dart';
 
 class DecksScreen extends ConsumerStatefulWidget {
   const DecksScreen({super.key});
-
   @override
   ConsumerState<DecksScreen> createState() => _DecksScreenState();
 }
@@ -27,19 +25,16 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String? selected = ref.watch(selectedSubjectProvider);
+    final SubjectId? selected = ref.watch(selectedSubjectProvider);
     final String query = _search.text.trim();
-    final List<DeckSummary> decks = kMyDecks
-        .where((DeckSummary deck) {
-          final bool subjectMatches =
-              selected == null || deck.subjectId == selected;
-          final bool queryMatches =
-              query.isEmpty ||
-              deck.title.contains(query) ||
-              deck.subject.nameAr.contains(query);
-          return subjectMatches && queryMatches;
-        })
-        .toList(growable: false);
+    final List<DeckSummary> decks = kMyDecks.where((DeckSummary deck) {
+      final bool subjectMatches = selected == null || deck.subjectId == selected;
+      final bool queryMatches =
+          query.isEmpty ||
+          deck.title.contains(query) ||
+          deck.subject.nameAr.contains(query);
+      return subjectMatches && queryMatches;
+    }).toList(growable: false);
 
     return SafeArea(
       bottom: false,
@@ -56,26 +51,19 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
                     children: <Widget>[
                       Text('مجموعاتي', style: context.texts.headlineLarge),
                       const SizedBox(height: 2),
-                      Text(
-                        'كل ما تدرسه، منظّم في مكان واحد',
-                        style: context.texts.bodySmall,
-                      ),
+                      Text('كل ما تدرسه، منظّم في مكان واحد',
+                          style: context.texts.bodySmall),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
                     color: context.colors.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: Text(
-                    '${kMyDecks.length} مجموعات',
-                    style: context.texts.labelMedium,
-                  ),
+                  child: Text('${kMyDecks.length} مجموعات',
+                      style: context.texts.labelMedium),
                 ),
               ],
             ),
@@ -106,7 +94,7 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
           const SizedBox(height: 14),
           SubjectFilterBar(
             selected: selected,
-            onChanged: (String? value) {
+            onChanged: (SubjectId? value) {
               ref.read(selectedSubjectProvider.notifier).state = value;
             },
           ),
@@ -116,21 +104,14 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
               child: Column(
                 children: <Widget>[
-                  Icon(
-                    CupertinoIcons.search,
-                    size: 42,
-                    color: context.texts.bodySmall?.color,
-                  ),
+                  Icon(CupertinoIcons.search,
+                      size: 42, color: context.texts.bodySmall?.color),
                   const SizedBox(height: 12),
-                  Text(
-                    'لا توجد نتائج مطابقة',
-                    style: context.texts.titleMedium,
-                  ),
+                  Text('لا توجد نتائج مطابقة',
+                      style: context.texts.titleMedium),
                   const SizedBox(height: 4),
-                  Text(
-                    'جرّب مادة أخرى أو كلمة بحث مختلفة.',
-                    style: context.texts.bodySmall,
-                  ),
+                  Text('جرّب مادة أخرى أو كلمة بحث مختلفة.',
+                      style: context.texts.bodySmall),
                 ],
               ),
             )
@@ -150,15 +131,52 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
 }
 
 class SubjectFilterBar extends StatelessWidget {
-  const SubjectFilterBar({super.key});
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-class SubjectFilterBar extends StatelessWidget {
   const SubjectFilterBar({super.key, this.selected, this.onChanged});
   final SubjectId? selected;
   final ValueChanged<SubjectId?>? onChanged;
+
   @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: <Widget>[
+            _chip(context, null, 'الكل'),
+            for (final Subject subject in kSubjects)
+              _chip(context, subject.id, subject.nameAr),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chip(BuildContext context, SubjectId? id, String label) {
+    final bool isSelected = id == selected;
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: GestureDetector(
+        onTap: () => onChanged?.call(id),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? context.colors.primary
+                : context.colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected
+                  ? context.colors.onPrimary
+                  : context.colors.onSurface,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
