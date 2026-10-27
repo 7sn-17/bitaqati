@@ -11,12 +11,14 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/section_header.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/content_providers.dart';
 import '../../data/library_providers.dart';
 import '../../data/library_repository.dart';
 import '../../data/sharing_providers.dart';
 import '../../data/sharing_service.dart';
+import '../../data/sync_providers.dart';
 import '../../domain/enums.dart';
 import '../../domain/models.dart';
 import '../create/deck_editor_sheet.dart';
@@ -69,9 +71,15 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     // enough that a fixed white foreground would disappear on it.
     final Color headerInk = onDeckColor(deck.color);
 
+    // Kept as an AsyncValue: an empty list means "this deck has no cards"
+    // only when the stream actually delivered an empty list. While the first
+    // frame is still loading — or if the query failed — an empty list would be
+    // a lie, and the deck used to show "no cards yet" in both cases.
+    final AsyncValue<List<ReviewCard>> cardsAsync = ref.watch(
+      deckCardsProvider(deck.id),
+    );
     final List<ReviewCard> cards =
-        ref.watch(deckCardsProvider(deck.id)).valueOrNull ??
-        const <ReviewCard>[];
+        cardsAsync.valueOrNull ?? const <ReviewCard>[];
     final List<ReviewCard> visibleCards = _matching(cards);
     final bool canStudy = !isPreview && deck.cardCount > 0;
     final String studyLabel = isPreview
@@ -291,7 +299,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               ),
               const SizedBox(height: 14),
               if (_tab == 0)
-                ..._cardSection(context, deck, cards, visibleCards)
+                ..._cardSection(context, deck, cards, visibleCards, cardsAsync)
               else if (_tab == 1)
                 _DeckStatisticsTab(deck: deck)
               else
@@ -337,8 +345,24 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     DeckNode deck,
     List<ReviewCard> cards,
     List<ReviewCard> visibleCards,
+    AsyncValue<List<ReviewCard>> cardsAsync,
   ) {
     if (cards.isEmpty) {
+      // Three different situations used to render as one empty state:
+      // the query is still running, the query failed, or the deck really is
+      // empty. Only the last one should ever say "no cards yet" — the other two
+      // are the reason a deck could look empty while its count said otherwise.
+      if (cardsAsync.isLoading) {
+        return const <Widget>[_CardsLoading()];
+      }
+      if (cardsAsync.hasError || deck.cardCount > 0) {
+        return <Widget>[
+          _CardsUnavailable(
+            deck: deck,
+            onRetry: () => _reloadCards(context, deck),
+          ),
+        ];
+      }
       return <Widget>[
         _EmptyState(
           icon: CupertinoIcons.rectangle_stack,
@@ -1119,6 +1143,37 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     ];
   }
 
+  /// Re-reads the deck's cards, and asks the sync layer for anything newer.
+  ///
+  /// The provider is invalidated first so the list rebuilds even when the
+  /// device is offline and the sync pass has nothing to pull.
+  Future<void> _reloadCards(BuildContext context, DeckNode deck) async {
+    try {
+      await ref.read(syncControllerProvider.notifier).syncNow(force: true);
+    } catch (_) {
+      // Offline is not an error here: the local copy is still the source of
+      // truth, so the read below runs either way.
+    }
+    ref.invalidate(deckCardsProvider(deck.id));
+    if (!context.mounted) {
+      return;
+    }
+    final List<ReviewCard> fresh = await ref
+        .read(deckCardsProvider(deck.id).future)
+        .timeout(
+          const Duration(seconds: 8),
+          onTimeout: () => const <ReviewCard>[],
+        );
+    if (!context.mounted || fresh.isNotEmpty) {
+      return;
+    }
+    showAppMessage(
+      context,
+      'تعذّر تحميل بطاقات هذه المجموعة. تحقّق من اتصالك وحاول مرة أخرى.',
+      kind: AppMessageKind.error,
+    );
+  }
+
   List<ReviewCard> _matching(List<ReviewCard> cards) {
     final String needle = _query.trim();
     if (needle.isEmpty) {
@@ -1167,6 +1222,89 @@ class _MiniStat extends StatelessWidget {
           ),
           Text(label, style: context.texts.bodySmall),
         ],
+      ),
+    );
+  }
+}
+
+/// Placeholder rows while a deck's cards are being read from the database.
+class _CardsLoading extends StatelessWidget {
+  const _CardsLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      child: SkeletonShimmer(
+        child: Column(
+          children: <Widget>[
+            for (int index = 0; index < 3; index++)
+              Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: context.colors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    SkeletonBox(width: 210, height: 13),
+                    SizedBox(height: 9),
+                    SkeletonBox(width: 140, height: 10, radius: 6),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when a deck reports cards but the list could not read them.
+///
+/// The alternative — the empty state — told the user their cards were gone,
+/// which is the one thing this screen must never say wrongly.
+class _CardsUnavailable extends StatelessWidget {
+  const _CardsUnavailable({required this.deck, required this.onRetry});
+
+  final DeckNode deck;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      child: SurfaceCard(
+        child: Column(
+          children: <Widget>[
+            Icon(
+              CupertinoIcons.arrow_clockwise,
+              size: 32,
+              color: context.colors.primary,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'تعذّر عرض البطاقات',
+              textAlign: TextAlign.center,
+              style: context.texts.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'المجموعة تحتوي ${deck.cardCount} بطاقة لكن القائمة لم تُحمّل. '
+              'أعد المحاولة، أو اخرج وأعد فتح المجموعة.',
+              textAlign: TextAlign.center,
+              style: context.texts.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(CupertinoIcons.arrow_clockwise, size: 16),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
       ),
     );
   }

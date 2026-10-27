@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/scheduling/fsrs_engine.dart';
@@ -190,14 +191,10 @@ ORDER BY d.position, d.created_at
   }
 
   String _randomShareCode({int? seed}) {
-    final Random random = seed == null
-        ? Random.secure()
-        : Random(seed);
+    final Random random = seed == null ? Random.secure() : Random(seed);
     final StringBuffer out = StringBuffer();
     for (int index = 0; index < 6; index++) {
-      out.write(
-        _shareAlphabet[random.nextInt(_shareAlphabet.length)],
-      );
+      out.write(_shareAlphabet[random.nextInt(_shareAlphabet.length)]);
     }
     return out.toString();
   }
@@ -206,14 +203,14 @@ ORDER BY d.position, d.created_at
   /// one when it collided with another account's deck.
   Future<void> setDeckShareCode(String deckId, String code) {
     return _db.transaction(() async {
-      await (_db.update(_db.decks)
-            ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
-          .write(
-            DecksCompanion(
-              shareCode: Value<String?>(code.toUpperCase()),
-              updatedAt: Value<DateTime>(_clock()),
-            ),
-          );
+      await (_db.update(
+        _db.decks,
+      )..where((d) => d.id.equals(deckId) & d.deletedAt.isNull())).write(
+        DecksCompanion(
+          shareCode: Value<String?>(code.toUpperCase()),
+          updatedAt: Value<DateTime>(_clock()),
+        ),
+      );
       await _enqueue('decks', deckId, SyncOperation.upsert);
     });
   }
@@ -227,9 +224,7 @@ ORDER BY d.position, d.created_at
     }
     final DeckRow? row =
         await (_db.select(_db.decks)
-              ..where(
-                (d) => d.shareCode.equals(needle) & d.deletedAt.isNull(),
-              ))
+              ..where((d) => d.shareCode.equals(needle) & d.deletedAt.isNull()))
             .getSingleOrNull();
     return row == null ? null : _deckNodeFromRow(row);
   }
@@ -295,32 +290,31 @@ ORDER BY d.position, d.created_at
         throw StateError('Deck $deckId does not exist');
       }
       final List<String> cardIds = <String>[
-        for (final CardRow card
-            in await (_db.select(_db.cards)
-                  ..where((c) => c.deckId.equals(deckId)))
-                .get())
+        for (final CardRow card in await (_db.select(
+          _db.cards,
+        )..where((c) => c.deckId.equals(deckId))).get())
           card.id,
       ];
 
       for (final List<String> chunk in _chunks(cardIds)) {
-        await (_db.delete(_db.cardStates)
-              ..where((s) => s.cardId.isIn(chunk)))
-            .go();
-        await (_db.delete(_db.reviewLogs)
-              ..where((r) => r.cardId.isIn(chunk)))
-            .go();
+        await (_db.delete(
+          _db.cardStates,
+        )..where((s) => s.cardId.isIn(chunk))).go();
+        await (_db.delete(
+          _db.reviewLogs,
+        )..where((r) => r.cardId.isIn(chunk))).go();
         // Drop queued upserts first so a pending push cannot recreate the
         // rows we are about to delete.
-        await (_db.delete(_db.syncQueue)
-              ..where((q) => q.entityId.isIn(chunk)))
-            .go();
+        await (_db.delete(
+          _db.syncQueue,
+        )..where((q) => q.entityId.isIn(chunk))).go();
       }
 
       await (_db.delete(_db.cards)..where((c) => c.deckId.equals(deckId))).go();
       await (_db.delete(_db.decks)..where((d) => d.id.equals(deckId))).go();
-      await (_db.delete(_db.syncQueue)
-            ..where((q) => q.entityId.equals(deckId)))
-          .go();
+      await (_db.delete(
+        _db.syncQueue,
+      )..where((q) => q.entityId.equals(deckId))).go();
 
       // Enqueued last, so purging the queue above cannot take it with it.
       await _enqueue('decks', deckId, SyncOperation.delete);
@@ -339,9 +333,10 @@ ORDER BY d.position, d.created_at
 
   /// The stored privacy of one deck, or null when it no longer exists.
   Future<DeckPrivacy?> deckPrivacy(String deckId) async {
-    final DeckRow? row = await (_db.select(_db.decks)
-          ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
-        .getSingleOrNull();
+    final DeckRow? row =
+        await (_db.select(_db.decks)
+              ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
+            .getSingleOrNull();
     return row?.privacy;
   }
 
@@ -381,10 +376,11 @@ ORDER BY d.position, d.created_at
     if (deck == null) {
       throw StateError('Deck $deckId does not exist');
     }
-    final List<CardRow> cards = await (_db.select(_db.cards)
-          ..where((c) => c.deckId.equals(deckId) & c.deletedAt.isNull())
-          ..orderBy([(c) => OrderingTerm.asc(c.position)]))
-        .get();
+    final List<CardRow> cards =
+        await (_db.select(_db.cards)
+              ..where((c) => c.deckId.equals(deckId) & c.deletedAt.isNull())
+              ..orderBy([(c) => OrderingTerm.asc(c.position)]))
+            .get();
 
     return DeckBundle(
       deck: _deckNodeFromRow(deck, cardCount: cards.length),
@@ -693,14 +689,14 @@ ORDER BY d.position, d.created_at
   /// Pins or unpins a card locally.
   Future<void> setCardFavorite(String cardId, bool favorite) {
     return _db.transaction(() async {
-      await (_db.update(_db.cards)
-            ..where((c) => c.id.equals(cardId) & c.deletedAt.isNull()))
-          .write(
-            CardsCompanion(
-              favorite: Value<bool>(favorite),
-              updatedAt: Value<DateTime>(_clock()),
-            ),
-          );
+      await (_db.update(
+        _db.cards,
+      )..where((c) => c.id.equals(cardId) & c.deletedAt.isNull())).write(
+        CardsCompanion(
+          favorite: Value<bool>(favorite),
+          updatedAt: Value<DateTime>(_clock()),
+        ),
+      );
       await _enqueue('cards', cardId, SyncOperation.upsert);
     });
   }
@@ -718,15 +714,14 @@ ORDER BY d.position, d.created_at
       if (deck == null) {
         throw StateError('Deck $deckId does not exist');
       }
-      await (_db.update(_db.cards)..where(
-            (c) => c.id.isIn(cardIds) & c.deletedAt.isNull(),
-          ))
-          .write(
-            CardsCompanion(
-              deckId: Value<String>(deckId),
-              updatedAt: Value<DateTime>(_clock()),
-            ),
-          );
+      await (_db.update(
+        _db.cards,
+      )..where((c) => c.id.isIn(cardIds) & c.deletedAt.isNull())).write(
+        CardsCompanion(
+          deckId: Value<String>(deckId),
+          updatedAt: Value<DateTime>(_clock()),
+        ),
+      );
       for (final String id in cardIds) {
         await _enqueue('cards', id, SyncOperation.upsert);
       }
@@ -743,9 +738,9 @@ ORDER BY d.position, d.created_at
       return Future<void>.value();
     }
     return _db.transaction(() async {
-      final List<CardRow> cards = await (_db.select(_db.cards)
-            ..where((c) => c.id.isIn(cardIds) & c.deletedAt.isNull()))
-          .get();
+      final List<CardRow> cards = await (_db.select(
+        _db.cards,
+      )..where((c) => c.id.isIn(cardIds) & c.deletedAt.isNull())).get();
       for (final CardRow card in cards) {
         final List<String> merged = <String>{
           ...card.tags,
@@ -778,10 +773,9 @@ ORDER BY d.position, d.created_at
     return _db.transaction(() async {
       final DateTime now = _clock().toUtc();
       for (final String cardId in cardIds) {
-        final CardStateRow? previous =
-            await (_db.select(_db.cardStates)
-                  ..where((s) => s.cardId.equals(cardId)))
-                .getSingleOrNull();
+        final CardStateRow? previous = await (_db.select(
+          _db.cardStates,
+        )..where((s) => s.cardId.equals(cardId))).getSingleOrNull();
         if (suspended) {
           await _db
               .into(_db.cardStates)
@@ -848,18 +842,17 @@ ORDER BY d.position, d.created_at
   Future<void> deleteCards(List<String> cardIds) {
     return _db.transaction(() async {
       final DateTime now = _clock();
-      final List<CardRow> cards = await (_db.select(_db.cards)
-            ..where((c) => c.id.isIn(cardIds) & c.deletedAt.isNull()))
-          .get();
-      await (_db.update(_db.cards)..where(
-            (c) => c.id.isIn(cardIds) & c.deletedAt.isNull(),
-          ))
-          .write(
-            CardsCompanion(
-              deletedAt: Value<DateTime>(now),
-              updatedAt: Value<DateTime>(now),
-            ),
-          );
+      final List<CardRow> cards = await (_db.select(
+        _db.cards,
+      )..where((c) => c.id.isIn(cardIds) & c.deletedAt.isNull())).get();
+      await (_db.update(
+        _db.cards,
+      )..where((c) => c.id.isIn(cardIds) & c.deletedAt.isNull())).write(
+        CardsCompanion(
+          deletedAt: Value<DateTime>(now),
+          updatedAt: Value<DateTime>(now),
+        ),
+      );
       for (final CardRow card in cards) {
         await _enqueue('cards', card.id, SyncOperation.delete);
       }
@@ -951,12 +944,24 @@ ORDER BY d.position, d.created_at
     return _toCards(rows);
   }
 
+  /// Maps rows to cards, skipping any row that cannot be read.
+  ///
+  /// A throwing map turns the whole stream into an error, and the card list
+  /// then shows nothing at all while the deck's count still says otherwise.
+  /// One unreadable row is a data problem; a blank screen is a worse one.
   List<ReviewCard> _toCards(List<TypedResult> rows) {
     final List<ReviewCard> cards = <ReviewCard>[];
     for (final TypedResult row in rows) {
-      cards.add(
-        _toCard(row.readTable(_db.cards), row.readTableOrNull(_db.cardStates)),
-      );
+      try {
+        cards.add(
+          _toCard(
+            row.readTable(_db.cards),
+            row.readTableOrNull(_db.cardStates),
+          ),
+        );
+      } catch (error) {
+        debugPrint('Skipped an unreadable card row: $error');
+      }
     }
     return cards;
   }
