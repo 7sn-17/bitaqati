@@ -420,25 +420,36 @@ and the download URL 404s.
 **Check.** `UpdateService` reads the installed version with
 `PackageInfo.fromPlatform()` — never a constant, so the number in Settings
 cannot drift from the APK — then `GET`s
-`https://api.github.com/repos/7sn-17/bitaqati/releases/latest`. The answer is
-cached for three hours, because GitHub allows 60 unauthenticated requests an
-hour and an app that is opened often would burn them for nothing. A check that
-fails returns `null`, which the UI treats as "nothing to show", never as "you
-are up to date" — that is the one wrong answer that could strand someone on an
-old build.
+`https://api.github.com/repos/7sn-17/bitaqati/releases/latest`. There is no
+cached fast path: the check runs once per cold start and once per tap in
+Settings, so a release published an hour ago is offered on the next launch
+instead of after a timer expires. The remembered answer is only a stand-in for
+a request that failed outright, and a failed check returns `null`, which the UI
+treats as "nothing to show", never as "you are up to date" — that is the one
+wrong answer that could strand someone on an old build.
 
 **Compare.** `UpdateService.compareVersions` walks numeric segments first and
 then the pre-release tag, so `1.0.0` beats `1.0.0-beta.2` and `v1.2.0` equals
 `1.2.0`. `+build` suffixes are stripped before comparing.
 
 **Show.** `AppShell` waits two seconds after the first frame, reads
-`updateInfoProvider`, and shows `UpdateDialog` when there is something newer and
-the user has not already dismissed that exact version. Settings carries the same
-information as an "تحديث متوفر" row that only exists while an update is
-pending, and the version row doubles as a manual re-check. "تحديث الآن" hands
-the URL to the system browser: Android will not let an app install a package it
-downloaded itself without a second permission, and a browser already shows
-progress and resumes.
+`updateInfoProvider`, and shows `UpdateDialog` when there is something newer.
+That happens on every cold start. "لاحقاً" only sets `updateDismissedProvider`
+in memory, so it silences the dialog for the rest of the session and the offer
+returns the next time the app is opened — persisting it to disk, as it once
+did, quietly turned "later" into "never". Settings carries the same information
+as an "تحديث متوفر" row that only exists while an update is pending, and the
+version row doubles as a manual re-check. "تحديث الآن" hands the URL to the
+system browser: Android will not let an app install a package it downloaded
+itself without a second permission, and a browser already shows progress and
+resumes.
+
+**Notes.** The dialog's "ما الجديد" box shows the release `body`, and that body
+is not written in the workflow: the release step cuts the section for the
+current version out of `CHANGELOG.md` and passes it as `body_path`. It used to
+be a hard-coded paragraph listing every APK by name, so the first thing a user
+read about a new version was `bitaqati-v1.1.0-arm64-v8a.apk`. Keep each bullet
+to one line — the dialog strips markdown but does not reflow wrapped lines.
 
 ## Deck customisation
 

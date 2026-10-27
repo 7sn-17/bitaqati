@@ -36,8 +36,7 @@ class SettingsScreen extends ConsumerWidget {
     final String? avatarUrl = userAvatarUrl(user);
     final String displayName = ref.watch(displayNameProvider);
     final String accountSubtitle =
-        user?.email ??
-        (guest ? 'وضع الزائر · للتصفح فقط' : 'غير مسجل الدخول');
+        user?.email ?? (guest ? 'وضع الزائر · للتصفح فقط' : 'غير مسجل الدخول');
     final bool isDark =
         themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && context.isDark);
@@ -174,9 +173,8 @@ class SettingsScreen extends ConsumerWidget {
                   trailing: Switch.adaptive(
                     value: notificationsEnabled,
                     onChanged: (bool value) {
-                      ref
-                          .read(notificationsEnabledProvider.notifier)
-                          .state = value;
+                      ref.read(notificationsEnabledProvider.notifier).state =
+                          value;
                       unawaited(
                         ref.read(reminderCoordinatorProvider).refresh(),
                       );
@@ -190,8 +188,7 @@ class SettingsScreen extends ConsumerWidget {
                   _Row(
                     icon: CupertinoIcons.exclamationmark_circle,
                     title: 'الإشعارات موقوفة من النظام',
-                    subtitle:
-                        'افتح إعدادات النظام وفعّل الإشعارات لهذا التطبيق ليصلك التذكير.',
+                    subtitle: 'افتح إعدادات النظام وفعّل الإشعارات لهذا التطبيق ليصلك التذكير.',
                     onTap: () async {
                       await ReminderService.instance.openSystemSettings();
                       ref.invalidate(reminderAccessProvider);
@@ -203,8 +200,7 @@ class SettingsScreen extends ConsumerWidget {
                   _Row(
                     icon: CupertinoIcons.clock,
                     title: 'تذكير في الوقت المحدد',
-                    subtitle:
-                        'قد يتأخر التنبيه حتى ساعة بسبب توفير الطاقة. اسمح بالمنبهات الدقيقة.',
+                    subtitle: 'قد يتأخر التنبيه حتى ساعة بسبب توفير الطاقة. اسمح بالمنبهات الدقيقة.',
                     onTap: () async {
                       await ReminderService.instance.requestExactAlarms();
                       ref.invalidate(exactAlarmProvider);
@@ -312,10 +308,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             Center(
-              child: Text(
-                'صُنع بحب للطلاب',
-                style: context.texts.bodySmall,
-              ),
+              child: Text('صُنع بحب للطلاب', style: context.texts.bodySmall),
             ),
           ],
         ),
@@ -393,10 +386,11 @@ class SettingsScreen extends ConsumerWidget {
   /// claiming that on a timeout is the one answer that could leave someone on
   /// an old build for months.
   Future<void> _checkForUpdate(BuildContext context, WidgetRef ref) async {
-    final UpdateInfo? info = await ref
-        .read(updateServiceProvider)
-        .check(force: true);
+    // Invalidate first, then read: the provider is what actually runs the
+    // check, so this is one request that also refreshes the row above. Asking
+    // the service directly and invalidating afterwards would fire two.
     ref.invalidate(updateInfoProvider);
+    final UpdateInfo? info = await ref.read(updateInfoProvider.future);
     if (!context.mounted) {
       return;
     }
@@ -485,11 +479,7 @@ class SettingsScreen extends ConsumerWidget {
       if (!context.mounted) {
         return;
       }
-      showAppMessage(
-        context,
-        'تم تحديث الاسم.',
-        kind: AppMessageKind.success,
-      );
+      showAppMessage(context, 'تم تحديث الاسم.', kind: AppMessageKind.success);
     } on ProfileFailure catch (error) {
       if (!context.mounted) {
         return;
@@ -521,11 +511,7 @@ class _EditNameButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(
-                CupertinoIcons.pencil,
-                size: 13,
-                color: Colors.white,
-              ),
+              const Icon(CupertinoIcons.pencil, size: 13, color: Colors.white),
               const SizedBox(width: 5),
               const Text(
                 'تعديل',
@@ -576,8 +562,7 @@ class _NameDialogState extends State<_NameDialog> {
     if (value.length < ProfileRepository.minNameLength ||
         value.length > ProfileRepository.maxNameLength) {
       setState(() {
-        _error =
-            'الاسم يجب أن يكون بين حرفين و40 حرفاً.';
+        _error = 'الاسم يجب أن يكون بين حرفين و40 حرفاً.';
       });
       return;
     }
@@ -620,6 +605,7 @@ class _NameDialogState extends State<_NameDialog> {
     );
   }
 }
+
 class _AccountAvatar extends StatelessWidget {
   const _AccountAvatar({required this.url, required this.initial});
 
@@ -757,16 +743,10 @@ class _Row extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: context.isDark
-                  ? AppColors.darkSurfaceHigh
-                  : Colors.white,
+              color: context.isDark ? AppColors.darkSurfaceHigh : Colors.white,
               borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: context.colors.primary,
-            ),
+            child: Icon(icon, size: 18, color: context.colors.primary),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -886,9 +866,7 @@ class _StepButton extends StatelessWidget {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: enabled
-                ? context.softAccent
-                : context.raisedSurface,
+            color: enabled ? context.softAccent : context.raisedSurface,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(

@@ -136,6 +136,25 @@ jobs:
           done
           ls -lh dist
 
+          # The in-app update dialog shows this text verbatim, so it is written
+          # for a person: what changed, no file names, no download advice.
+          # It is cut from CHANGELOG.md rather than typed here so the release
+          # page and the dialog can never disagree, and so the notes change
+          # with the code instead of staying frozen at the first release.
+          NOTES="dist/notes.md"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              $0 ~ "^##[[:space:]]+" ver "([[:space:]]|$)" { found = 1; next }
+              found && /^##[[:space:]]/ { exit }
+              found { print }
+            ' CHANGELOG.md > "$NOTES"
+          fi
+          if [ ! -s "$NOTES" ]; then
+            printf 'تحسينات وإصلاحات في هذا الإصدار.\n' > "$NOTES"
+          fi
+          echo "--- release notes ---"
+          cat "$NOTES"
+
       - name: Verify APK signer
         env:
           EXPECTED_SHA1: ${{ vars.ANDROID_CERT_SHA1 }}
@@ -169,7 +188,9 @@ jobs:
 
       # Attaches the APK to a real GitHub Release (not just a workflow
       # artifact) so /releases/latest/download/bitaqati.apk always resolves to
-      # the newest build. The in-app updater reads this release's tag and body.
+      # the newest build. The in-app updater reads this release's tag and body,
+      # and the body is the changelog section written above — never a list of
+      # assets, because that list is what the update dialog used to show.
       - name: Publish to GitHub Releases
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
@@ -177,22 +198,7 @@ jobs:
           tag_name: ${{ steps.release.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: "بطاقاتي ${{ steps.release.outputs.version }}"
-          body: |
-            الإصدار ${{ steps.release.outputs.version }} — الإطلاق الأول
-
-            أول إصدار مستقر من بطاقاتي، وأول إصدار يصل عبر التحديث التلقائي.
-
-            - محرّك المراجعة المتباعدة FSRS-6 مع فترات محسوبة لكل بطاقة.
-            - تذكيرات يومية ذكية تتوقف تلقائياً عندما لا يبقى شيء للمراجعة.
-            - أوضاع دراسة متعددة: المراجعة، الاختبار، ولعبة المطابقة.
-            - مكتبة عامة يمكن تثبيت المجموعات منها مع حفظ حق المؤلف.
-            - عمل كامل دون اتصال، ومزامنة تلقائية عند عودة الشبكة.
-
-            أي ملف أنزّل؟
-            - bitaqati.apk: الأنسب لمعظم الهواتف الحديثة (arm64).
-            - bitaqati-${{ steps.release.outputs.tag }}-arm64-v8a.apk: نسخة مطابقة باسم تقليدي.
-            - bitaqati-${{ steps.release.outputs.tag }}-armeabi-v7a.apk: للهواتف القديمة ذات 32 بت.
-            - bitaqati-${{ steps.release.outputs.tag }}-x86_64.apk: للمحاكيات فقط.
+          body_path: dist/notes.md
           files: |
             dist/bitaqati.apk
             dist/bitaqati-${{ steps.release.outputs.tag }}-arm64-v8a.apk

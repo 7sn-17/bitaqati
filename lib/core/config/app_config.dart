@@ -5,10 +5,11 @@
 abstract final class AppConfig {
   static const String appNameAr = 'بطاقاتي';
   static const String appNameEn = 'Bitaqati';
+
   /// Fallback only: the real version is read from the Android manifest at
   /// runtime (`appVersionProvider`), so the number on screen can never drift
   /// from the APK that is installed.
-  static const String appVersion = '1.1.0';
+  static const String appVersion = '1.1.1';
 
   /// Custom URL scheme kept for links that were already shared.
   ///

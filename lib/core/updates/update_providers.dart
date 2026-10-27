@@ -11,7 +11,10 @@ final Provider<UpdateService> updateServiceProvider = Provider<UpdateService>(
 /// The newest release, or null when the check could not be made.
 ///
 /// Kept in a provider so the launch prompt and the Settings row share one
-/// answer instead of asking GitHub twice.
+/// answer instead of asking GitHub twice. It is deliberately not auto-disposed
+/// and not cached to disk with a time window: the shell evaluates it once per
+/// cold start, which is what makes a release published an hour ago show up on
+/// the next launch instead of after a timer expires.
 final FutureProvider<UpdateInfo?> updateInfoProvider =
     FutureProvider<UpdateInfo?>(
       (Ref ref) => ref.watch(updateServiceProvider).check(),
@@ -23,22 +26,18 @@ final FutureProvider<String> appVersionProvider = FutureProvider<String>(
   (Ref ref) => ref.watch(updateServiceProvider).currentVersion(),
 );
 
-/// The release the user already said "later" to.
+/// The release the user said "later" to, for this run of the app only.
 ///
-/// One version only: a newer release shows the prompt again, and the same one
-/// never nags twice.
+/// Nothing is written to disk. That is the whole point: "later" used to mean
+/// "never again" because the dismissed version was persisted, so a user who
+/// tapped it once stopped being told about that release for good. Holding it
+/// in memory gives the behaviour the button promises — quiet for the rest of
+/// this session, offered again the next time the app is opened.
 class UpdateDismissedNotifier extends Notifier<String?> {
-  static const String _key = 'update_dismissed_version';
-
   @override
-  String? build() {
-    return ref.watch(sharedPreferencesProvider).getString(_key);
-  }
+  String? build() => null;
 
-  Future<void> dismiss(String version) async {
-    state = version;
-    await ref.read(sharedPreferencesProvider).setString(_key, version);
-  }
+  void dismiss(String version) => state = version;
 }
 
 final NotifierProvider<UpdateDismissedNotifier, String?>

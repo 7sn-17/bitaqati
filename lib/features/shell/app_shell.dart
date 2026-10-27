@@ -23,8 +23,10 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  /// One check per launch. The provider caches the answer for three hours, so
-  /// this never turns into a request on every rebuild.
+  /// One prompt per launch. The shell is built once per cold start and lives
+  /// for the whole session, so this flag is what keeps the dialog from
+  /// reappearing as the user moves between tabs — while a fresh process always
+  /// gets a fresh check.
   bool _prompted = false;
 
   @override
@@ -35,11 +37,16 @@ class _AppShellState extends ConsumerState<AppShell> {
     });
   }
 
-  /// Looks for a newer release in the background and offers it once.
+  /// Looks for a newer release in the background and offers it, once per
+  /// launch.
   ///
   /// Deliberately late: the first frame, the first sync and the reminder
   /// refresh all matter more than a dialog, and a user who taps through in the
   /// first second should not have the screen covered.
+  ///
+  /// "Later" is remembered in memory only, so the offer comes back the next
+  /// time the app is opened. It used to be written to disk, which quietly
+  /// turned "later" into "never" for anyone who tapped it once.
   Future<void> _promptForUpdate() async {
     if (_prompted) {
       return;
@@ -71,7 +78,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     // that is always mounted, so listening here is what makes syncing
     // invisible to the user instead of a button in Settings. A listener rather
     // than a watch, so a sync starting never rebuilds the tab bar.
-    ref.listen<SyncState>(syncControllerProvider, (SyncState? _, SyncState __) {});
+    ref.listen<SyncState>(
+      syncControllerProvider,
+      (SyncState? _, SyncState __) {},
+    );
 
     // Reminders follow the workload, not a timer: whenever the amount of due
     // work changes the schedule is rebuilt a couple of seconds later, which

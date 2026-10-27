@@ -16,12 +16,11 @@ Future<void> showUpdateDialog(BuildContext context, UpdateInfo info) {
     barrierLabel: 'تحديث',
     barrierColor: Colors.black.withValues(alpha: 0.58),
     transitionDuration: const Duration(milliseconds: 320),
-    pageBuilder:
-        (
-          BuildContext context,
-          Animation<double> animation,
-          Animation<double> secondaryAnimation,
-        ) => UpdateDialog(info: info),
+    pageBuilder: (
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+    ) => UpdateDialog(info: info),
     transitionBuilder:
         (
           BuildContext context,
@@ -222,7 +221,8 @@ class _GlowFrameState extends State<_GlowFrame>
                 spreadRadius: -4,
               ),
               BoxShadow(
-                color: const Color(0xFF38BDF8).withValues(alpha: 0.08 + 0.1 * t),
+                color: const Color(0xFF38BDF8)
+                    .withValues(alpha: 0.08 + 0.1 * t),
                 blurRadius: 44,
                 spreadRadius: -12,
                 offset: const Offset(0, 14),
@@ -295,10 +295,7 @@ class _RocketState extends State<_Rocket> with SingleTickerProviderStateMixin {
                   ),
                 ),
               ),
-              Transform.translate(
-                offset: Offset(0, -3 * t),
-                child: child,
-              ),
+              Transform.translate(offset: Offset(0, -3 * t), child: child),
             ],
           );
         },
@@ -333,8 +330,13 @@ class _RocketState extends State<_Rocket> with SingleTickerProviderStateMixin {
   }
 }
 
-/// `v0.9.5 ← v1.0.0`, forced left-to-right so the arrow always points at the
-/// version the user is on, in both Arabic and English layouts.
+/// `v1.0.0 → v1.1.0`, read in the direction the page reads.
+///
+/// In Arabic the row lays out right to left, so the installed version lands
+/// on the right and the new one on the left, and the arrow has to point left
+/// to mean "from here to there". Forcing the row to LTR — as this did — put
+/// the new version on the far side of an arrow aimed at the old one, so the
+/// jump read backwards.
 class _VersionFlow extends StatelessWidget {
   const _VersionFlow({required this.current, required this.latest});
 
@@ -343,24 +345,29 @@ class _VersionFlow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          _VersionChip(label: 'v$current', highlighted: false),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9),
+    final bool rtl = Directionality.of(context) == TextDirection.rtl;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        _VersionChip(label: 'v$current', highlighted: false),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          // The arrow glyphs are mirrored by the framework in RTL, which
+          // would flip a left arrow back into a right one. Pinning the
+          // icon's own direction leaves the choice above as the only thing
+          // that decides which way it points.
+          child: Directionality(
+            textDirection: TextDirection.ltr,
             child: Icon(
-              Icons.arrow_back_rounded,
+              rtl ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
               size: 17,
               color: context.muted,
             ),
           ),
-          _VersionChip(label: 'v$latest', highlighted: true),
-        ],
-      ),
+        ),
+        _VersionChip(label: 'v$latest', highlighted: true),
+      ],
     );
   }
 }
@@ -375,9 +382,7 @@ class _VersionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color fill = highlighted
         ? context.selectedFill
-        : (context.isDark
-              ? AppColors.darkSurfaceHigh
-              : AppColors.surface);
+        : (context.isDark ? AppColors.darkSurfaceHigh : AppColors.surface);
     final Color ink = highlighted ? context.onSoftAccent : context.muted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -464,27 +469,51 @@ class _Notes extends StatelessWidget {
     );
   }
 
-  /// Turns GitHub markdown into something that reads well in a plain Text:
-  /// bullets become dots, bold markers disappear, and runs of blank lines
-  /// collapse.
+  /// Turns GitHub markdown into something that reads well in a plain Text.
+  ///
+  /// Release notes are written by hand in CHANGELOG.md and arrive with
+  /// heading marks, bullet dashes, bold markers and sometimes a link. None of
+  /// that survives into the dialog: what the reader gets is the sentences,
+  /// one paragraph per block, with bullets as dots.
   static String _clean(String raw) {
-    final List<String> lines = raw
-        .replaceAll('\r\n', '\n')
-        .split('\n')
-        .map((String line) {
-          String value = line.trim().replaceAll('**', '').replaceAll('`', '');
-          if (value.startsWith('- ') || value.startsWith('* ')) {
-            value = '•  ${value.substring(2)}';
-          }
-          return value;
-        })
-        .toList();
+    final List<String> lines = raw.replaceAll('\r\n', '\n').split('\n').map((
+      String line,
+    ) {
+      String value = line.trim();
+      if (value.isEmpty) {
+        return '';
+      }
+      value = value
+          .replaceAllMapped(
+            RegExp(r'\[([^\]]+)\]\([^)]+\)'),
+            (Match match) => match.group(1) ?? '',
+          )
+          .replaceAll(RegExp(r'^#{1,6}\s*'), '')
+          .replaceAll('**', '')
+          .replaceAll('__', '')
+          .replaceAll('`', '');
+      if (value.startsWith('- ') || value.startsWith('* ')) {
+        value = value.substring(2);
+        value = '•  $value';
+      }
+      return value;
+    }).toList();
+
+    // Exactly one blank line between blocks, whatever the source had. A
+    // pasted changelog with three blank lines should not open a gap in a
+    // 168px box.
     final StringBuffer buffer = StringBuffer();
+    int blanks = 0;
     for (final String line in lines) {
-      if (line.isEmpty && buffer.toString().endsWith('\n\n')) {
+      if (line.isEmpty) {
+        blanks++;
         continue;
       }
+      if (buffer.isNotEmpty && blanks > 0) {
+        buffer.writeln();
+      }
       buffer.writeln(line);
+      blanks = 0;
     }
     return buffer.toString().trim();
   }

@@ -22,7 +22,8 @@ class UpdateInfo {
   final String currentVersion;
   final String latestVersion;
 
-  /// The GitHub release body, exactly as the maintainer wrote it.
+  /// The release description, minus the download guide that older releases
+  /// carried. This is what the dialog shows under "ما الجديد".
   final String releaseNotes;
 
   /// Direct APK download. Always resolves to the newest build.
@@ -99,10 +100,13 @@ class UpdateService {
   static const String releasePage =
       'https://github.com/$owner/$repo/releases/latest';
 
-  /// A launch check reuses a result younger than this. GitHub allows 60
-  /// unauthenticated requests an hour per address, and an app that is opened
-  /// often would burn through that for nothing.
-  static const Duration _cacheTtl = Duration(hours: 3);
+  /// How long a remembered answer may stand in for a failed check.
+  ///
+  /// Every launch asks GitHub, so this is not a rate-limit shield: it is what
+  /// keeps the prompt working on a phone that opens the app with no network.
+  /// A week survives a holiday and is short enough that a release pulled from
+  /// the repo stops being advertised soon after.
+  static const Duration _cacheTtl = Duration(days: 7);
 
   static const String _cacheKey = 'update_cache';
   static const String _cacheAtKey = 'update_cache_at';
@@ -125,21 +129,18 @@ class UpdateService {
   /// limited, or GitHub answering with something unexpected. Callers treat
   /// null as "nothing to show", never as "you are up to date".
   ///
-  /// [force] skips the cache; the Settings row uses it so a tap always asks
-  /// GitHub rather than replaying a three-hour-old answer.
-  Future<UpdateInfo?> check({bool force = false}) async {
+  /// There is no cached fast path. This runs once per launch and once per tap
+  /// in Settings, and replaying a stored answer is exactly what used to hide a
+  /// freshly published release for hours. The stored copy is now only a
+  /// stand-in for a check that could not reach GitHub at all.
+  Future<UpdateInfo?> check() async {
     final String current = await currentVersion();
-    if (!force) {
-      final UpdateInfo? cached = _readCache(current);
-      if (cached != null) {
-        return cached;
-      }
-    }
     final UpdateInfo? fetched = await _fetch(current);
     if (fetched != null) {
       _writeCache(fetched);
+      return fetched;
     }
-    return fetched;
+    return _readCache(current);
   }
 
   Future<UpdateInfo?> _fetch(String current) async {
@@ -170,7 +171,7 @@ class UpdateService {
         hasUpdate: isNewer(latest, current),
         currentVersion: current,
         latestVersion: latest,
-        releaseNotes: _string(decoded['body']),
+        releaseNotes: _releaseNotes(decoded),
         downloadUrl: _assetUrl(decoded) ?? downloadUrl,
         publishedAt: DateTime.tryParse(_string(decoded['published_at'])),
         releaseUrl: _string(decoded['html_url']).isEmpty
@@ -205,6 +206,32 @@ class UpdateService {
       }
     }
     return null;
+  }
+
+  /// The release description, with the download guide cut out.
+  ///
+  /// Older releases carried a "which file do I download?" paragraph listing
+  /// every APK by name, and the dialog showed it verbatim — so the first thing
+  /// a user read about a new version was a filename like
+  /// bitaqati-v1.1.0-arm64-v8a.apk. The pipeline no longer writes that
+  /// paragraph; this drops it from the releases that already have it, because
+  /// those are the ones still being offered to people on old builds.
+  ///
+  /// A block is removed whole rather than line by line: the heading and its
+  /// list belong together, and deleting only the file names would leave a
+  /// question hanging with nothing under it.
+  static String _releaseNotes(Map<String, Object?> json) {
+    final String body = _string(json['body']);
+    if (body.isEmpty) {
+      return _string(json['name']);
+    }
+    final String notes = body
+        .replaceAll('\r\n', '\n')
+        .split(RegExp(r'\n\s*\n'))
+        .where((String block) => !block.toLowerCase().contains('.apk'))
+        .join('\n\n')
+        .trim();
+    return notes.isEmpty ? _string(json['name']) : notes;
   }
 
   UpdateInfo? _readCache(String current) {

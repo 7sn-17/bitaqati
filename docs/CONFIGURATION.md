@@ -266,6 +266,11 @@ adb install -r ./dist/bitaqati.apk
 
 Bumping the version publishes a new release, and because `make_latest: true`
 is set, `/releases/latest` moves with it. Nothing else in the pipeline has to
-change; the release notes in the workflow body are the one thing a maintainer
-should rewrite for each version, since the app shows them verbatim in the
-update dialog.
+change.
+
+The one thing a maintainer must do for each version is add a section to
+`CHANGELOG.md` headed `## <version>`. The release step cuts that section out
+and uses it as the release body, which is exactly what the in-app update dialog
+shows under "ما الجديد" — so write it for a user, one bullet per line, and never
+list APK file names. If the section is missing the release still publishes, but
+the dialog falls back to a single generic line.
