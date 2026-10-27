@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -20,6 +22,17 @@ class DeveloperInfoScreen extends StatelessWidget {
   static const String _instagram = 'https://instagram.com/7sn__08';
   static const String _whatsapp = 'https://wa.me/963984623461';
   static const String _telegram = 'https://t.me/DOVx3';
+  static const String _photo = 'https://iili.io/nvhi46B.jpg';
+
+  // Brand colours, taken from each network's own guidelines.
+  static const Color _whatsappGreen = Color(0xFF25D366);
+  static const Color _telegramBlue = Color(0xFF229ED9);
+  static const List<Color> _instagramGradient = <Color>[
+    Color(0xFF833AB4),
+    Color(0xFFFD1D1D),
+    Color(0xFFF56040),
+    Color(0xFFFFDC80),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +58,7 @@ class DeveloperInfoScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            _Hero(name: _name, role: _role),
+            _Hero(name: _name, role: _role, photo: _photo),
             const SizedBox(height: 22),
             Text(
               'تواصل معي',
@@ -63,31 +76,32 @@ class DeveloperInfoScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             _ContactCard(
-              icon: CupertinoIcons.mail_solid,
+              icon: FontAwesomeIcons.envelope,
               label: 'البريد الإلكتروني',
               value: _email,
               tint: AppColors.blue,
               onTap: () => _open(context, 'mailto:$_email'),
             ),
             _ContactCard(
-              icon: CupertinoIcons.chat_bubble_2_fill,
+              icon: FontAwesomeIcons.whatsapp,
               label: 'واتساب',
               value: '+963 984 623 461',
-              tint: const Color(0xFF1F9D55),
+              tint: _whatsappGreen,
               onTap: () => _open(context, _whatsapp),
             ),
             _ContactCard(
-              icon: CupertinoIcons.paperplane_fill,
+              icon: FontAwesomeIcons.telegram,
               label: 'تيليجرام',
               value: '@DOVx3',
-              tint: const Color(0xFF229ED9),
+              tint: _telegramBlue,
               onTap: () => _open(context, _telegram),
             ),
             _ContactCard(
-              icon: CupertinoIcons.camera_fill,
+              icon: FontAwesomeIcons.instagram,
               label: 'إنستغرام',
               value: '@7sn__08',
-              tint: const Color(0xFFC13584),
+              tint: const Color(0xFFE1306C),
+              gradient: _instagramGradient,
               onTap: () => _open(context, _instagram),
             ),
             const SizedBox(height: 26),
@@ -128,10 +142,15 @@ class DeveloperInfoScreen extends StatelessWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({required this.name, required this.role});
+  const _Hero({
+    required this.name,
+    required this.role,
+    required this.photo,
+  });
 
   final String name;
   final String role;
+  final String photo;
 
   @override
   Widget build(BuildContext context) {
@@ -147,28 +166,7 @@ class _Hero extends StatelessWidget {
       ),
       child: Column(
         children: <Widget>[
-          Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.22),
-                width: 3,
-              ),
-            ),
-            alignment: Alignment.center,
-            child: const Text(
-              'ح',
-              style: TextStyle(
-                fontFamily: 'ReadexPro',
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
+          _Avatar(photo: photo, initial: name.substring(0, 1)),
           const SizedBox(height: 14),
           Text(
             name,
@@ -208,12 +206,19 @@ class _ContactCard extends StatelessWidget {
     required this.value,
     required this.tint,
     required this.onTap,
+    this.gradient,
   });
 
   final IconData icon;
   final String label;
   final String value;
+
+  /// Brand colour. Fills the icon and, at low opacity, the tile behind it.
   final Color tint;
+
+  /// Some brands (Instagram) are only recognisable as a gradient.
+  final List<Color>? gradient;
+
   final VoidCallback onTap;
 
   @override
@@ -231,15 +236,11 @@ class _ContactCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
               children: <Widget>[
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: dark ? 0.24 : 0.12),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(icon, size: 19, color: tint),
+                _BrandBadge(
+                  icon: icon,
+                  tint: tint,
+                  gradient: gradient,
+                  dark: dark,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -312,6 +313,123 @@ class _BackButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The developer's photo, cached on disk so the header still shows a face
+/// with no connection. Falls back to the initial when the image cannot load.
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.photo, required this.initial});
+
+  final String photo;
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 92,
+      height: 92,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: <Color>[AppColors.accent, Color(0xFF63C13A)],
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.38),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: photo,
+          fit: BoxFit.cover,
+          memCacheWidth: 276,
+          maxWidthDiskCache: 276,
+          fadeInDuration: const Duration(milliseconds: 260),
+          placeholder: (BuildContext context, String url) => _fallback(),
+          errorWidget:
+              (BuildContext context, String url, Object error) => _fallback(),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return Container(
+      color: AppColors.accent,
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(
+          fontFamily: 'ReadexPro',
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+}
+
+/// The square that holds a brand logo: a wash of the brand colour behind the
+/// logo itself, so the row reads as "WhatsApp" at a glance instead of
+/// "generic chat bubble".
+class _BrandBadge extends StatelessWidget {
+  const _BrandBadge({
+    required this.icon,
+    required this.tint,
+    required this.dark,
+    this.gradient,
+  });
+
+  final IconData icon;
+  final Color tint;
+  final bool dark;
+  final List<Color>? gradient;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Color>? colors = gradient;
+    final Widget glyph = FaIcon(icon, size: 19, color: tint);
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: colors == null
+            ? tint.withValues(alpha: dark ? 0.22 : 0.11)
+            : null,
+        gradient: colors == null
+            ? null
+            : LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: <Color>[
+                  for (final Color color in colors)
+                    color.withValues(alpha: dark ? 0.26 : 0.14),
+                ],
+              ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: Alignment.center,
+      child: colors == null
+          ? glyph
+          : ShaderMask(
+              blendMode: BlendMode.srcIn,
+              shaderCallback: (Rect bounds) => LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: colors,
+              ).createShader(bounds),
+              child: FaIcon(icon, size: 19, color: Colors.white),
+            ),
     );
   }
 }
