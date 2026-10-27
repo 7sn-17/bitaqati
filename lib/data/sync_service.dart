@@ -174,7 +174,7 @@ class SyncService {
     };
     final List<DeckRow> rows = await (_db.select(
       _db.decks,
-    )..where((Deck d) => d.id.isIn(ids))).get();
+    )..where((Decks d) => d.id.isIn(ids))).get();
 
     final List<Map<String, Object?>> upserts = <Map<String, Object?>>[];
     final Set<String> pushed = <String>{};
@@ -188,7 +188,7 @@ class SyncService {
     if (upserts.isNotEmpty) {
       await client.from('decks').upsert(upserts);
       // The cloud owns the row now, so remember who it belongs to.
-      await (_db.update(_db.decks)..where((Deck d) => d.id.isIn(pushed)))
+      await (_db.update(_db.decks)..where((Decks d) => d.id.isIn(pushed)))
           .write(DecksCompanion(ownerId: Value<String>(userId)));
     }
     if (removals.isNotEmpty) {
@@ -214,7 +214,7 @@ class SyncService {
     };
     final List<CardRow> rows = await (_db.select(
       _db.cards,
-    )..where((Card c) => c.id.isIn(ids))).get();
+    )..where((Cards c) => c.id.isIn(ids))).get();
 
     final List<Map<String, Object?>> upserts = <Map<String, Object?>>[];
     for (final CardRow row in rows) {
@@ -462,7 +462,7 @@ class SyncService {
   ) async {
     final List<String> deckIds = <String>[
       for (final DeckRow row in await (_db.select(_db.decks)..where(
-            (Deck d) => d.ownerId.equals(userId) & d.deletedAt.isNull(),
+            (Decks d) => d.ownerId.equals(userId) & d.deletedAt.isNull(),
           ))
               .get())
         row.id,

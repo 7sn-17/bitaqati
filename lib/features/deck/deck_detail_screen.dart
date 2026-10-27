@@ -893,7 +893,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     }
     await Clipboard.setData(ClipboardData(text: code));
     if (context.mounted) {
-      showAppMessage(context, 'تم نسخ الرمز ${code}.');
+      showAppMessage(context, 'تم نسخ الرمز $code.');
     }
   }
 

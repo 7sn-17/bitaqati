@@ -98,7 +98,7 @@ class LibraryRepository {
       if (deckId == null) {
         return null;
       }
-      return _deckById(deckId);
+      return await _deckById(deckId);
     } on LibraryFailure {
       rethrow;
     } catch (_) {
