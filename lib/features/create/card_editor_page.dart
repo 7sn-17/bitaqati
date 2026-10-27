@@ -43,6 +43,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
   bool _saving = false;
   bool _uploading = false;
   bool _hydrated = false;
+  int _hydrateAttempts = 0;
   _CardKind _kind = _CardKind.basic;
   List<String> _tags = <String>[];
   String? _imageUrl;
@@ -102,6 +103,12 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       }
     }
     if (found == null) {
+      // The cards stream may still be loading on a cold deep link. Retry for a
+      // few frames, then stop instead of rebuilding forever.
+      _hydrateAttempts++;
+      if (_hydrateAttempts > 30) {
+        return;
+      }
       WidgetsBinding.instance.addPostFrameCallback((Duration _) {
         if (mounted && !_hydrated) {
           _hydrate(notify: false);
