@@ -16,7 +16,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'bitaqati'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -33,6 +33,9 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('UPDATE decks SET depth = 1 WHERE depth > 1');
           // ignore: experimental_member_use
           await migrator.alterTable(TableMigration(decks));
+        }
+        if (from < 3) {
+          await migrator.addColumn(cards, cards.favorite);
         }
       },
       beforeOpen: (OpeningDetails details) async {

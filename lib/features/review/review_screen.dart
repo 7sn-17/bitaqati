@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_message.dart';
 import '../../data/content_providers.dart';
@@ -51,14 +52,35 @@ class _ReviewSession extends ConsumerStatefulWidget {
 
 class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   late final DeckNode _deck = widget.deck;
-  late final List<ReviewCard> _cards = widget.cards;
-  late final int _newCount = _countPhase(CardPhase.newCard);
-  late final int _learningCount = _countPhase(CardPhase.learning);
-  late final int _reviewCount = _countPhase(CardPhase.review);
+  late List<ReviewCard> _cards;
+  late int _remainingNew;
+  late int _remainingLearning;
+  late int _remainingReview;
+  final List<ReviewCard> _hardCards = <ReviewCard>[];
+  late final Set<String> _favorites;
   DateTime _shownAt = DateTime.now();
+  DateTime _startedAt = DateTime.now();
+  DateTime? _finishedAt;
 
-  int _countPhase(CardPhase phase) =>
-      _cards.where((ReviewCard card) => card.phase == phase).length;
+  @override
+  void initState() {
+    super.initState();
+    _cards = List<ReviewCard>.of(widget.cards);
+    _favorites = <String>{
+      for (final ReviewCard card in _cards)
+        if (card.favorite) card.id,
+    };
+    _resetRemaining();
+  }
+
+  void _resetRemaining() {
+    _remainingNew = _countPhase(_cards, CardPhase.newCard);
+    _remainingLearning = _countPhase(_cards, CardPhase.learning);
+    _remainingReview = _countPhase(_cards, CardPhase.review);
+  }
+
+  int _countPhase(List<ReviewCard> cards, CardPhase phase) =>
+      cards.where((ReviewCard card) => card.phase == phase).length;
 
   int _index = 0;
   int _completed = 0;
@@ -88,6 +110,10 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
     }
     final ReviewCard? answered = _current;
     if (answered != null) {
+      if (rating <= 2 && !_hardCards.any((c) => c.id == answered.id)) {
+        _hardCards.add(answered);
+      }
+      _decrementRemaining(answered.phase);
       unawaited(
         ref
             .read(contentRepositoryProvider)
@@ -105,6 +131,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
       _hintVisible = false;
       if (done) {
         _finished = true;
+        _finishedAt = DateTime.now();
       } else {
         _index++;
       }
@@ -112,7 +139,59 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
     _shownAt = DateTime.now();
   }
 
+  void _decrementRemaining(CardPhase phase) {
+    switch (phase) {
+      case CardPhase.newCard:
+        _remainingNew = (_remainingNew - 1).clamp(0, 999).toInt();
+      case CardPhase.learning:
+        _remainingLearning = (_remainingLearning - 1).clamp(0, 999).toInt();
+      case CardPhase.review:
+      case CardPhase.paused:
+        _remainingReview = (_remainingReview - 1).clamp(0, 999).toInt();
+    }
+  }
+
+  Future<void> _toggleFavorite(ReviewCard card) async {
+    final bool next = !_favorites.contains(card.id);
+    setState(() {
+      if (next) {
+        _favorites.add(card.id);
+      } else {
+        _favorites.remove(card.id);
+      }
+    });
+    try {
+      await ref
+          .read(contentRepositoryProvider)
+          .setCardFavorite(card.id, next);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        if (next) {
+          _favorites.remove(card.id);
+        } else {
+          _favorites.add(card.id);
+        }
+      });
+      showAppMessage(
+        context,
+        'تعذّر حفظ البطاقة المفضلة. حاول مرة أخرى.',
+        kind: AppMessageKind.error,
+      );
+    }
+  }
+
   Future<void> _editCard(ReviewCard card) async {
+    if (!ensureSignedIn(
+      context,
+      ref,
+      message:
+          'تعديل البطاقات يحتاج حساباً. سجّل الدخول من الإعدادات بحساب Google.',
+    )) {
+      return;
+    }
     final ReviewCard? updated = await showCardEditSheet(context, card);
     if (updated == null || !mounted) {
       return;
@@ -147,12 +226,14 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
       'ستعود البطاقة إلى المراجعة بعد 10 دقائق.',
       kind: AppMessageKind.info,
     );
+    _decrementRemaining(card.phase);
     final bool done = _index >= _cards.length - 1;
     setState(() {
       _revealed = false;
       _hintVisible = false;
       if (done) {
         _finished = true;
+        _finishedAt = DateTime.now();
       } else {
         _index++;
       }
@@ -162,7 +243,14 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
 
   void _restart() {
     _shownAt = DateTime.now();
+    _startedAt = DateTime.now();
+    _finishedAt = null;
     setState(() {
+      _cards = _hardCards.isNotEmpty
+          ? List<ReviewCard>.of(_hardCards)
+          : List<ReviewCard>.of(widget.cards);
+      _hardCards.clear();
+      _resetRemaining();
       _index = 0;
       _completed = 0;
       _revealed = false;
@@ -211,7 +299,13 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                   ),
                   const SizedBox(height: 20),
                   FilledButton(
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.primary,
@@ -230,12 +324,21 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
       return _Summary(
         deck: _deck,
         total: _cards.length,
+        completed: _completed,
         again: _again,
         hard: _hard,
         good: _good,
         easy: _easy,
+        duration: (_finishedAt ?? DateTime.now()).difference(_startedAt),
+        hardCount: _hardCards.length,
         onRestart: _restart,
-        onClose: () => context.pop(),
+        onClose: () {
+          if (context.canPop()) {
+            context.pop();
+          } else {
+            context.go('/home');
+          }
+        },
       );
     }
 
@@ -254,7 +357,13 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                   _DarkRoundButton(
                     icon: CupertinoIcons.xmark,
                     label: 'إغلاق',
-                    onTap: () => context.pop(),
+                    onTap: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -286,11 +395,22 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  _Legend(text: 'جديدة $_newCount', active: true),
+                  _Legend(
+                    text: 'جديدة $_remainingNew',
+                    active: card.phase == CardPhase.newCard,
+                  ),
                   const SizedBox(width: 14),
-                  _Legend(text: 'تعلّم $_learningCount'),
+                  _Legend(
+                    text: 'تعلّم $_remainingLearning',
+                    active: card.phase == CardPhase.learning,
+                  ),
                   const SizedBox(width: 14),
-                  _Legend(text: 'مراجعة $_reviewCount'),
+                  _Legend(
+                    text: 'مراجعة $_remainingReview',
+                    active:
+                        card.phase == CardPhase.review ||
+                        card.phase == CardPhase.paused,
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
@@ -353,17 +473,41 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                           revealed: _revealed,
                           position: _index + 1,
                           hintVisible: _hintVisible,
-                          onToggleHint: () =>
-                              setState(() => _hintVisible = !_hintVisible),
-                          onEdit: () => _editCard(card),
-                          onSnooze: () => _snooze(card),
+                          favorite: _favorites.contains(card.id),
+                          onToggleFavorite: () => _toggleFavorite(card),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  if (card.hint != null) ...<Widget>[
+                    _SoftAction(
+                      icon: CupertinoIcons.lightbulb,
+                      label: _hintVisible ? 'إخفاء التلميح' : 'تلميح',
+                      onTap: () =>
+                          setState(() => _hintVisible = !_hintVisible),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  _SoftAction(
+                    icon: CupertinoIcons.pencil,
+                    label: 'تعديل',
+                    onTap: () => _editCard(card),
+                  ),
+                  const SizedBox(width: 8),
+                  _SoftAction(
+                    icon: CupertinoIcons.clock,
+                    label: 'تأجيل',
+                    onTap: () => _snooze(card),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               if (!_revealed)
                 SizedBox(
                   width: double.infinity,
@@ -387,6 +531,61 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   }
 }
 
+class _CardContent extends StatelessWidget {
+  const _CardContent({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final RegExpMatch? image = RegExp(
+      r'^!\[[^\]]*\]\(([^)]+)\)$',
+    ).firstMatch(text.trim());
+    if (image == null) {
+      return Text(text, style: style);
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Image.network(
+        image.group(1)!,
+        width: double.infinity,
+        height: 190,
+        fit: BoxFit.cover,
+        loadingBuilder: (
+          BuildContext context,
+          Widget child,
+          ImageChunkEvent? progress,
+        ) {
+          if (progress == null) {
+            return child;
+          }
+          return Container(
+            height: 190,
+            alignment: Alignment.center,
+            color: AppColors.accentSoft,
+            child: const CircularProgressIndicator(strokeWidth: 2),
+          );
+        },
+        errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
+          return Container(
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.accentSoft,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              'تعذّر تحميل الصورة',
+              style: style.copyWith(fontSize: 12),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _CardBody extends StatelessWidget {
   const _CardBody({
     required this.card,
@@ -394,9 +593,8 @@ class _CardBody extends StatelessWidget {
     required this.revealed,
     required this.position,
     required this.hintVisible,
-    required this.onToggleHint,
-    required this.onEdit,
-    required this.onSnooze,
+    required this.favorite,
+    required this.onToggleFavorite,
   });
 
   final ReviewCard card;
@@ -404,9 +602,8 @@ class _CardBody extends StatelessWidget {
   final bool revealed;
   final int position;
   final bool hintVisible;
-  final VoidCallback onToggleHint;
-  final VoidCallback onEdit;
-  final VoidCallback onSnooze;
+  final bool favorite;
+  final VoidCallback onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -446,8 +643,19 @@ class _CardBody extends StatelessWidget {
                 'بطاقة $position',
                 style: TextStyle(color: muted, fontSize: 11),
               ),
-              const SizedBox(width: 8),
-              Icon(CupertinoIcons.star, size: 20, color: muted),
+              const SizedBox(width: 4),
+              IconButton(
+                onPressed: onToggleFavorite,
+                tooltip: favorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  favorite ? CupertinoIcons.star_fill : CupertinoIcons.star,
+                  size: 20,
+                  color: favorite ? AppColors.accent : muted,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -492,8 +700,8 @@ class _CardBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 5),
-            Text(
-              card.front,
+            _CardContent(
+              text: card.front,
               style: TextStyle(
                 fontFamily: 'ReadexPro',
                 fontSize: 24,
@@ -531,33 +739,9 @@ class _CardBody extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 18),
-            Row(
-              children: <Widget>[
-                if (card.hint != null) ...<Widget>[
-                  _SoftAction(
-                    icon: CupertinoIcons.lightbulb,
-                    label: hintVisible ? 'إخفاء' : 'تلميح',
-                    onTap: onToggleHint,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                _SoftAction(
-                  icon: CupertinoIcons.pencil,
-                  label: 'تعديل',
-                  onTap: onEdit,
-                ),
-                const SizedBox(width: 8),
-                _SoftAction(
-                  icon: CupertinoIcons.clock,
-                  label: 'تأجيل',
-                  onTap: onSnooze,
-                ),
-              ],
-            ),
           ] else ...<Widget>[
-            Text(
-              card.front,
+            _CardContent(
+              text: card.front,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.62),
                 fontSize: 13,
@@ -598,8 +782,8 @@ class _CardBody extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  Text(
-                    card.back,
+                  _CardContent(
+                    text: card.back,
                     style: const TextStyle(
                       fontFamily: 'ReadexPro',
                       color: AppColors.accent,
@@ -770,29 +954,47 @@ class _RatingButton extends StatelessWidget {
   }
 }
 
-class _Summary extends StatelessWidget {
+class _Summary extends ConsumerWidget {
   const _Summary({
     required this.deck,
     required this.total,
+    required this.completed,
     required this.again,
     required this.hard,
     required this.good,
     required this.easy,
+    required this.duration,
+    required this.hardCount,
     required this.onRestart,
     required this.onClose,
   });
 
   final DeckNode deck;
   final int total;
+  final int completed;
   final int again;
   final int hard;
   final int good;
   final int easy;
+  final Duration duration;
+  final int hardCount;
   final VoidCallback onRestart;
   final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int streak = ref.watch(streakProvider).valueOrNull ?? 0;
+    final List<DueForecastDay> forecast =
+        ref.watch(dueForecastProvider).valueOrNull ?? const <DueForecastDay>[];
+    final int tomorrow = forecast.length > 1 ? forecast[1].count : 0;
+    final int correct = hard + good + easy;
+    final int answered = again + hard + good + easy;
+    final int accuracy = answered == 0
+        ? 0
+        : (correct / answered * 100).round();
+    final String streakLabel = streak == 2
+        ? 'يومان'
+        : '$streak ${_dayWord(streak)}';
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: SafeArea(
@@ -828,7 +1030,7 @@ class _Summary extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '$total بطاقة في 7 دقائق',
+              '$completed من $total بطاقة في ${_formatDuration(duration)}',
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.muted, fontSize: 13),
             ),
@@ -837,17 +1039,23 @@ class _Summary extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: _SummaryStat(
-                    value: '${((good + easy) / total * 100).round()}%',
+                    value: '$accuracy%',
+                    label: 'دقة الإجابات',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _SummaryStat(
+                    value: '$correct',
                     label: 'إجابات صحيحة',
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
-                  child: _SummaryStat(value: '+3', label: 'راسخة جديدة'),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: _SummaryStat(value: '7', label: 'دقائق'),
+                Expanded(
+                  child: _SummaryStat(
+                    value: _durationShort(duration),
+                    label: 'وقت الجلسة',
+                  ),
                 ),
               ],
             ),
@@ -910,9 +1118,9 @@ class _Summary extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const Text(
-                          'سلسلتك 13 يوماً',
-                          style: TextStyle(
+                        Text(
+                          'سلسلتك $streakLabel',
+                          style: const TextStyle(
                             fontFamily: 'ReadexPro',
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -920,7 +1128,9 @@ class _Summary extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'غداً: 18 بطاقة بانتظارك',
+                          tomorrow == 0
+                              ? 'لا بطاقات مستحقة غداً'
+                              : 'غداً: $tomorrow ${tomorrow == 1 ? 'بطاقة' : 'بطاقات'} بانتظارك',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.65),
                             fontSize: 11,
@@ -945,7 +1155,9 @@ class _Summary extends StatelessWidget {
             TextButton(
               onPressed: onRestart,
               child: Text(
-                'راجع البطاقات الصعبة الآن (${again + hard})',
+                hardCount > 0
+                    ? 'راجع البطاقات الصعبة الآن ($hardCount)'
+                    : 'إعادة الجلسة',
                 style: const TextStyle(
                   color: AppColors.primary,
                   decoration: TextDecoration.underline,
@@ -1112,4 +1324,39 @@ class _RatingSpec {
   final String label;
   final String interval;
   final Color color;
+}
+
+String _formatDuration(Duration duration) {
+  if (duration.inMinutes < 1) {
+    final int seconds = duration.inSeconds < 1 ? 1 : duration.inSeconds;
+    return '$seconds ثانية';
+  }
+  if (duration.inHours < 1) {
+    return '${duration.inMinutes} دقيقة';
+  }
+  final int minutes = duration.inMinutes.remainder(60);
+  return '${duration.inHours} س ${minutes} د';
+}
+
+String _durationShort(Duration duration) {
+  if (duration.inMinutes < 1) {
+    return '${duration.inSeconds < 1 ? 1 : duration.inSeconds}ث';
+  }
+  if (duration.inHours < 1) {
+    return '${duration.inMinutes}د';
+  }
+  return '${duration.inHours}س ${duration.inMinutes.remainder(60)}د';
+}
+
+String _dayWord(int days) {
+  if (days == 1) {
+    return 'يوم';
+  }
+  if (days == 2) {
+    return 'يومان';
+  }
+  if (days >= 3 && days <= 10) {
+    return 'أيام';
+  }
+  return 'يوماً';
 }

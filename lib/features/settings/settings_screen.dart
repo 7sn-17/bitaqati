@@ -20,7 +20,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeMode themeMode = ref.watch(themeModeProvider);
-    final bool notifications = ref.watch(notificationsEnabledProvider);
     final User? user = ref.watch(currentUserProvider).valueOrNull;
     final bool guestMode = ref.watch(guestModeProvider);
     final bool guest = user == null && guestMode;
@@ -118,23 +117,7 @@ class SettingsScreen extends ConsumerWidget {
                   icon: CupertinoIcons.mail,
                   title: 'البريد الإلكتروني',
                   subtitle: user?.email ?? 'غير مرتبط بعد',
-                  onTap: user != null
-                      ? null
-                      : guest
-                      ? () => _goToLogin(ref)
-                      : () => _comingSoon(context, 'ربط الحساب'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.arrow_2_circlepath,
-                  title: 'المزامنة السحابية',
-                  subtitle: 'ستُفعّل مع المرحلة الثانية',
-                  onTap: () => _comingSoon(context, 'المزامنة'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.archivebox,
-                  title: 'النسخ الاحتياطي',
-                  subtitle: 'تصدير بياناتك في أي وقت',
-                  onTap: () => _comingSoon(context, 'النسخ الاحتياطي'),
+                  onTap: user == null ? () => _goToLogin(ref) : null,
                 ),
               ],
             ),
@@ -154,79 +137,6 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            const _SectionLabel('الإشعارات'),
-            _Group(
-              children: <Widget>[
-                _Row(
-                  icon: CupertinoIcons.bell,
-                  title: 'تذكير المراجعة اليومي',
-                  subtitle: 'نذكّرك في الوقت المناسب',
-                  trailing: Switch.adaptive(
-                    value: notifications,
-                    onChanged: (bool value) {
-                      ref.read(notificationsEnabledProvider.notifier).state =
-                          value;
-                      ref
-                          .read(sharedPreferencesProvider)
-                          .setBool('notifications', value);
-                    },
-                  ),
-                ),
-                _Row(
-                  icon: CupertinoIcons.time,
-                  title: 'وقت التذكير',
-                  subtitle: '8:00 مساءً',
-                  onTap: () => _comingSoon(context, 'تعديل وقت التذكير'),
-                ),
-              ],
-            ),
-            const _SectionLabel('الدراسة'),
-            _Group(
-              children: <Widget>[
-                _Row(
-                  icon: CupertinoIcons.add,
-                  title: 'بطاقات جديدة يومياً',
-                  subtitle: '10 بطاقات',
-                  onTap: () => _comingSoon(context, 'إعدادات الدراسة'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.arrow_counterclockwise,
-                  title: 'نسبة التذكر المطلوبة',
-                  subtitle: '90%',
-                  onTap: () => _comingSoon(context, 'إعدادات الدراسة'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.clock,
-                  title: 'المنطقة الزمنية',
-                  subtitle: 'تلقائية',
-                  onTap: () => _comingSoon(context, 'المنطقة الزمنية'),
-                ),
-              ],
-            ),
-            const _SectionLabel('البيانات'),
-            _Group(
-              children: <Widget>[
-                _Row(
-                  icon: CupertinoIcons.square_arrow_up,
-                  title: 'تصدير البيانات',
-                  subtitle: 'JSON · CSV',
-                  onTap: () => _comingSoon(context, 'تصدير البيانات'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.square_arrow_down,
-                  title: 'استيراد البيانات',
-                  subtitle: 'من ملف أو نسخة احتياطية',
-                  onTap: () => _comingSoon(context, 'استيراد البيانات'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.trash,
-                  title: 'مسح جميع البيانات',
-                  subtitle: 'لا يمكن التراجع',
-                  danger: true,
-                  onTap: () => _comingSoon(context, 'مسح البيانات'),
-                ),
-              ],
-            ),
             const _SectionLabel('عن التطبيق'),
             _Group(
               children: <Widget>[
@@ -234,16 +144,6 @@ class SettingsScreen extends ConsumerWidget {
                   icon: CupertinoIcons.info_circle,
                   title: 'الإصدار',
                   subtitle: AppConfig.appVersion,
-                ),
-                _Row(
-                  icon: CupertinoIcons.doc_text,
-                  title: 'سياسة الخصوصية',
-                  onTap: () => _comingSoon(context, 'سياسة الخصوصية'),
-                ),
-                _Row(
-                  icon: CupertinoIcons.question_circle,
-                  title: 'المساعدة والدعم',
-                  onTap: () => _comingSoon(context, 'المساعدة'),
                 ),
               ],
             ),
@@ -275,14 +175,6 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
-
-  void _comingSoon(BuildContext context, String feature) {
-    showAppMessage(
-      context,
-      'سنضيف $feature في تحديث قادم.',
-      kind: AppMessageKind.info,
     );
   }
 

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/auth_providers.dart';
+import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -15,11 +16,37 @@ import '../../core/widgets/tag_filter_bar.dart';
 import '../../data/content_providers.dart';
 import '../../domain/models.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+      _consumePendingLink();
+    });
+  }
+
+  Future<void> _consumePendingLink() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final String? deckId = prefs.getString(AppConfig.pendingDeckKey);
+    if (deckId == null || deckId.isEmpty) {
+      return;
+    }
+    await prefs.remove(AppConfig.pendingDeckKey);
+    if (!mounted) {
+      return;
+    }
+    context.push('/deck/$deckId');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final String? selected = ref.watch(selectedTagProvider);
     final List<DeckNode> allDecks = ref.watch(deckForestProvider);
     final List<DeckNode> decks = selected == null

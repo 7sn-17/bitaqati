@@ -1,11 +1,9 @@
 import 'package:drift/drift.dart';
 
+import '../../domain/enums.dart';
 import 'converters.dart';
 
 export 'converters.dart';
-
-/// Who may see a deck. Mirrors the cloud `deck_privacy` enum.
-enum DeckPrivacy { private, unlisted, public }
 
 /// Card layout. Mirrors the cloud `card_type` enum.
 enum CardType { basic, cloze, mcq, occlusion }
@@ -164,6 +162,9 @@ class Cards extends Table {
   TextColumn get source => text().nullable()();
 
   BoolColumn get aiGenerated => boolean().withDefault(const Constant(false))();
+
+  /// Locally pinned cards shown first in review and the card list.
+  BoolColumn get favorite => boolean().withDefault(const Constant(false))();
 
   IntColumn get position => integer().withDefault(const Constant(0))();
 

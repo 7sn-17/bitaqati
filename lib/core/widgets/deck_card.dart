@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/enums.dart';
 import '../../domain/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -19,15 +20,18 @@ class DeckCard extends StatelessWidget {
   final Widget? trailing;
 
   String get _subtitle {
-    if (showAuthor && deck.author != null) {
-      return '${deck.cardCount} بطاقة · ${deck.author}';
+    if (showAuthor) {
+      final String usage = deck.installCount > 0
+          ? ' · ${deck.installCount} استخدام'
+          : '';
+      return '${deck.cardCount} بطاقة · '
+          '${deck.author ?? 'مجموعة مشاركة'}$usage';
     }
-    final String visibility = deck.isPublic ? 'عامة' : 'خاصة';
     final String subDecks = deck.childCount > 0
         ? ' · ${deck.childCount} فرعية'
         : '';
-    return '${deck.cardCount} بطاقة · $visibility · '
-        'حفظ ${deck.retention.round()}%$subDecks';
+    return '${deck.cardCount} بطاقة · ${deck.privacy.shortLabelAr} · '
+        'أتقنت ${deck.masteryPercent.round()}%$subDecks';
   }
 
   String get _statusLabel {
@@ -35,7 +39,13 @@ class DeckCard extends StatelessWidget {
     if (rating != null) {
       return '${rating.toStringAsFixed(1)} ★';
     }
-    return deck.cardCount == 0 ? 'فارغة' : 'أُنجزت';
+    if (deck.cardCount == 0) {
+      return 'فارغة';
+    }
+    if (deck.masteredCount > 0) {
+      return '${deck.masteredCount}/${deck.cardCount}';
+    }
+    return 'لم تبدأ';
   }
 
   @override

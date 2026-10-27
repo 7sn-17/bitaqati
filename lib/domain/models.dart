@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'enums.dart';
+
 /// Icons a deck can use. The key is what gets stored in `decks.icon`.
 ///
 /// The keys are stable: never rename one without a data migration, because
@@ -98,6 +100,12 @@ class ReviewCard {
     this.note,
     this.tags = const <String>[],
     this.phase = CardPhase.newCard,
+    this.type = 'basic',
+    this.due,
+    this.lapses = 0,
+    this.scheduledDays = 0,
+    this.suspended = false,
+    this.favorite = false,
   });
 
   final String id;
@@ -108,6 +116,19 @@ class ReviewCard {
   final String? note;
   final List<String> tags;
   final CardPhase phase;
+  final String type;
+  final DateTime? due;
+  final int lapses;
+  final int scheduledDays;
+  final bool suspended;
+  final bool favorite;
+
+  bool get isLeech => lapses >= 4;
+
+  bool get isDue {
+    final DateTime? value = due;
+    return value != null && !value.isAfter(DateTime.now());
+  }
 
   /// 0 new, 1 learning, 2 settled. Matches the dots in the card list.
   int get stateIndex {
@@ -153,9 +174,13 @@ class DeckNode {
     this.description = '',
     this.iconKey = 'layers',
     this.tags = const <String>[],
+    this.privacy = DeckPrivacy.private,
     this.isPublic = false,
+    this.publishedAt,
+    this.sourceDeckId,
     this.ownCardCount = 0,
     this.cardCount = 0,
+    this.masteredCount = 0,
     this.dueNew = 0,
     this.dueLearning = 0,
     this.dueReview = 0,
@@ -164,6 +189,8 @@ class DeckNode {
     this.childCount = 0,
     this.author,
     this.rating,
+    this.ratingCount = 0,
+    this.installCount = 0,
     this.children = const <DeckNode>[],
   });
 
@@ -177,9 +204,15 @@ class DeckNode {
   final Color color;
   final String iconKey;
   final List<String> tags;
+  final DeckPrivacy privacy;
   final bool isPublic;
+  final DateTime? publishedAt;
+  final String? sourceDeckId;
   final int ownCardCount;
   final int cardCount;
+
+  /// Cards in this deck (and its sub-decks) that reached the review state.
+  final int masteredCount;
   final int dueNew;
   final int dueLearning;
   final int dueReview;
@@ -188,6 +221,8 @@ class DeckNode {
   final int childCount;
   final String? author;
   final double? rating;
+  final int ratingCount;
+  final int installCount;
   final List<DeckNode> children;
 
   IconData get icon => kDeckIcons[iconKey] ?? Icons.layers_rounded;
@@ -210,15 +245,25 @@ class DeckNode {
   /// Only sub-decks hold cards. Main decks never do.
   bool get canHoldCards => isSubDeck;
 
-  /// Library decks shown before the cloud library is connected.
+  /// A deck that came from the public library or a share link.
   bool get isPreview => author != null;
+
+  bool get isUnlisted => privacy == DeckPrivacy.unlisted;
+
+  bool get isPublished => privacy != DeckPrivacy.private;
 
   /// Share of answers rated hard or better, 0 to 100.
   double get retention =>
       reviewCount == 0 ? 0 : correctCount / reviewCount * 100;
 
+  /// Share of cards that have reached the review state.
+  double get masteryPercent =>
+      cardCount == 0 ? 0 : masteredCount / cardCount * 100;
+
+  /// Progress bars measure mastered cards, not answer accuracy. This keeps a
+  /// one-card deck from looking empty after its first successful review.
   double get progress {
-    final double ratio = retention / 100;
+    final double ratio = cardCount == 0 ? 0 : masteredCount / cardCount;
     if (ratio < 0) {
       return 0;
     }
@@ -253,9 +298,13 @@ class DeckNode {
       description: description,
       iconKey: iconKey,
       tags: tags,
+      privacy: privacy,
       isPublic: isPublic,
+      publishedAt: publishedAt,
+      sourceDeckId: sourceDeckId,
       ownCardCount: ownCardCount,
       cardCount: cardCount,
+      masteredCount: masteredCount,
       dueNew: dueNew,
       dueLearning: dueLearning,
       dueReview: dueReview,
@@ -264,6 +313,8 @@ class DeckNode {
       childCount: childCount,
       author: author,
       rating: rating,
+      ratingCount: ratingCount,
+      installCount: installCount,
       children: children ?? this.children,
     );
   }
@@ -316,4 +367,150 @@ DeckNode? findDeckNode(List<DeckNode> forest, String id) {
     }
   }
   return null;
+}
+
+/// One day of review history, used by the progress heatmap and streaks.
+@immutable
+class ReviewActivityDay {
+  const ReviewActivityDay({
+    required this.day,
+    required this.reviews,
+    required this.correct,
+  });
+
+  final DateTime day;
+  final int reviews;
+  final int correct;
+}
+
+/// How many cards are due on one of the next seven days.
+@immutable
+class DueForecastDay {
+  const DueForecastDay({required this.day, required this.count});
+
+  final DateTime day;
+  final int count;
+}
+
+/// Real statistics for a deck and, when it is a main deck, its sub-decks.
+@immutable
+class DeckStatistics {
+  const DeckStatistics({
+    this.totalCards = 0,
+    this.newCards = 0,
+    this.learningCards = 0,
+    this.dueCards = 0,
+    this.matureCards = 0,
+    this.reviewCount = 0,
+    this.correctCount = 0,
+  });
+
+  final int totalCards;
+  final int newCards;
+  final int learningCards;
+  final int dueCards;
+  final int matureCards;
+  final int reviewCount;
+  final int correctCount;
+
+  double get retention =>
+      reviewCount == 0 ? 0 : correctCount / reviewCount * 100;
+
+  double get maturity =>
+      totalCards == 0 ? 0 : matureCards / totalCards;
+
+  double get maturityPercent => maturity * 100;
+}
+
+/// A deck row ready to be written to Supabase.
+@immutable
+class DeckBundleNode {
+  const DeckBundleNode({
+    required this.id,
+    required this.parentId,
+    required this.depth,
+    required this.position,
+    required this.title,
+    this.description = '',
+    this.colorHex,
+    this.icon = 'layers',
+    this.tags = const <String>[],
+    this.settings = const <String, Object?>{},
+    this.coverUrl,
+    this.sourceDeckId,
+    this.sourceVersion = 1,
+    this.publishedAt,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String? parentId;
+  final int depth;
+  final int position;
+  final String title;
+  final String description;
+  final String? colorHex;
+  final String icon;
+  final List<String> tags;
+  final Map<String, Object?> settings;
+  final String? coverUrl;
+  final String? sourceDeckId;
+  final int sourceVersion;
+  final DateTime? publishedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+}
+
+/// A card row ready to be written to Supabase.
+@immutable
+class DeckBundleCard {
+  const DeckBundleCard({
+    required this.id,
+    required this.deckId,
+    required this.front,
+    required this.back,
+    required this.position,
+    this.type = 'basic',
+    this.notes = '',
+    this.hint = '',
+    this.tags = const <String>[],
+    this.media = const <Object?>[],
+    this.occlusion,
+    this.source,
+    this.aiGenerated = false,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String deckId;
+  final String type;
+  final String front;
+  final String back;
+  final String notes;
+  final String hint;
+  final List<String> tags;
+  final List<Object?> media;
+  final Map<String, Object?>? occlusion;
+  final String? source;
+  final bool aiGenerated;
+  final int position;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+}
+
+/// A deck subtree and its cards, used for publishing and for installing a
+/// deck from the library or a share link.
+@immutable
+class DeckBundle {
+  const DeckBundle({
+    required this.root,
+    required this.nodes,
+    required this.cards,
+  });
+
+  final DeckNode root;
+  final List<DeckBundleNode> nodes;
+  final List<DeckBundleCard> cards;
 }

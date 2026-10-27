@@ -8,46 +8,73 @@ import '../../data/content_providers.dart';
 import '../../domain/models.dart';
 import 'editor_common.dart';
 
-/// Opens the "new deck" sheet. With [parentId] it creates a sub-deck.
-/// Returns the new deck id, or null when the sheet was dismissed.
+/// Opens the deck sheet. With [parentId] it creates a sub-deck. With [deck]
+/// it edits that deck's title, colour and icon.
+/// Returns the created or edited deck id, or null when dismissed.
 Future<String?> showDeckEditorSheet(
   BuildContext context, {
   String? parentId,
   String? parentTitle,
+  DeckNode? deck,
 }) async {
   final String? id = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.38),
-    builder: (BuildContext sheet) =>
-        _DeckEditorSheet(parentId: parentId, parentTitle: parentTitle),
+    builder: (BuildContext sheet) => _DeckEditorSheet(
+      parentId: parentId,
+      parentTitle: parentTitle,
+      deck: deck,
+    ),
   );
   if (id != null && context.mounted) {
-    showAppMessage(
-      context,
-      parentId == null ? 'تم إنشاء المجموعة' : 'تمت إضافة المجموعة الفرعية',
-    );
+    if (deck != null) {
+      showAppMessage(context, 'تم تحديث المجموعة.');
+    } else {
+      showAppMessage(
+        context,
+        parentId == null ? 'تم إنشاء المجموعة' : 'تمت إضافة المجموعة الفرعية',
+      );
+    }
   }
   return id;
 }
 
 class _DeckEditorSheet extends ConsumerStatefulWidget {
-  const _DeckEditorSheet({this.parentId, this.parentTitle});
+  const _DeckEditorSheet({this.parentId, this.parentTitle, this.deck});
 
   final String? parentId;
   final String? parentTitle;
+  final DeckNode? deck;
 
   @override
   ConsumerState<_DeckEditorSheet> createState() => _DeckEditorSheetState();
 }
 
 class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
-  final TextEditingController _title = TextEditingController();
+  late final TextEditingController _title;
   int _colorIndex = 0;
   String _iconKey = 'layers';
   String? _error;
   bool _saving = false;
+
+  bool get _isEditing => widget.deck != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final DeckNode? deck = widget.deck;
+    _title = TextEditingController(text: deck?.title ?? '');
+    _iconKey = deck?.iconKey ?? 'layers';
+    if (deck != null) {
+      final String hex = colorToHex(deck.color);
+      final int index = kDeckColors.indexWhere(
+        (Color color) => colorToHex(color) == hex,
+      );
+      _colorIndex = index < 0 ? 0 : index;
+    }
+  }
 
   @override
   void dispose() {
@@ -66,6 +93,22 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
       _error = null;
     });
     try {
+      final DeckNode? editing = widget.deck;
+      if (editing != null) {
+        await ref
+            .read(contentRepositoryProvider)
+            .updateDeck(
+              deckId: editing.id,
+              title: title,
+              colorHex: colorToHex(kDeckColors[_colorIndex]),
+              icon: _iconKey,
+            );
+        if (!mounted) {
+          return;
+        }
+        Navigator.of(context).pop(editing.id);
+        return;
+      }
       final String id = await ref
           .read(contentRepositoryProvider)
           .createDeck(
@@ -84,20 +127,26 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
       }
       setState(() {
         _saving = false;
-        _error = 'تعذّر إنشاء المجموعة. حاول مرة أخرى.';
+        _error = _isEditing
+            ? 'تعذّر تحديث المجموعة. حاول مرة أخرى.'
+            : 'تعذّر إنشاء المجموعة. حاول مرة أخرى.';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isSub = widget.parentId != null;
+    final bool isSub = widget.deck?.isSubDeck ?? widget.parentId != null;
     final Color chosen = kDeckColors[_colorIndex];
     final IconData icon = kDeckIcons[_iconKey] ?? Icons.layers_rounded;
     final String previewTitle = _title.text.trim();
 
     return EditorSheetFrame(
-      title: isSub ? 'مجموعة فرعية جديدة' : 'مجموعة جديدة',
+      title: _isEditing
+          ? 'تعديل المجموعة'
+          : isSub
+          ? 'مجموعة فرعية جديدة'
+          : 'مجموعة جديدة',
       subtitle: widget.parentTitle == null
           ? null
           : 'داخل: ${widget.parentTitle}',
@@ -176,7 +225,7 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
             onChanged: (_) => setState(() => _error = null),
             decoration: editorDecoration(
               context,
-              hint: 'مثال: الفيزياء · الحركة',
+              hint: 'مثال: ملاحظاتي · الفصل الأول',
               errorText: _error,
             ),
           ),
@@ -274,7 +323,13 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
             width: double.infinity,
             child: FilledButton(
               onPressed: _saving ? null : _save,
-              child: Text(_saving ? 'جارٍ الحفظ' : 'إنشاء المجموعة'),
+              child: Text(
+                _saving
+                    ? 'جارٍ الحفظ'
+                    : _isEditing
+                    ? 'حفظ التعديلات'
+                    : 'إنشاء المجموعة',
+              ),
             ),
           ),
         ],

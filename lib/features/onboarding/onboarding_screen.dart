@@ -24,13 +24,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       asset: 'assets/onboarding/review_less.svg',
     ),
     _OnboardingPage(
-      title: 'حوّل أي ملف إلى بطاقات',
-      body: 'الصق نصاً أو أضف صورة أو ملفاً، وسنحوّله إلى بطاقات مراجعة جاهزة يمكنك تعديلها قبل الحفظ.',
+      title: 'أنشئ بطاقات بطريقتك',
+      body: 'اختر بطاقة أساسية أو ملء فراغ أو تغطية صورة، وأضف التنسيق والوسوم والتلميحات قبل الحفظ.',
       asset: 'assets/onboarding/file_to_cards.svg',
     ),
     _OnboardingPage(
-      title: 'مكتبة من الطلاب',
-      body: 'اكتشف مجموعات جاهزة في الفيزياء والكيمياء والبيولوجيا وتاريخ الطب والانكليزية 1.',
+      title: 'مكتبة من المتعلّمين',
+      body: 'اكتشف مجموعات جاهزة في العلوم واللغات والتاريخ والمهارات '
+          'وأي مجال تريد إتقانه، ثم أضف ما يناسبك إلى مساحتك.',
       asset: 'assets/onboarding/student_library.svg',
     ),
   ];
@@ -151,34 +152,102 @@ class _PageContent extends StatelessWidget {
     return Center(
       child: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            SvgPicture.asset(
-              page.asset,
-              width: 300,
-              height: 244,
-              semanticsLabel: page.title,
-            ),
-            const SizedBox(height: 30),
-            Text(
-              page.title,
-              textAlign: TextAlign.center,
-              style: context.texts.displaySmall,
-            ),
-            const SizedBox(height: 12),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 330),
-              child: Text(
-                page.body,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 520),
+          curve: Curves.easeOutCubic,
+          builder: (BuildContext context, double value, Widget? child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, 14 * (1 - value)),
+                child: child,
+              ),
+            );
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _AnimatedIllustration(asset: page.asset, label: page.title),
+              const SizedBox(height: 30),
+              Text(
+                page.title,
                 textAlign: TextAlign.center,
-                style: context.texts.bodyLarge?.copyWith(
-                  color: context.texts.bodySmall?.color,
-                  height: 1.8,
+                style: context.texts.displaySmall,
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 330),
+                child: Text(
+                  page.body,
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodyLarge?.copyWith(
+                    color: context.texts.bodySmall?.color,
+                    height: 1.8,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gives the static SVG a gentle breathing float. The motion is intentionally
+/// small so the onboarding still feels calm and premium.
+class _AnimatedIllustration extends StatefulWidget {
+  const _AnimatedIllustration({required this.asset, required this.label});
+
+  final String asset;
+  final String label;
+
+  @override
+  State<_AnimatedIllustration> createState() => _AnimatedIllustrationState();
+}
+
+class _AnimatedIllustrationState extends State<_AnimatedIllustration>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 4),
+  )..repeat(reverse: true);
+  late final Animation<double> _float = Tween<double>(
+    begin: -5,
+    end: 5,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _float,
+      builder: (BuildContext context, Widget? child) {
+        return Transform.translate(
+          offset: Offset(0, _float.value),
+          child: child,
+        );
+      },
+      child: Container(
+        width: 310,
+        height: 254,
+        decoration: BoxDecoration(
+          color: context.colors.surfaceContainerHighest.withValues(
+            alpha: 0.55,
+          ),
+          borderRadius: BorderRadius.circular(42),
+        ),
+        child: SvgPicture.asset(
+          widget.asset,
+          width: 300,
+          height: 244,
+          semanticsLabel: widget.label,
         ),
       ),
     );

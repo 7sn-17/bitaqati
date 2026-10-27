@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/guest_guard.dart';
+import '../../core/auth/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
@@ -78,27 +78,8 @@ class _CreateSheet extends ConsumerWidget {
               _Option(
                 icon: CupertinoIcons.doc_text,
                 title: 'بطاقة جديدة',
-                subtitle: 'أساسية، إخفاء كلمة، اختيار، أو صورة',
+                subtitle: 'أساسية، ملء فراغ، أو تغطية صورة',
                 onTap: () => _openCardEditor(context, ref),
-              ),
-              _Option(
-                icon: CupertinoIcons.text_alignleft,
-                title: 'استيراد نص',
-                subtitle: 'الصق نصك وحوّل كل سطر إلى بطاقة',
-                onTap: () => _comingSoon(context, 'الاستيراد الذكي'),
-              ),
-              _Option(
-                icon: CupertinoIcons.sparkles,
-                title: 'إنشاء بالذكاء الاصطناعي',
-                subtitle: 'من ملف أو صورة أو نص',
-                accent: true,
-                onTap: () => _comingSoon(context, 'التوليد بالذكاء الاصطناعي'),
-              ),
-              _Option(
-                icon: CupertinoIcons.photo,
-                title: 'تغطية صورة',
-                subtitle: 'حوّل أجزاء الصورة إلى بطاقات اختبار',
-                onTap: () => _comingSoon(context, 'محرّر تغطية الصورة'),
               ),
             ],
           ),
@@ -108,28 +89,33 @@ class _CreateSheet extends ConsumerWidget {
   }
 
   void _openDeckEditor(BuildContext context, WidgetRef ref) {
+    final bool allowed = ref.read(authServiceProvider).currentUser != null;
     Navigator.of(context).pop();
-    if (!ensureCanCreate(parentContext, ref)) {
+    if (!allowed) {
+      showAppMessage(
+        parentContext,
+        'إنشاء المجموعات والبطاقات متاح للحسابات. '
+        'سجّل الدخول من الإعدادات بحساب Google لحفظ بطاقاتك ومزامنتها.',
+        kind: AppMessageKind.info,
+      );
       return;
     }
     showDeckEditorSheet(parentContext);
   }
 
   void _openCardEditor(BuildContext context, WidgetRef ref) {
+    final bool allowed = ref.read(authServiceProvider).currentUser != null;
     Navigator.of(context).pop();
-    if (!ensureCanCreate(parentContext, ref)) {
+    if (!allowed) {
+      showAppMessage(
+        parentContext,
+        'إنشاء المجموعات والبطاقات متاح للحسابات. '
+        'سجّل الدخول من الإعدادات بحساب Google لحفظ بطاقاتك ومزامنتها.',
+        kind: AppMessageKind.info,
+      );
       return;
     }
     showCardEditorSheet(parentContext);
-  }
-
-  void _comingSoon(BuildContext context, String feature) {
-    Navigator.of(context).pop();
-    showAppMessage(
-      parentContext,
-      '$feature سيُفعّل في المرحلة القادمة.',
-      kind: AppMessageKind.info,
-    );
   }
 }
 
@@ -139,23 +125,17 @@ class _Option extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.accent = false,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool accent;
 
   @override
   Widget build(BuildContext context) {
-    final Color tile = accent
-        ? (context.isDark ? AppColors.accent : AppColors.accentSoft)
-        : context.colors.surfaceContainerHighest;
-    final Color foreground = accent
-        ? (context.isDark ? AppColors.primary : AppColors.primary)
-        : context.colors.onSurface;
+    final Color tile = context.colors.surfaceContainerHighest;
+    final Color foreground = context.colors.onSurface;
 
     return Material(
       color: Colors.transparent,

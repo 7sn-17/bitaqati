@@ -106,3 +106,46 @@ final Provider<DeckNode?> todayReviewDeckProvider = Provider<DeckNode?>((
 final StreamProvider<int> streakProvider = StreamProvider<int>(
   (Ref ref) => ref.watch(contentRepositoryProvider).watchStreak(),
 );
+
+/// Real review history grouped by day. Drives the heatmap and retention.
+final StreamProvider<List<ReviewActivityDay>> reviewActivityProvider =
+    StreamProvider<List<ReviewActivityDay>>(
+      (Ref ref) => ref.watch(contentRepositoryProvider).watchReviewActivity(),
+    );
+
+/// Real due counts for the next seven days.
+final StreamProvider<List<DueForecastDay>> dueForecastProvider =
+    StreamProvider<List<DueForecastDay>>(
+      (Ref ref) => ref.watch(contentRepositoryProvider).watchDueForecast(),
+    );
+
+/// Total, new, learning, due, mature and retention values for one deck.
+final StreamProviderFamily<DeckStatistics, String> deckStatisticsProvider =
+    StreamProvider.family<DeckStatistics, String>(
+      (Ref ref, String deckId) =>
+          ref.watch(contentRepositoryProvider).watchDeckStatistics(deckId),
+    );
+
+/// Remote library deck ids that already exist in the local database.
+final Provider<Set<String>> installedLibraryDeckIdsProvider =
+    Provider<Set<String>>((Ref ref) {
+      final List<DeckNode> decks =
+          ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
+      return <String>{
+        for (final DeckNode deck in decks)
+          if (deck.sourceDeckId != null) deck.sourceDeckId!,
+      };
+    });
+
+/// Local deck created from a remote source, if it has been installed.
+final ProviderFamily<String?, String> localDeckIdForSourceProvider =
+    Provider.family<String?, String>((Ref ref, String sourceId) {
+      final List<DeckNode> decks =
+          ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
+      for (final DeckNode deck in decks) {
+        if (deck.sourceDeckId == sourceId) {
+          return deck.id;
+        }
+      }
+      return null;
+    });

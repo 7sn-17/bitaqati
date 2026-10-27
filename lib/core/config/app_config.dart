@@ -7,6 +7,30 @@ abstract final class AppConfig {
   static const String appNameEn = 'Bitaqati';
   static const String appVersion = '0.1.0';
 
+  /// Custom URL scheme registered by the Android manifest.
+  ///
+  /// Links look like `bitaqati://deck/<deck-id>`. The id is the same UUID the
+  /// deck has locally and in Supabase, so the recipient can open a preview
+  /// and install an exact snapshot.
+  static const String shareScheme = 'bitaqati';
+
+  /// SharedPreferences key for a link that arrived before sign-in completed.
+  static const String pendingDeckKey = 'pending_deck_id';
+
+  static String deckShareLink(String deckId) => '$shareScheme://deck/$deckId';
+
+  /// Extracts a deck id from a share link, or null for unrelated links.
+  static String? deckIdFromShareLink(Uri uri) {
+    if (uri.scheme != shareScheme || uri.host != 'deck') {
+      return null;
+    }
+    if (uri.pathSegments.isEmpty) {
+      return null;
+    }
+    final String id = uri.pathSegments.first.trim();
+    return id.isEmpty ? null : id;
+  }
+
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
     defaultValue: '',
