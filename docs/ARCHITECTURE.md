@@ -37,6 +37,8 @@
 /review/:id                root navigator
 /create-card               root navigator
 /edit-card/:id             root navigator
+/import-cards/:deckId      root navigator
+/draft-card                root navigator, draft passed in memory
 /search                    root navigator
 /settings                  root navigator
 /developer                 root navigator
@@ -111,6 +113,29 @@ every child relationship is `ON DELETE CASCADE`.
 
 Version 4 rebuilds the table with `TableMigration`, which copies every column
 that still exists, so existing decks and their cards survive the flattening.
+
+## Smart import
+
+Pasting a wall of text is how most people already have their material, so the
+import flow turns it into cards instead of asking for them one by one.
+
+```text
+Front | Back
+Front | Back | Hint
+Front | Back | Hint | Note
+```
+
+- One card per line. A line with no pipe, or with an empty front or back, is
+  counted and skipped rather than guessed at.
+- A backslash before a pipe (`\|`) keeps the pipe inside the field.
+- Extra separators are folded into the note so no text is lost.
+
+The screen has two states: paste, then preview. Nothing is written until the
+user presses save. Tapping a draft pushes `/draft-card` with the draft in
+`extra` and `collectOnly: true`, which runs the real editor — formatting,
+occlusion, tags — and returns the edited `CardDraft` instead of persisting it.
+Saving the batch goes through `ContentRepository.addCards`, one transaction and
+one queue row per card, so a failure cannot leave half a deck behind.
 
 ## Deleting a deck
 
@@ -192,6 +217,21 @@ value authoritative:
 
 The local row is keyed by user id, so a rename survives a sign-out, a
 reinstall, and an offline session.
+
+The library never stores the name. `public_decks.author_name` is
+`profiles.display_name` joined at query time, so a rename changes the credit on
+every deck that account ever published, in the same statement, with no backfill
+and nothing that can drift. Three details keep that promise:
+
+- `profiles_normalise_name` trims and collapses whitespace, and refuses to let a
+  blank name through, because one empty row would blank the author on every
+  published deck at once.
+- `SyncService` calls `ProfileRepository.syncToCloud` before pulling, so a
+  rename made offline still reaches the library on the next connection. It only
+  pushes when the cloud copy is not newer, which keeps two devices from
+  fighting.
+- `DisplayNameController` invalidates the cached library catalog after a rename,
+  so the user sees the new name without restarting the app.
 
 ## FSRS review engine
 
