@@ -20,9 +20,9 @@ class ContentRepository {
 
   /// The app allows exactly two levels: a main deck and its sub-decks.
   ///
-  /// This is stricter than the cloud `decks_depth_check` constraint, which is
-  /// kept permissive so old rows stay readable; the invariant is enforced here
-  /// so every screen inherits it.
+  /// This matches the cloud `decks_depth_check` and local Drift constraints;
+  /// it is also enforced here so every screen inherits the invariant before a
+  /// write ever reaches SQLite.
   static const int maxDepth = kMaxDeckDepth;
 
   static const String _deckStatsSql = '''
@@ -311,6 +311,46 @@ ORDER BY d.depth, d.position, d.created_at
     });
   }
 
+  /// Updates the editable fields of an existing card.
+  ///
+  /// The deck and the review state are intentionally left untouched, so
+  /// editing a card mid-session never resets its scheduling.
+  Future<void> updateCard({
+    required String cardId,
+    required String front,
+    required String back,
+    String hint = '',
+    String note = '',
+    List<String> tags = const <String>[],
+  }) {
+    final String cleanFront = front.trim();
+    final String cleanBack = back.trim();
+    if (cleanFront.isEmpty || cleanBack.isEmpty) {
+      throw ArgumentError('A card needs both a front and a back');
+    }
+    return _db.transaction(() async {
+      final CardRow? existing =
+          await (_db.select(_db.cards)..where(
+                (c) => c.id.equals(cardId) & c.deletedAt.isNull(),
+              ))
+              .getSingleOrNull();
+      if (existing == null) {
+        throw StateError('Card $cardId does not exist');
+      }
+      await (_db.update(_db.cards)..where((c) => c.id.equals(cardId))).write(
+        CardsCompanion(
+          front: Value(cleanFront),
+          back: Value(cleanBack),
+          hint: Value(hint.trim()),
+          notes: Value(note.trim()),
+          tags: Value(_cleanTags(tags)),
+          updatedAt: Value(_clock()),
+        ),
+      );
+      await _enqueue('cards', cardId, SyncOperation.upsert);
+    });
+  }
+
   /// Cards to study now in [deckId] and every deck nested under it:
   /// learning first, then reviews, then new cards.
   Future<List<ReviewCard>> studyQueue(String deckId, {int limit = 200}) async {
@@ -513,6 +553,40 @@ ORDER BY d.depth, d.position, d.created_at
           );
       await _enqueue('card_states', cardId, SyncOperation.upsert);
       await _enqueue('review_logs', logId, SyncOperation.upsert);
+    });
+  }
+
+  /// Pushes a card's next review into the future without rating it.
+  ///
+  /// Used by the "postpone" action in the review screen. The card leaves the
+  /// current queue and returns as a learning card after [duration].
+  Future<void> snoozeCard({
+    required String cardId,
+    Duration duration = const Duration(minutes: 10),
+  }) {
+    return _db.transaction(() async {
+      final DateTime now = _clock();
+      final CardStateRow? previous =
+          await (_db.select(_db.cardStates)..where(
+                (s) => s.cardId.equals(cardId),
+              ))
+              .getSingleOrNull();
+      await _db
+          .into(_db.cardStates)
+          .insertOnConflictUpdate(
+            CardStatesCompanion(
+              cardId: Value(cardId),
+              status: Value(CardStatus.learning),
+              due: Value(now.add(duration)),
+              elapsedDays: Value(previous?.elapsedDays ?? 0),
+              scheduledDays: Value(0),
+              reps: Value(previous?.reps ?? 0),
+              lapses: Value(previous?.lapses ?? 0),
+              lastReview: Value(previous?.lastReview ?? now),
+              updatedAt: Value(now),
+            ),
+          );
+      await _enqueue('card_states', cardId, SyncOperation.upsert);
     });
   }
 

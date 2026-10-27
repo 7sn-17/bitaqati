@@ -1,0 +1,253 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/auth/auth_providers.dart';
+import '../../core/config/app_config.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
+import '../../data/auth_service.dart';
+
+/// Entry screen shown after onboarding: native Google sign-in or guest mode.
+class LoginScreen extends ConsumerStatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final GuestModeNotifier guestMode = ref.read(guestModeProvider.notifier);
+    try {
+      await ref.read(authServiceProvider).signInWithGoogle();
+      await guestMode.exit();
+      // The router redirects to /home once the session is visible.
+    } on AuthFailure catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'تعذّر إكمال تسجيل الدخول. حاول مرة أخرى.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _continueAsGuest() async {
+    await ref.read(guestModeProvider.notifier).enter();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool canUseGoogle =
+        AppConfig.hasGoogleSignIn && AppConfig.hasSupabase;
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: context.colors.primary,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.rectangle_stack,
+                    size: 34,
+                    color: context.colors.onPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                'مرحباً بك في بطاقاتي',
+                textAlign: TextAlign.center,
+                style: context.texts.displaySmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'سجّل الدخول لتحفظ تقدّمك في كل أجهزتك، أو تابع كزائر '
+                'وتبقى بطاقاتك على هذا الجهاز.',
+                textAlign: TextAlign.center,
+                style: context.texts.bodySmall?.copyWith(height: 1.8),
+              ),
+              const SizedBox(height: 28),
+              if (_error != null) ...<Widget>[
+                _ErrorBox(message: _error!),
+                const SizedBox(height: 14),
+              ],
+              SizedBox(
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: _busy || !canUseGoogle ? null : _signInWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: context.isDark
+                        ? AppColors.darkSurface
+                        : Colors.white,
+                    side: BorderSide(color: context.colors.outlineVariant),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            const _GoogleMark(),
+                            const SizedBox(width: 10),
+                            Text(
+                              'المتابعة بحساب Google',
+                              style: context.texts.titleSmall,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              if (!canUseGoogle) ...<Widget>[
+                const SizedBox(height: 10),
+                Text(
+                  'تسجيل الدخول بجوجل غير مهيّأ في هذا البناء. '
+                  'أضف GOOGLE_WEB_CLIENT_ID وبيانات Supabase.',
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodySmall?.copyWith(
+                    color: AppColors.danger,
+                    height: 1.7,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Divider(color: context.colors.outlineVariant),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text('أو', style: context.texts.labelSmall),
+                  ),
+                  Expanded(
+                    child: Divider(color: context.colors.outlineVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                height: 50,
+                child: TextButton(
+                  onPressed: _busy ? null : _continueAsGuest,
+                  child: const Text('المتابعة كزائر'),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'وضع الزائر يحفظ كل شيء محلياً على هذا الجهاز فقط، '
+                'ولن تتم مزامنة تقدّمك.',
+                textAlign: TextAlign.center,
+                style: context.texts.bodySmall?.copyWith(
+                  fontSize: 11,
+                  height: 1.7,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'بالمتابعة أنت توافق على سياسة الخصوصية وشروط الاستخدام',
+                textAlign: TextAlign.center,
+                style: context.texts.bodySmall?.copyWith(fontSize: 10.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Simple placeholder for the Google "G". Swap for the official asset when it
+/// is added to `assets/branding/`.
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(color: const Color(0xFFE3E3E3)),
+      ),
+      child: const Text(
+        'G',
+        style: TextStyle(
+          fontFamily: 'ReadexPro',
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF4285F4),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBox extends StatelessWidget {
+  const _ErrorBox({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Icon(
+            CupertinoIcons.exclamationmark_circle,
+            size: 18,
+            color: AppColors.danger,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: context.texts.bodySmall?.copyWith(
+                color: AppColors.danger,
+                height: 1.7,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

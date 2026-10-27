@@ -128,7 +128,7 @@ class Decks extends Table {
 
   @override
   List<String> get customConstraints => <String>[
-    'CHECK (depth BETWEEN 0 AND 20)',
+    'CHECK (depth BETWEEN 0 AND 1)',
   ];
 }
 

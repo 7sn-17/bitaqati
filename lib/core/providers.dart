@@ -55,3 +55,26 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
     await setMode(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
   }
 }
+
+/// App language chosen in Settings. Arabic is the default.
+final NotifierProvider<LanguageNotifier, Locale> languageProvider =
+    NotifierProvider<LanguageNotifier, Locale>(LanguageNotifier.new);
+
+class LanguageNotifier extends Notifier<Locale> {
+  static const String _key = 'language';
+
+  @override
+  Locale build() {
+    final String? saved = ref.watch(sharedPreferencesProvider).getString(_key);
+    return Locale(saved == 'en' ? 'en' : 'ar');
+  }
+
+  /// Switches the locale and text direction. Full English copy lands with the
+  /// localization pass; until then the content stays Arabic.
+  Future<void> setLanguage(String code) async {
+    state = Locale(code == 'en' ? 'en' : 'ar');
+    await ref
+        .read(sharedPreferencesProvider)
+        .setString(_key, state.languageCode);
+  }
+}

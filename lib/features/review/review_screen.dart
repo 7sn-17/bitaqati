@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_message.dart';
 import '../../data/content_providers.dart';
 import '../../domain/models.dart';
+import '../create/card_editor_sheet.dart';
 
 /// Loads the deck and the cards that are due now, then runs the session.
 class ReviewScreen extends ConsumerWidget {
@@ -63,6 +65,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   int _index = 0;
   int _completed = 0;
   bool _revealed = false;
+  bool _hintVisible = false;
   bool _finished = false;
   int _again = 0;
   int _hard = 0;
@@ -101,6 +104,55 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
     setState(() {
       _completed++;
       _revealed = false;
+      _hintVisible = false;
+      if (done) {
+        _finished = true;
+      } else {
+        _index++;
+      }
+    });
+    _shownAt = DateTime.now();
+  }
+
+  Future<void> _editCard(ReviewCard card) async {
+    final ReviewCard? updated = await showCardEditSheet(context, card);
+    if (updated == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _cards[_index] = updated;
+      _revealed = false;
+      _hintVisible = false;
+    });
+    _shownAt = DateTime.now();
+    showAppMessage(context, 'تم تحديث البطاقة.');
+  }
+
+  Future<void> _snooze(ReviewCard card) async {
+    try {
+      await ref.read(contentRepositoryProvider).snoozeCard(cardId: card.id);
+    } catch (_) {
+      if (mounted) {
+        showAppMessage(
+          context,
+          'تعذّر تأجيل البطاقة. حاول مرة أخرى.',
+          kind: AppMessageKind.error,
+        );
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    showAppMessage(
+      context,
+      'ستعود البطاقة إلى المراجعة بعد 10 دقائق.',
+      kind: AppMessageKind.info,
+    );
+    final bool done = _index >= _cards.length - 1;
+    setState(() {
+      _revealed = false;
+      _hintVisible = false;
       if (done) {
         _finished = true;
       } else {
@@ -116,6 +168,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
       _index = 0;
       _completed = 0;
       _revealed = false;
+      _hintVisible = false;
       _finished = false;
       _again = 0;
       _hard = 0;
@@ -301,6 +354,12 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                           deck: _deck,
                           revealed: _revealed,
                           position: _index + 1,
+                          hintVisible: _hintVisible,
+                          onToggleHint: () => setState(
+                            () => _hintVisible = !_hintVisible,
+                          ),
+                          onEdit: () => _editCard(card),
+                          onSnooze: () => _snooze(card),
                         ),
                       ),
                     ),
@@ -337,12 +396,20 @@ class _CardBody extends StatelessWidget {
     required this.deck,
     required this.revealed,
     required this.position,
+    required this.hintVisible,
+    required this.onToggleHint,
+    required this.onEdit,
+    required this.onSnooze,
   });
 
   final ReviewCard card;
   final DeckNode deck;
   final bool revealed;
   final int position;
+  final bool hintVisible;
+  final VoidCallback onToggleHint;
+  final VoidCallback onEdit;
+  final VoidCallback onSnooze;
 
   @override
   Widget build(BuildContext context) {
@@ -440,7 +507,7 @@ class _CardBody extends StatelessWidget {
                 color: ink,
               ),
             ),
-            if (card.hint != null) ...<Widget>[
+            if (card.hint != null && hintVisible) ...<Widget>[
               const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.all(11),
@@ -472,22 +539,24 @@ class _CardBody extends StatelessWidget {
             const SizedBox(height: 18),
             Row(
               children: <Widget>[
-                _SoftAction(
-                  icon: CupertinoIcons.lightbulb,
-                  label: 'تلميح',
-                  onTap: () {},
-                ),
-                const SizedBox(width: 8),
+                if (card.hint != null) ...<Widget>[
+                  _SoftAction(
+                    icon: CupertinoIcons.lightbulb,
+                    label: hintVisible ? 'إخفاء' : 'تلميح',
+                    onTap: onToggleHint,
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 _SoftAction(
                   icon: CupertinoIcons.pencil,
                   label: 'تعديل',
-                  onTap: () {},
+                  onTap: onEdit,
                 ),
                 const SizedBox(width: 8),
                 _SoftAction(
                   icon: CupertinoIcons.clock,
                   label: 'تأجيل',
-                  onTap: () {},
+                  onTap: onSnooze,
                 ),
               ],
             ),

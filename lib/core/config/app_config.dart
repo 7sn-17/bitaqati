@@ -17,6 +17,21 @@ abstract final class AppConfig {
     defaultValue: '',
   );
 
+  /// Web OAuth client id. Required on Android: it is the `serverClientId` that
+  /// makes Google return an ID token for Supabase to verify.
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '',
+  );
+
+  /// iOS OAuth client id. Only used on iOS builds.
+  static const String googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+    defaultValue: '',
+  );
+
   static bool get hasSupabase =>
       supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty;
+
+  static bool get hasGoogleSignIn => googleWebClientId.isNotEmpty;
 }

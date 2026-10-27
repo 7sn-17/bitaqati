@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/login_screen.dart';
 import '../../features/deck/deck_detail_screen.dart';
 import '../../features/decks/decks_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -12,24 +13,37 @@ import '../../features/review/review_screen.dart';
 import '../../features/search/search_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/app_shell.dart';
+import '../auth/auth_providers.dart';
 import '../providers.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
-  final bool onboarded = ref.read(onboardingCompletedProvider);
+  // Re-runs the redirect below whenever the session or guest mode changes.
+  final AuthRefresh refresh = ref.watch(authRefreshProvider);
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: onboarded ? '/home' : '/onboarding',
+    initialLocation: '/home',
+    refreshListenable: refresh,
     debugLogDiagnostics: false,
     redirect: (BuildContext context, GoRouterState state) {
-      final bool done = ref.read(onboardingCompletedProvider);
-      final bool atOnboarding = state.matchedLocation == '/onboarding';
-      if (!done && !atOnboarding) {
-        return '/onboarding';
+      final bool onboarded = ref.read(onboardingCompletedProvider);
+      final bool signedIn = isSignedInNow(ref);
+      final String location = state.matchedLocation;
+      final bool atOnboarding = location == '/onboarding';
+      final bool atLogin = location == '/login';
+
+      // 1. Onboarding comes first, once per install.
+      if (!onboarded) {
+        return atOnboarding ? null : '/onboarding';
       }
-      if (done && atOnboarding) {
+      // 2. Then authentication: session or guest mode.
+      if (!signedIn) {
+        return atLogin ? null : '/login';
+      }
+      // 3. Signed in: the entry screens are never shown again.
+      if (atOnboarding || atLogin) {
         return '/home';
       }
       return null;
@@ -39,6 +53,11 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: '/onboarding',
         builder: (BuildContext context, GoRouterState state) =>
             const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (BuildContext context, GoRouterState state) =>
+            const LoginScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (

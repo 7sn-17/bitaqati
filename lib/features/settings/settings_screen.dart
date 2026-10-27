@@ -2,12 +2,17 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/user_display.dart';
+import '../../core/widgets/app_message.dart';
 import '../../core/widgets/surface_card.dart';
+import '../../data/auth_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -16,6 +21,16 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeMode themeMode = ref.watch(themeModeProvider);
     final bool notifications = ref.watch(notificationsEnabledProvider);
+    final Locale locale = ref.watch(languageProvider);
+    final User? user = ref.watch(currentUserProvider).valueOrNull;
+    final bool guestMode = ref.watch(guestModeProvider);
+    final bool guest = user == null && guestMode;
+    final String? avatarUrl = userAvatarUrl(user);
+    final String displayName =
+        userFirstName(user) ?? (guest ? 'زائر' : 'بطاقاتي');
+    final String accountSubtitle =
+        user?.email ??
+        (guest ? 'وضع الزائر · البيانات محلية' : 'غير مسجل الدخول');
     final bool isDark =
         themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && context.isDark);
@@ -57,15 +72,11 @@ class SettingsScreen extends ConsumerWidget {
                         color: AppColors.accent,
                         borderRadius: BorderRadius.circular(18),
                       ),
+                      clipBehavior: Clip.antiAlias,
                       alignment: Alignment.center,
-                      child: const Text(
-                        'ب',
-                        style: TextStyle(
-                          fontFamily: 'ReadexPro',
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
+                      child: _AccountAvatar(
+                        url: avatarUrl,
+                        initial: userInitial(user),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -73,9 +84,11 @@ class SettingsScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          const Text(
-                            '7sn',
-                            style: TextStyle(
+                          Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
                               fontFamily: 'ReadexPro',
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
@@ -84,7 +97,9 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'طالب · الخطة المجانية',
+                            accountSubtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 12,
@@ -92,11 +107,6 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
-                    ),
-                    Icon(
-                      CupertinoIcons.pencil,
-                      color: Colors.white.withValues(alpha: 0.8),
-                      size: 19,
                     ),
                   ],
                 ),
@@ -108,8 +118,10 @@ class SettingsScreen extends ConsumerWidget {
                 _Row(
                   icon: CupertinoIcons.mail,
                   title: 'البريد الإلكتروني',
-                  subtitle: 'غير مرتبط بعد',
-                  onTap: () => _comingSoon(context, 'ربط الحساب'),
+                  subtitle: user?.email ?? 'غير مرتبط بعد',
+                  onTap: user == null
+                      ? () => _comingSoon(context, 'ربط الحساب')
+                      : null,
                 ),
                 _Row(
                   icon: CupertinoIcons.arrow_2_circlepath,
@@ -142,8 +154,8 @@ class SettingsScreen extends ConsumerWidget {
                 _Row(
                   icon: CupertinoIcons.globe,
                   title: 'لغة التطبيق',
-                  subtitle: 'العربية',
-                  onTap: () => _comingSoon(context, 'تغيير اللغة'),
+                  subtitle: locale.languageCode == 'ar' ? 'العربية' : 'English',
+                  onTap: () => _pickLanguage(context, ref),
                 ),
               ],
             ),
@@ -244,7 +256,7 @@ class SettingsScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: OutlinedButton(
-                onPressed: () => _comingSoon(context, 'تسجيل الخروج'),
+                onPressed: () => _signOut(context, ref),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
                   side: const BorderSide(color: AppColors.danger),
@@ -266,17 +278,149 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _comingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('$feature سيُفعّل قريباً.'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    showAppMessage(
+      context,
+      'سنضيف $feature في تحديث قادم.',
+      kind: AppMessageKind.info,
+    );
+  }
+
+  Future<void> _pickLanguage(BuildContext context, WidgetRef ref) async {
+    final String current = ref.read(languageProvider).languageCode;
+    final String? chosen = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheet) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppColors.accentSoft,
+                  child: Text(
+                    'ع',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                title: const Text('العربية'),
+                trailing: current == 'ar'
+                    ? Icon(
+                        CupertinoIcons.checkmark_alt,
+                        color: context.colors.primary,
+                      )
+                    : null,
+                onTap: () => Navigator.of(sheet).pop('ar'),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: AppColors.accentSoft,
+                  child: Text(
+                    'EN',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                title: const Text('English'),
+                trailing: current == 'en'
+                    ? Icon(
+                        CupertinoIcons.checkmark_alt,
+                        color: context.colors.primary,
+                      )
+                    : null,
+                onTap: () => Navigator.of(sheet).pop('en'),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
+                child: Text(
+                  'الواجهة تتغيّر الآن، وترجمة النصوص الكاملة قادمة في تحديث '
+                  'لاحق.',
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodySmall?.copyWith(height: 1.7),
+                ),
+              ),
+            ],
           ),
-        ),
+        );
+      },
+    );
+    if (chosen == null || chosen == current || !context.mounted) {
+      return;
+    }
+    await ref.read(languageProvider.notifier).setLanguage(chosen);
+    if (context.mounted) {
+      showAppMessage(
+        context,
+        chosen == 'ar' ? 'تم تغيير اللغة إلى العربية' : 'Language changed',
       );
+    }
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        title: const Text('تسجيل الخروج'),
+        content: const Text('ستبقى بطاقاتك محفوظة على هذا الجهاز.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialog).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('خروج'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    final AuthService auth = ref.read(authServiceProvider);
+    final GuestModeNotifier guestMode = ref.read(guestModeProvider.notifier);
+    showAppMessage(context, 'تم تسجيل الخروج.');
+    await guestMode.exit();
+    await auth.signOut();
+  }
+}
+
+class _AccountAvatar extends StatelessWidget {
+  const _AccountAvatar({required this.url, required this.initial});
+
+  final String? url;
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget label = Text(
+      initial,
+      style: const TextStyle(
+        fontFamily: 'ReadexPro',
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        color: AppColors.primary,
+      ),
+    );
+    if (url == null) {
+      return label;
+    }
+    return Image.network(
+      url!,
+      width: 54,
+      height: 54,
+      fit: BoxFit.cover,
+      errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
+        return label;
+      },
+    );
   }
 }
 

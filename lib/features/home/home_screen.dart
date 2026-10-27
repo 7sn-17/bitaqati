@@ -2,10 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/auth/auth_providers.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/user_display.dart';
 import '../../core/widgets/deck_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/tag_filter_bar.dart';
@@ -85,19 +88,23 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
+class _HomeHeader extends ConsumerWidget {
   const _HomeHeader({required this.onSearch});
 
   final VoidCallback onSearch;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final User? user = ref.watch(currentUserProvider).valueOrNull;
+    final bool guestMode = ref.watch(guestModeProvider);
+    final bool guest = user == null && guestMode;
+
     final int hour = DateTime.now().hour;
-    final String greeting = hour < 12
-        ? 'صباح الخير'
-        : hour < 17
-        ? 'مساء الخير'
-        : 'مساء الخير';
+    final String timeGreeting = hour < 12 ? 'صباح الخير' : 'مساء الخير';
+    final String? firstName = userFirstName(user);
+    final String greeting = user == null
+        ? (guest ? 'أهلاً بك، تابع كزائر' : 'أهلاً بك')
+        : '$timeGreeting، ${firstName ?? 'صديقنا'}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
@@ -112,15 +119,11 @@ class _HomeHeader extends StatelessWidget {
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(16),
               ),
+              clipBehavior: Clip.antiAlias,
               alignment: Alignment.center,
-              child: const Text(
-                'ب',
-                style: TextStyle(
-                  fontFamily: 'ReadexPro',
-                  color: AppColors.accent,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: _HeaderAvatar(
+                url: userAvatarUrl(user),
+                initial: userInitial(user),
               ),
             ),
           ),
@@ -129,7 +132,12 @@ class _HomeHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(greeting, style: context.texts.bodySmall),
+                Text(
+                  greeting,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.texts.bodySmall,
+                ),
                 Text(
                   'بطاقاتي',
                   style: context.texts.headlineMedium?.copyWith(
@@ -146,6 +154,39 @@ class _HomeHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Google profile photo with a letter fallback, sized for the header.
+class _HeaderAvatar extends StatelessWidget {
+  const _HeaderAvatar({required this.url, required this.initial});
+
+  final String? url;
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget label = Text(
+      initial,
+      style: const TextStyle(
+        fontFamily: 'ReadexPro',
+        color: AppColors.accent,
+        fontSize: 21,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    if (url == null) {
+      return label;
+    }
+    return Image.network(
+      url!,
+      width: 46,
+      height: 46,
+      fit: BoxFit.cover,
+      errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
+        return label;
+      },
     );
   }
 }

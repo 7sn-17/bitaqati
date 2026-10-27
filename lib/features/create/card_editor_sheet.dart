@@ -30,10 +30,25 @@ Future<void> showCardEditorSheet(
   }
 }
 
+/// Opens the editor on an existing card. Returns the updated card when saved.
+///
+/// The deck is intentionally locked: moving a card between decks is a separate
+/// operation, and changing `deck_id` from a review session would be surprising.
+Future<ReviewCard?> showCardEditSheet(BuildContext context, ReviewCard card) {
+  return showModalBottomSheet<ReviewCard>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (BuildContext sheet) => _CardEditorSheet(editCard: card),
+  );
+}
+
 class _CardEditorSheet extends ConsumerStatefulWidget {
-  const _CardEditorSheet({this.initialDeckId});
+  const _CardEditorSheet({this.initialDeckId, this.editCard});
 
   final String? initialDeckId;
+  final ReviewCard? editCard;
 
   @override
   ConsumerState<_CardEditorSheet> createState() => _CardEditorSheetState();
@@ -55,7 +70,15 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
   @override
   void initState() {
     super.initState();
-    _deckId = widget.initialDeckId;
+    final ReviewCard? card = widget.editCard;
+    _deckId = card?.deckId ?? widget.initialDeckId;
+    if (card != null) {
+      _front.text = card.front;
+      _back.text = card.back;
+      _hint.text = card.hint ?? '';
+      _note.text = card.note ?? '';
+      _tags.text = card.tags.join('، ');
+    }
   }
 
   @override
@@ -85,17 +108,30 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
       _error = null;
     });
     try {
-      await ref
-          .read(contentRepositoryProvider)
-          .addCard(
-            deckId: deckId,
-            front: _front.text,
-            back: _back.text,
-            hint: _hint.text,
-            note: _note.text,
-            tags: parseTags(_tags.text),
-          );
-      _added++;
+      if (widget.editCard != null) {
+        await ref
+            .read(contentRepositoryProvider)
+            .updateCard(
+              cardId: widget.editCard!.id,
+              front: _front.text,
+              back: _back.text,
+              hint: _hint.text,
+              note: _note.text,
+              tags: parseTags(_tags.text),
+            );
+      } else {
+        await ref
+            .read(contentRepositoryProvider)
+            .addCard(
+              deckId: deckId,
+              front: _front.text,
+              back: _back.text,
+              hint: _hint.text,
+              note: _note.text,
+              tags: parseTags(_tags.text),
+            );
+        _added++;
+      }
       return true;
     } catch (_) {
       if (mounted) {
@@ -110,9 +146,26 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
   }
 
   Future<void> _saveAndClose() async {
-    if (await _store() && mounted) {
-      Navigator.of(context).pop(_added);
+    if (!await _store() || !mounted) {
+      return;
     }
+    final ReviewCard? card = widget.editCard;
+    if (card == null) {
+      Navigator.of(context).pop(_added);
+      return;
+    }
+    Navigator.of(context).pop(
+      ReviewCard(
+        id: card.id,
+        deckId: card.deckId,
+        front: _front.text.trim(),
+        back: _back.text.trim(),
+        hint: _hint.text.trim().isEmpty ? null : _hint.text.trim(),
+        note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+        tags: parseTags(_tags.text),
+        phase: card.phase,
+      ),
+    );
   }
 
   Future<void> _saveAndContinue() async {
@@ -128,12 +181,14 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final bool editing = widget.editCard != null;
+
     // Cards live in sub-decks only: main decks are containers for sub-decks.
     final List<DeckNode> decks = flattenDeckForest(
       ref.watch(deckForestProvider),
     ).where((DeckNode deck) => deck.canHoldCards).toList(growable: false);
 
-    if (decks.isEmpty) {
+    if (!editing && decks.isEmpty) {
       return const EditorSheetFrame(
         title: 'بطاقة جديدة',
         child: Padding(
@@ -154,15 +209,18 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
       }
     }
 
+    final String? subtitleDeckId =
+        widget.editCard?.deckId ?? widget.initialDeckId;
+
     return EditorSheetFrame(
-      title: 'بطاقة جديدة',
-      subtitle: widget.initialDeckId != null && selected != null
+      title: editing ? 'تعديل البطاقة' : 'بطاقة جديدة',
+      subtitle: subtitleDeckId != null && selected != null
           ? 'في: ${selected.title}'
           : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          if (widget.initialDeckId == null) ...<Widget>[
+          if (!editing && widget.initialDeckId == null) ...<Widget>[
             const EditorLabel('المجموعة'),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -199,7 +257,7 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
           TextField(
             controller: _front,
             focusNode: _frontFocus,
-            autofocus: true,
+            autofocus: !editing,
             minLines: 2,
             maxLines: 5,
             textInputAction: TextInputAction.newline,
@@ -251,7 +309,7 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
               _error!,
               style: const TextStyle(color: AppColors.danger, fontSize: 12.5),
             ),
-          ] else if (_added > 0) ...<Widget>[
+          ] else if (!editing && _added > 0) ...<Widget>[
             const SizedBox(height: 12),
             Row(
               children: <Widget>[
@@ -269,23 +327,32 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
             ),
           ],
           const SizedBox(height: 20),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _saving ? null : _saveAndContinue,
-                  child: const Text('حفظ وإضافة أخرى'),
-                ),
+          if (editing)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving ? null : _saveAndClose,
+                child: const Text('حفظ التعديلات'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _saving ? null : _saveAndClose,
-                  child: const Text('حفظ'),
+            )
+          else
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : _saveAndContinue,
+                    child: const Text('حفظ وإضافة أخرى'),
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _saving ? null : _saveAndClose,
+                    child: const Text('حفظ'),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
