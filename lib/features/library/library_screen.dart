@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
 import '../../core/widgets/deck_card.dart';
-import '../../data/models.dart';
+import '../../data/library_demo.dart';
+import '../../domain/models.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -21,11 +23,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final SubjectId? selected = ref.watch(librarySubjectProvider);
-    final List<DeckSummary> decks = selected == null
+    final String? selected = ref.watch(libraryTagProvider);
+    final List<DeckNode> decks = selected == null
         ? kLibraryDecks
         : kLibraryDecks
-              .where((DeckSummary deck) => deck.subjectId == selected)
+              .where((DeckNode deck) => deck.hasTag(selected))
               .toList(growable: false);
 
     return SafeArea(
@@ -118,17 +120,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               spacing: 10,
               runSpacing: 10,
               children: <Widget>[
-                for (final Subject subject in kSubjects)
+                for (final LibraryTag subject in kLibraryTags)
                   _SubjectTile(
                     subject: subject,
-                    count: kLibraryDecks
-                        .where(
-                          (DeckSummary deck) => deck.subjectId == subject.id,
-                        )
-                        .length,
+                    count: subject.count,
                     selected: selected == subject.id,
                     onTap: () {
-                      ref.read(librarySubjectProvider.notifier).state =
+                      ref.read(libraryTagProvider.notifier).state =
                           selected == subject.id ? null : subject.id;
                     },
                   ),
@@ -144,7 +142,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   child: Text(
                     selected == null
                         ? 'الأكثر استخداماً'
-                        : subjectById(selected).nameAr,
+                        : selected,
                     style: context.texts.titleLarge,
                   ),
                 ),
@@ -162,7 +160,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          for (final DeckSummary deck in decks)
+          for (final DeckNode deck in decks)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
               child: DeckCard(
@@ -186,19 +184,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
-  void _addDeck(BuildContext context, DeckSummary deck) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('أُضيفت نسخة من «${deck.title}» إلى مجموعاتك.'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(18, 0, 18, 100),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      );
+  void _addDeck(BuildContext context, DeckNode deck) {
+    showAppMessage(
+      context,
+      'نسخ «${deck.title}» سيُفعّل عند ربط المكتبة بالسحابة.',
+      kind: AppMessageKind.info,
+    );
   }
 }
 
@@ -210,7 +201,7 @@ class _SubjectTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final Subject subject;
+  final LibraryTag subject;
   final int count;
   final bool selected;
   final VoidCallback onTap;

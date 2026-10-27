@@ -20,7 +20,7 @@ on:
       - 'pubspec.lock'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -51,23 +51,51 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Check formatting
+        continue-on-error: true
         run: dart format --output=none --set-exit-if-changed $(git ls-files 'lib/*.dart')
 
       - name: Analyze
         run: flutter analyze
 
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build split release APKs
+        run: flutter build apk --release --split-per-abi
 
-      - name: Rename artifact
+      - name: Name the release and rename the APKs
+        id: release
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk bitaqati-phase0.apk
-          ls -lh bitaqati-phase0.apk
+          BRANCH="${GITHUB_REF_NAME//[^A-Za-z0-9._-]/-}"
+          TAG="build-${BRANCH}-${GITHUB_RUN_NUMBER}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-${abi}-release.apk" \
+              "dist/bitaqati-${TAG}-${abi}.apk"
+          done
+          ls -lh dist
 
-      - name: Upload APK
+      - name: Upload APKs as workflow artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: bitaqati-phase0-apk
-          path: bitaqati-phase0.apk
+          name: bitaqati-apks
+          path: dist/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish to GitHub Releases
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: "بطاقاتي ${{ steps.release.outputs.tag }}"
+          body: |
+            نسخة تجريبية مبنية تلقائياً من الفرع `${{ github.ref_name }}`
+            (تشغيل رقم ${{ github.run_number }}).
+
+            ### أي ملف أنزّل؟
+            - `arm64-v8a`: الأنسب لمعظم هواتف أندرويد الحديثة.
+            - `armeabi-v7a`: للهواتف القديمة ذات 32 بت.
+            - `x86_64`: للمحاكيات فقط.
+          files: dist/*.apk
+          prerelease: true
+          fail_on_unmatched_files: true

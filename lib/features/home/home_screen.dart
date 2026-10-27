@@ -8,20 +8,29 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/deck_card.dart';
 import '../../core/widgets/section_header.dart';
-import '../../core/widgets/subject_chip.dart';
-import '../../data/models.dart';
+import '../../core/widgets/tag_filter_bar.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final SubjectId? selected = ref.watch(selectedSubjectProvider);
-    final List<DeckSummary> decks = selected == null
-        ? kMyDecks
-        : kMyDecks
-              .where((DeckSummary deck) => deck.subjectId == selected)
+    final String? selected = ref.watch(selectedTagProvider);
+    final List<DeckNode> allDecks = ref.watch(deckForestProvider);
+    final List<DeckNode> decks = selected == null
+        ? allDecks
+        : allDecks
+              .where((DeckNode deck) => deck.hasTag(selected))
               .toList(growable: false);
+    final int totalCards = allDecks.fold<int>(
+      0,
+      (int sum, DeckNode deck) => sum + deck.cardCount,
+    );
+    final DueTotals due = ref.watch(dueTotalsProvider);
+    final DeckNode? reviewDeck = ref.watch(todayReviewDeckProvider);
+    final int streak = ref.watch(streakProvider).valueOrNull ?? 0;
 
     return SafeArea(
       bottom: false,
@@ -30,21 +39,26 @@ class HomeScreen extends ConsumerWidget {
         children: <Widget>[
           _HomeHeader(onSearch: () => context.push('/search')),
           const SizedBox(height: 18),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: _DailyReviewHero(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _DailyReviewHero(
+              due: due,
+              streak: streak,
+              reviewDeckId: reviewDeck?.id,
+            ),
           ),
           const SizedBox(height: 20),
-          SubjectFilterBar(
+          TagFilterBar(
+            tags: ref.watch(deckTagsProvider),
             selected: selected,
-            onChanged: (SubjectId? value) {
-              ref.read(selectedSubjectProvider.notifier).state = value;
+            onChanged: (String? value) {
+              ref.read(selectedTagProvider.notifier).state = value;
             },
           ),
           const SizedBox(height: 20),
           SectionHeader(
             title: 'مجموعاتي',
-            subtitle: '${kMyDecks.length} مجموعات · 398 بطاقة',
+            subtitle: '${allDecks.length} مجموعات · $totalCards بطاقة',
             actionLabel: 'عرض الكل',
             onAction: () => context.go('/decks'),
           ),
@@ -52,7 +66,7 @@ class HomeScreen extends ConsumerWidget {
           if (decks.isEmpty)
             const _NoDecks()
           else
-            for (final DeckSummary deck in decks)
+            for (final DeckNode deck in decks)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
                 child: DeckCard(
@@ -137,10 +151,19 @@ class _HomeHeader extends StatelessWidget {
 }
 
 class _DailyReviewHero extends StatelessWidget {
-  const _DailyReviewHero();
+  const _DailyReviewHero({
+    required this.due,
+    required this.streak,
+    required this.reviewDeckId,
+  });
+
+  final DueTotals due;
+  final int streak;
+  final String? reviewDeckId;
 
   @override
   Widget build(BuildContext context) {
+    final int minutes = (due.total * 22 / 60).ceil();
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -180,7 +203,7 @@ class _DailyReviewHero extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '12 يوماً',
+                      streak == 0 ? 'ابدأ سلسلتك' : '$streak يوماً',
                       style: TextStyle(
                         color: AppColors.accent.withValues(alpha: 0.95),
                         fontSize: 11,
@@ -197,9 +220,9 @@ class _DailyReviewHero extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: <Widget>[
-              const Text(
-                '24',
-                style: TextStyle(
+              Text(
+                '${due.total}',
+                style: const TextStyle(
                   fontFamily: 'ReadexPro',
                   color: AppColors.accent,
                   fontSize: 60,
@@ -210,7 +233,7 @@ class _DailyReviewHero extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                'بطاقة · 9 دقائق',
+                due.total == 0 ? 'لا بطاقات مستحقة' : 'بطاقة · $minutes دقائق',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.9),
                   fontSize: 14,
@@ -221,45 +244,73 @@ class _DailyReviewHero extends StatelessWidget {
           const SizedBox(height: 4),
           ClipRRect(
             borderRadius: BorderRadius.circular(5),
-            child: const SizedBox(
+            child: SizedBox(
               height: 8,
-              child: Row(
-                children: <Widget>[
-                  Expanded(flex: 8, child: ColoredBox(color: AppColors.accent)),
-                  SizedBox(width: 3),
-                  Expanded(
-                    flex: 3,
-                    child: ColoredBox(color: Color(0xFFE2F6D5)),
-                  ),
-                  SizedBox(width: 3),
-                  Expanded(
-                    flex: 13,
-                    child: ColoredBox(color: Color(0xFF054D28)),
-                  ),
-                ],
-              ),
+              child: due.total == 0
+                  ? const ColoredBox(color: Color(0xFF054D28))
+                  : Row(
+                      children: <Widget>[
+                        if (due.fresh > 0)
+                          Expanded(
+                            flex: due.fresh,
+                            child: const ColoredBox(color: AppColors.accent),
+                          ),
+                        if (due.fresh > 0 && due.learning + due.review > 0)
+                          const SizedBox(width: 3),
+                        if (due.learning > 0)
+                          Expanded(
+                            flex: due.learning,
+                            child: const ColoredBox(color: Color(0xFFE2F6D5)),
+                          ),
+                        if (due.learning > 0 && due.review > 0)
+                          const SizedBox(width: 3),
+                        if (due.review > 0)
+                          Expanded(
+                            flex: due.review,
+                            child: const ColoredBox(color: Color(0xFF054D28)),
+                          ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 10),
-          const Row(
+          Row(
             children: <Widget>[
-              _LegendDot(color: AppColors.accent, label: 'جديدة 8'),
-              SizedBox(width: 14),
-              _LegendDot(color: Color(0xFFE2F6D5), label: 'تعلّم 3'),
-              SizedBox(width: 14),
-              _LegendDot(color: Color(0xFF054D28), label: 'مراجعة 13'),
+              _LegendDot(color: AppColors.accent, label: 'جديدة ${due.fresh}'),
+              const SizedBox(width: 14),
+              _LegendDot(
+                color: const Color(0xFFE2F6D5),
+                label: 'تعلّم ${due.learning}',
+              ),
+              const SizedBox(width: 14),
+              _LegendDot(
+                color: const Color(0xFF054D28),
+                label: 'مراجعة ${due.review}',
+              ),
             ],
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => context.push('/review/biology-cell'),
+              onPressed: reviewDeckId == null
+                  ? null
+                  : () => context.push('/review/$reviewDeckId'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: AppColors.primary,
+                disabledBackgroundColor: AppColors.accent.withValues(
+                  alpha: 0.3,
+                ),
+                disabledForegroundColor: AppColors.primary.withValues(
+                  alpha: 0.5,
+                ),
               ),
-              child: const Text('ابدأ المراجعة'),
+              child: Text(
+                reviewDeckId == null
+                    ? 'لا توجد بطاقات مستحقة'
+                    : 'ابدأ المراجعة',
+              ),
             ),
           ),
         ],
@@ -386,7 +437,7 @@ class _NoDecks extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              'لا توجد مجموعات في هذه المادة بعد',
+              'لا توجد مجموعات هنا بعد',
               textAlign: TextAlign.center,
               style: context.texts.titleMedium,
             ),

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
+import 'card_editor_sheet.dart';
+import 'deck_editor_sheet.dart';
 
 Future<void> showCreateSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -10,16 +13,22 @@ Future<void> showCreateSheet(BuildContext context) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.38),
-    builder: (BuildContext context) => const _CreateSheet(),
+    builder: (BuildContext sheet) => _CreateSheet(parentContext: context),
   );
 }
 
 class _CreateSheet extends StatelessWidget {
-  const _CreateSheet();
+  const _CreateSheet({required this.parentContext});
+
+  /// Context of the screen that opened the sheet. It stays mounted after the
+  /// sheet closes, so editors and messages can be shown from it.
+  final BuildContext parentContext;
 
   @override
   Widget build(BuildContext context) {
-    final Color surface = context.isDark ? AppColors.darkSurface : Colors.white;
+    final Color surface = context.isDark
+        ? AppColors.darkSurfaceHigh
+        : Colors.white;
     return SafeArea(
       top: false,
       child: Padding(
@@ -62,13 +71,13 @@ class _CreateSheet extends StatelessWidget {
                 icon: CupertinoIcons.rectangle_stack,
                 title: 'مجموعة جديدة',
                 subtitle: 'نظّم بطاقاتك حسب المادة والفصل',
-                onTap: () => _comingSoon(context, 'إنشاء مجموعة جديدة'),
+                onTap: () => _openDeckEditor(context),
               ),
               _Option(
                 icon: CupertinoIcons.doc_text,
                 title: 'بطاقة جديدة',
                 subtitle: 'أساسية، إخفاء كلمة، اختيار، أو صورة',
-                onTap: () => _comingSoon(context, 'محرّر البطاقات'),
+                onTap: () => _openCardEditor(context),
               ),
               _Option(
                 icon: CupertinoIcons.text_alignleft,
@@ -96,20 +105,23 @@ class _CreateSheet extends StatelessWidget {
     );
   }
 
+  void _openDeckEditor(BuildContext context) {
+    Navigator.of(context).pop();
+    showDeckEditorSheet(parentContext);
+  }
+
+  void _openCardEditor(BuildContext context) {
+    Navigator.of(context).pop();
+    showCardEditorSheet(parentContext);
+  }
+
   void _comingSoon(BuildContext context, String feature) {
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('$feature سيُفعّل في المرحلة القادمة.'),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(18, 0, 18, 100),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      );
+    showAppMessage(
+      parentContext,
+      '$feature سيُفعّل في المرحلة القادمة.',
+      kind: AppMessageKind.info,
+    );
   }
 }
 

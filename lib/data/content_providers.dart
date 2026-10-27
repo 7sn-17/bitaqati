@@ -1,0 +1,108 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../domain/models.dart';
+import 'content_repository.dart';
+import 'local/database_provider.dart';
+
+final Provider<ContentRepository> contentRepositoryProvider =
+    Provider<ContentRepository>(
+      (Ref ref) => ContentRepository(ref.watch(appDatabaseProvider)),
+    );
+
+/// Every deck as a flat list. Emits again whenever the database changes.
+final StreamProvider<List<DeckNode>> deckListProvider =
+    StreamProvider<List<DeckNode>>(
+      (Ref ref) => ref.watch(contentRepositoryProvider).watchDecks(),
+    );
+
+/// Root decks, each with its sub-decks nested in `children`.
+final Provider<List<DeckNode>> deckForestProvider = Provider<List<DeckNode>>((
+  Ref ref,
+) {
+  final List<DeckNode> flat =
+      ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
+  return buildDeckForest(flat);
+});
+
+/// One deck (with its children) by id, or null when it does not exist.
+final ProviderFamily<DeckNode?, String> deckByIdProvider =
+    Provider.family<DeckNode?, String>(
+      (Ref ref, String id) => findDeckNode(ref.watch(deckForestProvider), id),
+    );
+
+/// Cards that sit directly in a deck.
+final StreamProviderFamily<List<ReviewCard>, String> deckCardsProvider =
+    StreamProvider.family<List<ReviewCard>, String>(
+      (Ref ref, String deckId) =>
+          ref.watch(contentRepositoryProvider).watchCards(deckId),
+    );
+
+/// The cards a review session should show. Loaded once per session.
+final AutoDisposeFutureProviderFamily<List<ReviewCard>, String>
+studyQueueProvider = FutureProvider.autoDispose
+    .family<List<ReviewCard>, String>(
+      (Ref ref, String deckId) =>
+          ref.watch(contentRepositoryProvider).studyQueue(deckId),
+    );
+
+final AutoDisposeFutureProviderFamily<List<ReviewCard>, String>
+searchCardsProvider = FutureProvider.autoDispose
+    .family<List<ReviewCard>, String>(
+      (Ref ref, String query) =>
+          ref.watch(contentRepositoryProvider).searchCards(query),
+    );
+
+/// Tags used by any deck, most common first. Drives the filter chips.
+final Provider<List<String>> deckTagsProvider = Provider<List<String>>((
+  Ref ref,
+) {
+  final List<DeckNode> flat =
+      ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
+  final Map<String, int> counts = <String, int>{};
+  for (final DeckNode deck in flat) {
+    for (final String tag in deck.tags) {
+      counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+  }
+  final List<String> tags = counts.keys.toList();
+  tags.sort((String a, String b) {
+    final int byCount = (counts[b] ?? 0).compareTo(counts[a] ?? 0);
+    return byCount != 0 ? byCount : a.compareTo(b);
+  });
+  return tags;
+});
+
+/// Cards waiting today across all root decks.
+final Provider<DueTotals> dueTotalsProvider = Provider<DueTotals>((Ref ref) {
+  int fresh = 0;
+  int learning = 0;
+  int review = 0;
+  for (final DeckNode deck in ref.watch(deckForestProvider)) {
+    fresh += deck.dueNew;
+    learning += deck.dueLearning;
+    review += deck.dueReview;
+  }
+  return DueTotals(fresh: fresh, learning: learning, review: review);
+});
+
+final Provider<int> totalDueProvider = Provider<int>(
+  (Ref ref) => ref.watch(dueTotalsProvider).total,
+);
+
+/// The root deck with the most cards due, or null when nothing is due.
+final Provider<DeckNode?> todayReviewDeckProvider = Provider<DeckNode?>((
+  Ref ref,
+) {
+  DeckNode? best;
+  for (final DeckNode deck in ref.watch(deckForestProvider)) {
+    if (deck.dueCount > 0 && (best == null || deck.dueCount > best.dueCount)) {
+      best = deck;
+    }
+  }
+  return best;
+});
+
+/// Consecutive days with at least one answer.
+final StreamProvider<int> streakProvider = StreamProvider<int>(
+  (Ref ref) => ref.watch(contentRepositoryProvider).watchStreak(),
+);

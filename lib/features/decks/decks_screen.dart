@@ -6,8 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/deck_card.dart';
-import '../../core/widgets/subject_chip.dart';
-import '../../data/models.dart';
+import '../../core/widgets/tag_filter_bar.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
 
 class DecksScreen extends ConsumerStatefulWidget {
   const DecksScreen({super.key});
@@ -27,17 +28,17 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final SubjectId? selected = ref.watch(selectedSubjectProvider);
+    final String? selected = ref.watch(selectedTagProvider);
     final String query = _search.text.trim();
-    final List<DeckSummary> decks = kMyDecks
-        .where((DeckSummary deck) {
-          final bool subjectMatches =
-              selected == null || deck.subjectId == selected;
+    final List<DeckNode> allDecks = ref.watch(deckForestProvider);
+    final List<DeckNode> decks = allDecks
+        .where((DeckNode deck) {
+          final bool tagMatches = selected == null || deck.hasTag(selected);
           final bool queryMatches =
               query.isEmpty ||
               deck.title.contains(query) ||
-              deck.subject.nameAr.contains(query);
-          return subjectMatches && queryMatches;
+              deck.tags.any((String tag) => tag.contains(query));
+          return tagMatches && queryMatches;
         })
         .toList(growable: false);
 
@@ -73,7 +74,7 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '${kMyDecks.length} مجموعات',
+                    '${allDecks.length} مجموعات',
                     style: context.texts.labelMedium,
                   ),
                 ),
@@ -104,10 +105,11 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          SubjectFilterBar(
+          TagFilterBar(
+            tags: ref.watch(deckTagsProvider),
             selected: selected,
-            onChanged: (SubjectId? value) {
-              ref.read(selectedSubjectProvider.notifier).state = value;
+            onChanged: (String? value) {
+              ref.read(selectedTagProvider.notifier).state = value;
             },
           ),
           const SizedBox(height: 18),
@@ -123,19 +125,23 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'لا توجد نتائج مطابقة',
+                    allDecks.isEmpty
+                        ? 'لا توجد مجموعات بعد'
+                        : 'لا توجد نتائج مطابقة',
                     style: context.texts.titleMedium,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'جرّب مادة أخرى أو كلمة بحث مختلفة.',
+                    allDecks.isEmpty
+                        ? 'أنشئ أول مجموعة من زر + في الأسفل.'
+                        : 'جرّب وسماً آخر أو كلمة بحث مختلفة.',
                     style: context.texts.bodySmall,
                   ),
                 ],
               ),
             )
           else
-            for (final DeckSummary deck in decks)
+            for (final DeckNode deck in decks)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
                 child: DeckCard(

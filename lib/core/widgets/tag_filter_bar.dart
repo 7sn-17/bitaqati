@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../data/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
-class SubjectChip extends StatelessWidget {
-  const SubjectChip({
+class TagChip extends StatelessWidget {
+  const TagChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -40,6 +39,9 @@ class SubjectChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: background,
             borderRadius: BorderRadius.circular(999),
+            border: selected || !context.isDark
+                ? null
+                : Border.all(color: context.colors.outlineVariant, width: 0.8),
           ),
           child: Text(
             label,
@@ -57,40 +59,42 @@ class SubjectChip extends StatelessWidget {
   }
 }
 
-class SubjectFilterBar extends StatelessWidget {
-  const SubjectFilterBar({
+/// Horizontal chips built from the tags the user's decks actually use.
+/// Renders nothing until at least one deck has a tag.
+class TagFilterBar extends StatelessWidget {
+  const TagFilterBar({
+    required this.tags,
     required this.selected,
     required this.onChanged,
-    this.includeAll = true,
     super.key,
   });
 
-  final SubjectId? selected;
-  final ValueChanged<SubjectId?> onChanged;
-  final bool includeAll;
+  final List<String> tags;
+  final String? selected;
+  final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    if (tags.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return SizedBox(
       height: 38,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         children: <Widget>[
-          if (includeAll) ...<Widget>[
-            SubjectChip(
-              label: 'الكل',
-              selected: selected == null,
-              onTap: () => onChanged(null),
-            ),
-            const SizedBox(width: 8),
-          ],
-          for (final Subject subject in kSubjects) ...<Widget>[
-            SubjectChip(
-              label: subject.nameAr,
-              color: subject.color,
-              selected: selected == subject.id,
-              onTap: () => onChanged(subject.id),
+          TagChip(
+            label: 'الكل',
+            selected: selected == null,
+            onTap: () => onChanged(null),
+          ),
+          const SizedBox(width: 8),
+          for (final String tag in tags) ...<Widget>[
+            TagChip(
+              label: tag,
+              selected: selected == tag,
+              onTap: () => onChanged(tag),
             ),
             const SizedBox(width: 8),
           ],

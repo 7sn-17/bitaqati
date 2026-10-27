@@ -1,28 +1,44 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
+import '../../core/widgets/deck_card.dart';
+import '../../core/widgets/section_header.dart';
 import '../../core/widgets/surface_card.dart';
-import '../../data/models.dart';
+import '../../data/content_providers.dart';
+import '../../data/library_demo.dart';
+import '../../domain/models.dart';
+import '../create/card_editor_sheet.dart';
+import '../create/deck_editor_sheet.dart';
 
-class DeckDetailScreen extends StatefulWidget {
+class DeckDetailScreen extends ConsumerStatefulWidget {
   const DeckDetailScreen({required this.deckId, super.key});
 
   final String deckId;
 
   @override
-  State<DeckDetailScreen> createState() => _DeckDetailScreenState();
+  ConsumerState<DeckDetailScreen> createState() => _DeckDetailScreenState();
 }
 
-class _DeckDetailScreenState extends State<DeckDetailScreen> {
+class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
-    final DeckSummary deck = findDeck(widget.deckId);
-    final List<ReviewCard> cards = cardsForDeck(deck);
+    final DeckNode? found =
+        ref.watch(deckByIdProvider(widget.deckId)) ??
+        findLibraryDeck(widget.deckId);
+    if (found == null) {
+      return _MissingDeck(loading: ref.watch(deckListProvider).isLoading);
+    }
+    final DeckNode deck = found;
+    final List<ReviewCard> cards =
+        ref.watch(deckCardsProvider(widget.deckId)).valueOrNull ??
+        const <ReviewCard>[];
 
     return Scaffold(
       body: SafeArea(
@@ -61,7 +77,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                   _RoundButton(
                     icon: CupertinoIcons.ellipsis,
                     label: 'المزيد',
-                    onTap: () => _showActions(context),
+                    onTap: () => _showActions(context, deck),
                   ),
                 ],
               ),
@@ -74,8 +90,8 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: <Color>[
-                      deck.subject.color,
-                      deck.subject.color.withValues(alpha: 0.82),
+                      deck.color,
+                      deck.color.withValues(alpha: 0.82),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(24),
@@ -89,11 +105,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(15),
                       ),
-                      child: Icon(
-                        deck.subject.icon,
-                        color: Colors.white,
-                        size: 25,
-                      ),
+                      child: Icon(deck.icon, color: Colors.white, size: 25),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -101,7 +113,9 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            deck.subject.nameAr,
+                            deck.tags.isEmpty
+                                ? 'مجموعة'
+                                : deck.tags.join(' · '),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -110,9 +124,9 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            deck.retention > 0
-                                ? 'نسبة الحفظ ${deck.retention.round()}% · ${deck.dueCount} مستحقة'
-                                : '${deck.cardCount} بطاقة · ${deck.author ?? 'مجهول'}',
+                            deck.isPreview
+                                ? '${deck.cardCount} بطاقة · ${deck.author}'
+                                : 'نسبة الحفظ ${deck.retention.round()}% · ${deck.dueCount} مستحقة',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 11.5,
@@ -151,7 +165,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                 children: <Widget>[
                   Expanded(
                     child: _MiniStat(
-                      value: '8',
+                      value: '${deck.dueNew}',
                       label: 'جديدة',
                       color: AppColors.blue,
                     ),
@@ -159,7 +173,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _MiniStat(
-                      value: '3',
+                      value: '${deck.dueLearning}',
                       label: 'تعلّم',
                       color: AppColors.danger,
                     ),
@@ -167,7 +181,7 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _MiniStat(
-                      value: '13',
+                      value: '${deck.dueReview}',
                       label: 'مراجعة',
                       color: AppColors.primary,
                     ),
@@ -181,17 +195,23 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () => context.push('/review/${deck.id}'),
+                  onPressed: () {
+                    if (deck.isPreview) {
+                      _showPreviewNotice(context);
+                    } else {
+                      context.push('/review/${deck.id}');
+                    }
+                  },
                   style: FilledButton.styleFrom(
-                    backgroundColor: deck.isPublic
+                    backgroundColor: deck.isPreview
                         ? AppColors.primary
                         : AppColors.accent,
-                    foregroundColor: deck.isPublic
+                    foregroundColor: deck.isPreview
                         ? AppColors.accent
                         : AppColors.primary,
                   ),
                   child: Text(
-                    deck.isPublic
+                    deck.isPreview
                         ? 'أضف نسخة إلى مجموعاتي'
                         : 'ادرس هذه المجموعة',
                   ),
@@ -208,6 +228,19 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
             ),
             const SizedBox(height: 14),
             if (_tab == 0) ...<Widget>[
+              if (deck.children.isNotEmpty) ...<Widget>[
+                const SectionHeader(title: 'مجموعات فرعية'),
+                const SizedBox(height: 10),
+                for (final DeckNode child in deck.children)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
+                    child: DeckCard(
+                      deck: child,
+                      onTap: () => context.push('/deck/${child.id}'),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+              ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: TextField(
@@ -254,7 +287,13 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
             children: <Widget>[
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => _showComingSoon(context, 'إضافة بطاقة'),
+                  onPressed: () {
+                    if (deck.isPreview) {
+                      _showPreviewNotice(context);
+                    } else {
+                      showCardEditorSheet(context, deckId: deck.id);
+                    }
+                  },
                   icon: const Icon(CupertinoIcons.plus, size: 18),
                   label: const Text('بطاقة'),
                 ),
@@ -274,9 +313,9 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
     );
   }
 
-  void _showActions(BuildContext context) {
+  void _showActions(BuildContext screenContext, DeckNode deck) {
     showModalBottomSheet<void>(
-      context: context,
+      context: screenContext,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) => SafeArea(
         top: false,
@@ -290,6 +329,22 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              ListTile(
+                leading: const Icon(CupertinoIcons.folder_badge_plus),
+                title: const Text('مجموعة فرعية جديدة'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  if (deck.isPreview) {
+                    _showPreviewNotice(screenContext);
+                  } else {
+                    showDeckEditorSheet(
+                      screenContext,
+                      parentId: deck.id,
+                      parentTitle: deck.title,
+                    );
+                  }
+                },
+              ),
               ListTile(
                 leading: const Icon(CupertinoIcons.pencil),
                 title: const Text('تعديل المجموعة'),
@@ -313,17 +368,19 @@ class _DeckDetailScreenState extends State<DeckDetailScreen> {
   }
 
   void _showComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('$feature سيُفعّل في المرحلة القادمة.'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      );
+    showAppMessage(
+      context,
+      '$feature سيُفعّل في المرحلة القادمة.',
+      kind: AppMessageKind.info,
+    );
+  }
+
+  void _showPreviewNotice(BuildContext context) {
+    showAppMessage(
+      context,
+      'مجموعات المكتبة للمعاينة فقط الآن، وستُفعّل مع الاتصال بالسحابة.',
+      kind: AppMessageKind.info,
+    );
   }
 }
 
@@ -430,7 +487,7 @@ class _CardRow extends StatelessWidget {
       AppColors.primary,
     ];
     final List<String> stateLabels = <String>['جديدة', 'تعلّم', 'راسخة'];
-    final int state = index % 3;
+    final int state = card.stateIndex;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
       child: Container(
@@ -542,6 +599,47 @@ class _RoundButton extends StatelessWidget {
             shape: BoxShape.circle,
           ),
           child: Icon(icon, size: 20, color: context.colors.onSurface),
+        ),
+      ),
+    );
+  }
+}
+
+class _MissingDeck extends StatelessWidget {
+  const _MissingDeck({required this.loading});
+
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: loading
+              ? const CircularProgressIndicator()
+              : Padding(
+                  padding: const EdgeInsets.all(30),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        CupertinoIcons.rectangle_stack,
+                        size: 40,
+                        color: context.texts.bodySmall?.color,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'لم نعثر على هذه المجموعة',
+                        style: context.texts.titleMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () => context.pop(),
+                        child: const Text('رجوع'),
+                      ),
+                    ],
+                  ),
+                ),
         ),
       ),
     );

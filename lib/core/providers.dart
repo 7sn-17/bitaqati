@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../data/models.dart';
-
 final Provider<SharedPreferences> sharedPreferencesProvider =
     Provider<SharedPreferences>(
       (Ref ref) => throw UnimplementedError('Override in main()'),
@@ -22,11 +20,15 @@ final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((
   return ref.watch(sharedPreferencesProvider).getBool('notifications') ?? true;
 });
 
-final StateProvider<SubjectId?> selectedSubjectProvider =
-    StateProvider<SubjectId?>((Ref ref) => null);
+/// Tag chosen in the filter bar of the home and decks screens.
+final StateProvider<String?> selectedTagProvider = StateProvider<String?>(
+  (Ref ref) => null,
+);
 
-final StateProvider<SubjectId?> librarySubjectProvider =
-    StateProvider<SubjectId?>((Ref ref) => null);
+/// Tag chosen on the library screen.
+final StateProvider<String?> libraryTagProvider = StateProvider<String?>(
+  (Ref ref) => null,
+);
 
 final NotifierProvider<ThemeModeNotifier, ThemeMode> themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);

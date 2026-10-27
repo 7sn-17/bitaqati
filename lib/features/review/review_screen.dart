@@ -1,22 +1,64 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
-import '../../data/models.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
 
-class ReviewScreen extends StatefulWidget {
+/// Loads the deck and the cards that are due now, then runs the session.
+class ReviewScreen extends ConsumerWidget {
   const ReviewScreen({required this.deckId, super.key});
 
   final String deckId;
 
   @override
-  State<ReviewScreen> createState() => _ReviewScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final DeckNode? found = ref.watch(deckByIdProvider(deckId));
+    final bool listReady = ref.watch(deckListProvider).hasValue;
+    final List<ReviewCard>? queue = ref
+        .watch(studyQueueProvider(deckId))
+        .valueOrNull;
+    if ((found == null && !listReady) || queue == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.primary,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
+      );
+    }
+    final DeckNode deck =
+        found ?? DeckNode(id: deckId, title: '', color: AppColors.primary);
+    return _ReviewSession(
+      deck: deck,
+      cards: found == null ? const <ReviewCard>[] : queue,
+    );
+  }
 }
 
-class _ReviewScreenState extends State<ReviewScreen> {
-  late final DeckSummary _deck = findDeck(widget.deckId);
-  late final List<ReviewCard> _cards = cardsForDeck(_deck);
+class _ReviewSession extends ConsumerStatefulWidget {
+  const _ReviewSession({required this.deck, required this.cards});
+
+  final DeckNode deck;
+  final List<ReviewCard> cards;
+
+  @override
+  ConsumerState<_ReviewSession> createState() => _ReviewSessionState();
+}
+
+class _ReviewSessionState extends ConsumerState<_ReviewSession> {
+  late final DeckNode _deck = widget.deck;
+  late final List<ReviewCard> _cards = widget.cards;
+  late final int _newCount = _countPhase(CardPhase.newCard);
+  late final int _learningCount = _countPhase(CardPhase.learning);
+  late final int _reviewCount = _countPhase(CardPhase.review);
+  DateTime _shownAt = DateTime.now();
+
+  int _countPhase(CardPhase phase) =>
+      _cards.where((ReviewCard card) => card.phase == phase).length;
 
   int _index = 0;
   int _completed = 0;
@@ -43,6 +85,18 @@ class _ReviewScreenState extends State<ReviewScreen> {
       case 4:
         _easy++;
     }
+    final ReviewCard? answered = _current;
+    if (answered != null) {
+      unawaited(
+        ref
+            .read(contentRepositoryProvider)
+            .recordReview(
+              cardId: answered.id,
+              rating: rating,
+              elapsedMs: DateTime.now().difference(_shownAt).inMilliseconds,
+            ),
+      );
+    }
     final bool done = _index >= _cards.length - 1;
     setState(() {
       _completed++;
@@ -53,9 +107,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
         _index++;
       }
     });
+    _shownAt = DateTime.now();
   }
 
   void _restart() {
+    _shownAt = DateTime.now();
     setState(() {
       _index = 0;
       _completed = 0;
@@ -97,7 +153,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'أضف بطاقات إلى هذه المجموعة أولاً.',
+                    'لا توجد بطاقات مستحقة الآن. عد لاحقاً أو أضف بطاقات جديدة.',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.65),
                     ),
@@ -179,11 +235,11 @@ class _ReviewScreenState extends State<ReviewScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  _Legend(text: 'جديدة 8', active: true),
+                  _Legend(text: 'جديدة $_newCount', active: true),
                   const SizedBox(width: 14),
-                  _Legend(text: 'تعلّم 2'),
+                  _Legend(text: 'تعلّم $_learningCount'),
                   const SizedBox(width: 14),
-                  _Legend(text: 'مراجعة 14'),
+                  _Legend(text: 'مراجعة $_reviewCount'),
                 ],
               ),
               const SizedBox(height: 10),
@@ -218,13 +274,25 @@ class _ReviewScreenState extends State<ReviewScreen> {
                       child: Container(
                         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                         decoration: BoxDecoration(
-                          color: _revealed ? AppColors.primary : Colors.white,
+                          color: _revealed
+                              ? AppColors.answerSurface
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(28),
+                          border: _revealed
+                              ? Border.all(
+                                  color: AppColors.accent.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                  width: 1.2,
+                                )
+                              : null,
                           boxShadow: <BoxShadow>[
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.18),
-                              blurRadius: 26,
-                              offset: const Offset(0, 12),
+                              color: Colors.black.withValues(
+                                alpha: _revealed ? 0.42 : 0.18,
+                              ),
+                              blurRadius: _revealed ? 34 : 26,
+                              offset: const Offset(0, 14),
                             ),
                           ],
                         ),
@@ -272,7 +340,7 @@ class _CardBody extends StatelessWidget {
   });
 
   final ReviewCard card;
-  final DeckSummary deck;
+  final DeckNode deck;
   final bool revealed;
   final int position;
 
@@ -301,7 +369,9 @@ class _CardBody extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '${deck.subject.nameAr} · ${deck.title.split('·').last.trim()}',
+                  deck.tags.isEmpty
+                      ? deck.title
+                      : '${deck.tags.first} · ${deck.title}',
                   style: TextStyle(
                     color: revealed ? AppColors.accent : AppColors.primary,
                     fontSize: 10.5,
@@ -331,7 +401,7 @@ class _CardBody extends StatelessWidget {
                 alignment: Alignment.center,
                 children: <Widget>[
                   Icon(
-                    deck.subject.icon,
+                    deck.icon,
                     size: 74,
                     color: AppColors.primary.withValues(alpha: 0.2),
                   ),
@@ -339,7 +409,7 @@ class _CardBody extends StatelessWidget {
                     bottom: 10,
                     right: 14,
                     child: Text(
-                      'الشكل التوضيحي · ${deck.subject.nameAr}',
+                      deck.title,
                       style: const TextStyle(
                         color: AppColors.primaryDeep,
                         fontSize: 10,
@@ -433,24 +503,48 @@ class _CardBody extends StatelessWidget {
             const SizedBox(height: 12),
             Container(height: 0.7, color: AppColors.primaryDeep),
             const SizedBox(height: 12),
-            const Text(
-              'الإجابة',
-              style: TextStyle(
-                color: AppColors.accent,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.4,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.45),
+                  width: 1.2,
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              card.back,
-              style: const TextStyle(
-                fontFamily: 'ReadexPro',
-                color: AppColors.accent,
-                fontSize: 26,
-                height: 1.5,
-                fontWeight: FontWeight.w700,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const Text(
+                    'الإجابة',
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    card.back,
+                    style: const TextStyle(
+                      fontFamily: 'ReadexPro',
+                      color: AppColors.accent,
+                      fontSize: 26,
+                      height: 1.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
             if (card.tags.isNotEmpty) ...<Widget>[
@@ -624,7 +718,7 @@ class _Summary extends StatelessWidget {
     required this.onClose,
   });
 
-  final DeckSummary deck;
+  final DeckNode deck;
   final int total;
   final int again;
   final int hard;

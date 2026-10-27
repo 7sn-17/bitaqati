@@ -1,11 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/surface_card.dart';
-import '../../data/models.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -102,7 +104,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             child: _ForecastChart(),
           ),
           const SizedBox(height: 22),
-          const SectionHeader(title: 'نسبة الحفظ حسب المادة'),
+          const SectionHeader(title: 'نسبة الحفظ حسب المجموعة'),
           const SizedBox(height: 10),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 20),
@@ -414,30 +416,42 @@ class _ForecastChart extends StatelessWidget {
   }
 }
 
-class _SubjectRetention extends StatelessWidget {
+class _SubjectRetention extends ConsumerWidget {
   const _SubjectRetention();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<DeckNode> decks = ref.watch(deckForestProvider);
+    if (decks.isEmpty) {
+      return Text(
+        'أنشئ مجموعتك الأولى لتظهر نسبة الحفظ هنا.',
+        style: context.texts.bodySmall,
+      );
+    }
     return Column(
       children: <Widget>[
-        for (final Subject subject in kSubjects)
+        for (final DeckNode deck in decks)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: <Widget>[
                 SizedBox(
                   width: 82,
-                  child: Text(subject.nameAr, style: context.texts.bodyMedium),
+                  child: Text(
+                    deck.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.texts.bodyMedium,
+                  ),
                 ),
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(99),
                     child: LinearProgressIndicator(
-                      value: _retention(subject.id) / 100,
+                      value: deck.progress,
                       minHeight: 8,
                       backgroundColor: context.colors.surfaceContainerHighest,
-                      valueColor: AlwaysStoppedAnimation<Color>(subject.color),
+                      valueColor: AlwaysStoppedAnimation<Color>(deck.color),
                     ),
                   ),
                 ),
@@ -445,7 +459,7 @@ class _SubjectRetention extends StatelessWidget {
                 SizedBox(
                   width: 38,
                   child: Text(
-                    '${_retention(subject.id).round()}%',
+                    '${deck.retention.round()}%',
                     textAlign: TextAlign.start,
                     style: context.texts.titleSmall,
                   ),
@@ -455,15 +469,5 @@ class _SubjectRetention extends StatelessWidget {
           ),
       ],
     );
-  }
-
-  double _retention(SubjectId id) {
-    return switch (id) {
-      SubjectId.physics => 88,
-      SubjectId.chemistry => 76,
-      SubjectId.biology => 91,
-      SubjectId.historyOfMedicine => 82,
-      SubjectId.english1 => 74,
-    };
   }
 }

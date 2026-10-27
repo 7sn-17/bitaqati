@@ -1,19 +1,21 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/deck_card.dart';
-import '../../data/models.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
 
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _query = '';
 
@@ -26,25 +28,19 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final String query = _query.trim();
-    final List<DeckSummary> decks = query.isEmpty
-        ? kMyDecks
-        : kMyDecks
+    final List<DeckNode> forest = ref.watch(deckForestProvider);
+    final List<DeckNode> decks = query.isEmpty
+        ? forest
+        : flattenDeckForest(forest)
               .where(
-                (DeckSummary deck) =>
+                (DeckNode deck) =>
                     deck.title.contains(query) ||
-                    deck.subject.nameAr.contains(query),
+                    deck.tags.any((String tag) => tag.contains(query)),
               )
               .toList(growable: false);
-    final List<ReviewCard> cards = query.isEmpty
-        ? kSampleCards.take(3).toList(growable: false)
-        : kSampleCards
-              .where(
-                (ReviewCard card) =>
-                    card.front.contains(query) ||
-                    card.back.contains(query) ||
-                    card.tags.any((String tag) => tag.contains(query)),
-              )
-              .toList(growable: false);
+    final List<ReviewCard> cards =
+        ref.watch(searchCardsProvider(query)).valueOrNull ??
+        const <ReviewCard>[];
 
     return Scaffold(
       body: SafeArea(
@@ -114,7 +110,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               )
             else ...<Widget>[
-              for (final DeckSummary deck in decks.take(4))
+              for (final DeckNode deck in decks.take(4))
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
                   child: DeckCard(
@@ -143,9 +139,9 @@ class _SearchScreenState extends State<SearchScreen> {
                           child: Row(
                             children: <Widget>[
                               Icon(
-                                subjectById(card.subjectId).icon,
+                                CupertinoIcons.doc_text,
                                 size: 20,
-                                color: subjectById(card.subjectId).color,
+                                color: context.colors.primary,
                               ),
                               const SizedBox(width: 10),
                               Expanded(

@@ -21,19 +21,26 @@ class SurfaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color resolved = color ?? context.colors.surfaceContainerHighest;
+    final BorderSide side = context.isDark
+        ? BorderSide(color: context.colors.outlineVariant, width: 0.8)
+        : BorderSide.none;
     if (onTap == null) {
       return Container(
         padding: padding,
         decoration: BoxDecoration(
           color: resolved,
           borderRadius: BorderRadius.circular(radius),
+          border: side == BorderSide.none ? null : Border.fromBorderSide(side),
         ),
         child: child,
       );
     }
     return Material(
       color: resolved,
-      borderRadius: BorderRadius.circular(radius),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: side,
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,

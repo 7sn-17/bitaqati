@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
+/// Floating, blurred tab bar with a raised centre "+" button.
 class GlassTabBar extends StatelessWidget {
   const GlassTabBar({
     required this.currentIndex,
@@ -20,6 +21,9 @@ class GlassTabBar extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final VoidCallback onCreate;
   final int dueCount;
+
+  static const double _barHeight = 64;
+  static const double _createSize = 58;
 
   static const List<_TabSpec> _tabs = <_TabSpec>[
     _TabSpec(
@@ -44,80 +48,82 @@ class GlassTabBar extends StatelessWidget {
     ),
   ];
 
+  Widget _item(int tab, Color active, Color inactive) {
+    return Expanded(
+      child: _TabItem(
+        spec: _tabs[tab],
+        selected: currentIndex == tab,
+        activeColor: active,
+        inactiveColor: inactive,
+        badge: tab == 0 ? dueCount : 0,
+        onTap: () => onSelect(tab),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDark = context.isDark;
     final Color inactive = isDark ? AppColors.darkMuted : AppColors.muted;
-    final Color active = context.colors.primary;
+    final Color active = isDark ? AppColors.accent : AppColors.primary;
     final Color barColor = isDark
-        ? AppColors.darkCanvas.withValues(alpha: 0.86)
-        : Colors.white.withValues(alpha: 0.84);
-    final Color border = isDark ? AppColors.darkLine : AppColors.line;
+        ? AppColors.darkSurface.withValues(alpha: 0.76)
+        : Colors.white.withValues(alpha: 0.74);
+    final Color border = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.black.withValues(alpha: 0.07);
+    final BorderRadius radius = BorderRadius.circular(32);
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: barColor,
-            border: Border(top: BorderSide(color: border, width: 0.6)),
-          ),
-          child: SafeArea(
-            top: false,
-            minimum: const EdgeInsets.only(bottom: 3),
-            child: SizedBox(
-              height: 62,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: <Widget>[
-                  Expanded(
-                    child: _TabItem(
-                      spec: _tabs[0],
-                      selected: currentIndex == 0,
-                      activeColor: active,
-                      inactiveColor: inactive,
-                      badge: dueCount,
-                      onTap: () => onSelect(0),
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 6),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: SizedBox(
+          height: _barHeight + 12,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: <Widget>[
+              Container(
+                height: _barHeight,
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.4 : 0.1,
+                      ),
+                      blurRadius: 26,
+                      offset: const Offset(0, 10),
                     ),
-                  ),
-                  Expanded(
-                    child: _TabItem(
-                      spec: _tabs[1],
-                      selected: currentIndex == 1,
-                      activeColor: active,
-                      inactiveColor: inactive,
-                      onTap: () => onSelect(1),
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Transform.translate(
-                        offset: const Offset(0, -12),
-                        child: _CreateButton(onTap: onCreate, isDark: isDark),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: radius,
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: barColor,
+                        borderRadius: radius,
+                        border: Border.all(color: border, width: 0.8),
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          _item(0, active, inactive),
+                          _item(1, active, inactive),
+                          const SizedBox(width: _createSize + 6),
+                          _item(2, active, inactive),
+                          _item(3, active, inactive),
+                        ],
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: _TabItem(
-                      spec: _tabs[2],
-                      selected: currentIndex == 2,
-                      activeColor: active,
-                      inactiveColor: inactive,
-                      onTap: () => onSelect(2),
-                    ),
-                  ),
-                  Expanded(
-                    child: _TabItem(
-                      spec: _tabs[3],
-                      selected: currentIndex == 3,
-                      activeColor: active,
-                      inactiveColor: inactive,
-                      onTap: () => onSelect(3),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Positioned(top: 0, child: _CreateButton(onTap: onCreate)),
+            ],
           ),
         ),
       ),
@@ -160,16 +166,29 @@ class _TabItem extends StatelessWidget {
           children: <Widget>[
             Stack(
               clipBehavior: Clip.none,
+              alignment: Alignment.center,
               children: <Widget>[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  width: selected ? 46 : 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? activeColor.withValues(alpha: 0.16)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
                 Icon(
                   selected ? spec.activeIcon : spec.icon,
-                  size: 24,
+                  size: 22,
                   color: color,
                 ),
                 if (badge > 0)
                   PositionedDirectional(
-                    top: -3,
-                    start: -7,
+                    top: -5,
+                    start: 2,
                     child: Container(
                       constraints: const BoxConstraints(minWidth: 15),
                       height: 15,
@@ -213,13 +232,13 @@ class _TabItem extends StatelessWidget {
 }
 
 class _CreateButton extends StatelessWidget {
-  const _CreateButton({required this.onTap, required this.isDark});
+  const _CreateButton({required this.onTap});
 
   final VoidCallback onTap;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = context.isDark;
     final Color background = isDark ? AppColors.accent : AppColors.primary;
     final Color foreground = isDark ? AppColors.primary : AppColors.accent;
     return Semantics(
@@ -231,16 +250,17 @@ class _CreateButton extends StatelessWidget {
           onTap();
         },
         child: Container(
-          width: 54,
-          height: 54,
+          width: GlassTabBar._createSize,
+          height: GlassTabBar._createSize,
           decoration: BoxDecoration(
             color: background,
             shape: BoxShape.circle,
+            border: Border.all(color: context.colors.surface, width: 4),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: background.withValues(alpha: 0.28),
+                color: background.withValues(alpha: 0.36),
                 blurRadius: 18,
-                offset: const Offset(0, 7),
+                offset: const Offset(0, 8),
               ),
             ],
           ),

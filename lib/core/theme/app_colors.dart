@@ -16,18 +16,16 @@ abstract final class AppColors {
   static const Color warning = Color(0xFFFFF4D6);
   static const Color warningInk = Color(0xFF7A5300);
 
-  // Dark palette.
-  static const Color darkCanvas = Color(0xFF0B0F0A);
-  static const Color darkSurface = Color(0xFF171D15);
-  static const Color darkSurfaceHigh = Color(0xFF222B20);
+  // Dark palette. The steps between canvas, surface and surface-high are
+  // wide enough that cards and sheets stay distinct from the page.
+  static const Color darkCanvas = Color(0xFF0A0E09);
+  static const Color darkSurface = Color(0xFF1F2B1D);
+  static const Color darkSurfaceHigh = Color(0xFF2C3B2A);
   static const Color darkInk = Color(0xFFF2F5EE);
-  static const Color darkMuted = Color(0xFFA6AFA0);
-  static const Color darkLine = Color(0xFF30392D);
+  static const Color darkMuted = Color(0xFFB3BCAD);
+  static const Color darkLine = Color(0xFF42523E);
 
-  // Subject colours. These are duplicated in the Supabase `subjects` table.
-  static const Color physics = Color(0xFF0B4C72);
-  static const Color chemistry = Color(0xFF054D28);
-  static const Color biology = Color(0xFF163300);
-  static const Color medicineHistory = Color(0xFF7A3E2F);
-  static const Color english = Color(0xFF4A3F7A);
+  /// Background of the review card once the answer is revealed. Lighter than
+  /// [primary] so the card separates from the green page behind it.
+  static const Color answerSurface = Color(0xFF2B5A1A);
 }

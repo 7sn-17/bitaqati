@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/models.dart';
+import '../../domain/models.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
@@ -13,22 +13,46 @@ class DeckCard extends StatelessWidget {
     super.key,
   });
 
-  final DeckSummary deck;
+  final DeckNode deck;
   final VoidCallback onTap;
   final bool showAuthor;
   final Widget? trailing;
 
+  String get _subtitle {
+    if (showAuthor && deck.author != null) {
+      return '${deck.cardCount} بطاقة · ${deck.author}';
+    }
+    final String visibility = deck.isPublic ? 'عامة' : 'خاصة';
+    final String subDecks = deck.childCount > 0
+        ? ' · ${deck.childCount} فرعية'
+        : '';
+    return '${deck.cardCount} بطاقة · $visibility · '
+        'حفظ ${deck.retention.round()}%$subDecks';
+  }
+
+  String get _statusLabel {
+    final double? rating = deck.rating;
+    if (rating != null) {
+      return '${rating.toStringAsFixed(1)} ★';
+    }
+    return deck.cardCount == 0 ? 'فارغة' : 'أُنجزت';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Subject subject = deck.subject;
-    final Color tileColor = subject.color;
+    final Color tileColor = deck.color;
     final Color surface = context.colors.surfaceContainerHighest;
     final Color onSurface = context.colors.onSurface;
     final Color muted = context.texts.bodySmall?.color ?? AppColors.muted;
 
     return Material(
       color: surface,
-      borderRadius: BorderRadius.circular(22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: context.isDark
+            ? BorderSide(color: context.colors.outlineVariant, width: 0.8)
+            : BorderSide.none,
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -45,7 +69,7 @@ class DeckCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(17),
                 ),
                 alignment: Alignment.center,
-                child: Icon(subject.icon, color: Colors.white, size: 26),
+                child: Icon(deck.icon, color: Colors.white, size: 26),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -70,9 +94,7 @@ class DeckCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      showAuthor && deck.author != null
-                          ? '${deck.cardCount} بطاقة · ${deck.author}'
-                          : '${deck.cardCount} بطاقة · ${deck.isPublic ? 'عامة' : 'خاصة'} · حفظ ${deck.retention.round()}%',
+                      _subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: context.texts.bodySmall,
@@ -90,7 +112,7 @@ class DeckCard extends StatelessWidget {
                                   ? AppColors.darkLine
                                   : Colors.white,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                tileColor,
+                                context.isDark ? AppColors.accent : tileColor,
                               ),
                             ),
                           ),
@@ -119,9 +141,7 @@ class DeckCard extends StatelessWidget {
                         ] else ...<Widget>[
                           const SizedBox(width: 10),
                           Text(
-                            deck.retention > 0
-                                ? 'أُنجزت'
-                                : '${deck.rating?.toStringAsFixed(1) ?? '—'} ★',
+                            _statusLabel,
                             style: TextStyle(
                               color: muted,
                               fontSize: 11,
