@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../domain/enums.dart';
@@ -24,8 +25,10 @@ class DeckCard extends StatelessWidget {
       final String usage = deck.installCount > 0
           ? ' · ${deck.installCount} استخدام'
           : '';
+      // The author is the real publisher name from the cloud profile, so a
+      // deck is always credited to whoever wrote it.
       return '${deck.cardCount} بطاقة · '
-          '${deck.author ?? 'مجموعة مشاركة'}$usage';
+          '${deck.author ?? 'مؤلف غير معروف'}$usage';
     }
     return '${deck.cardCount} بطاقة · ${deck.privacy.shortLabelAr} · '
         'أتقنت ${deck.masteryPercent.round()}%';
@@ -106,6 +109,10 @@ class DeckCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: context.texts.bodySmall,
                     ),
+                    if (deck.isRemix) ...<Widget>[
+                      const SizedBox(height: 6),
+                      _RemixBadge(author: deck.originalAuthorName ?? ''),
+                    ],
                     const SizedBox(height: 9),
                     Row(
                       children: <Widget>[
@@ -164,6 +171,54 @@ class DeckCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Marks a deck that was copied from someone else's work.
+///
+/// The credit sits on the card itself rather than a detail screen, so a remix
+/// can never be mistaken for an original while browsing the library.
+class _RemixBadge extends StatelessWidget {
+  const _RemixBadge({required this.author});
+
+  final String author;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool dark = context.isDark;
+    final String trimmed = author.trim();
+    final String label = trimmed.isEmpty ? 'مقتبسة' : 'مقتبسة من ' + trimmed;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: dark
+            ? AppColors.darkSurfaceHigh
+            : AppColors.blue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            CupertinoIcons.doc_on_doc,
+            size: 10,
+            color: dark ? AppColors.darkAccent : AppColors.blue,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'IBMPlexSansArabic',
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: dark ? AppColors.darkAccent : AppColors.blue,
+            ),
+          ),
+        ],
       ),
     );
   }

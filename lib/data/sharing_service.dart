@@ -163,6 +163,10 @@ class SharingService {
       'settings': node.settings,
       'is_starter': false,
       'share_code': shareCode,
+      // Attribution: kept on the row so a remix still credits the person who
+      // wrote the original, even after the original is unpublished.
+      'original_deck_id': node.originalDeckId,
+      'original_author_name': node.originalAuthorName,
     };
   }
 

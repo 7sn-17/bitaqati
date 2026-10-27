@@ -22,8 +22,8 @@ flutter run \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-`GOOGLE_WEB_CLIENT_ID` is optional locally because the public Web client id is
-the default in `lib/core/config/app_config.dart`.
+`GOOGLE_WEB_CLIENT_ID` is optional locally because the public Web client id
+is the default in `lib/core/config/app_config.dart`.
 
 ### GitHub Actions
 
@@ -48,9 +48,14 @@ Optional repository **variable**:
 The workflows pass the Supabase and Google values with `--dart-define`. CI
 decodes the authoritative `KEYSTORE_BASE64` secret into
 `android/app/bitaqati.p12` (falling back to the committed `bitaqati.p12`) and
-writes `android/key.properties` from the password secrets. On a non-PR build it
-refuses to publish when release signing is not configured, rather than shipping
-a debug-signed APK that cannot authenticate.
+writes `android/key.properties` from the password secrets. On a non-PR build
+it refuses to publish when release signing is not configured, rather than
+shipping a debug-signed APK that cannot authenticate.
+
+The build pipeline in order: `flutter pub get` → `dart run build_runner
+build --delete-conflicting-outputs` (Drift code generation, since `*.g.dart`
+is git-ignored) → `dart run flutter_launcher_icons` → signing setup →
+`flutter analyze` → `flutter build apk`.
 
 ## Google Sign-In (Android)
 
@@ -60,7 +65,8 @@ Native Google Sign-In only works when all of these agree:
    `android/app/build.gradle.kts`). It must match the package of the Android
    OAuth client in Google Cloud.
 2. **Signing certificate SHA-1** — the certificate inside `bitaqati.p12`, the
-   keystore used by CI. It must be registered on the same Android OAuth client.
+   keystore used by CI. It must be registered on the same Android OAuth
+   client.
 3. **Server client id** — the **Web** client id
    `610940162017-ohe2ei9dkkj96cai8gqu0i2jmgbspd8b.apps.googleusercontent.com`.
    The app passes it to `GoogleSignIn.instance.initialize(serverClientId: ...)`.
@@ -84,8 +90,7 @@ Native Google Sign-In only works when all of these agree:
 - **Authorized Client IDs**: every native client id used to obtain ID tokens.
 - **Site URL** may remain `com.bitaqati.app://login-callback`; the native flow
   does not use a browser redirect.
-- Leave **Skip nonce check** off for Android. It is only recommended for iOS in
-  Supabase's Flutter guide.
+- Leave **Skip nonce check** off for Android.
 
 The current remote values can be inspected with the Supabase Management API
 (`GET /v1/projects/mftghnvtdryxzochquee/config/auth`). The Google provider is
@@ -103,14 +108,14 @@ keytool -list -v -keystore bitaqati.p12 -storetype PKCS12 | grep -i SHA1
 "$ANDROID_HOME/build-tools/<version>/apksigner" verify --print-certs \
   app-release.apk | grep "SHA-1"
 
-# Debug keystore used by `flutter run`
+# Debug keystore used by flutter run
 keytool -list -v -keystore ~/.android/debug.keystore \
   -alias androiddebugkey -storepass android | grep -i SHA1
 ```
 
-The CI **Verify APK signer** step prints the built APK's SHA-1. Compare it with
-the value registered in Google Cloud, or set `ANDROID_CERT_SHA1` to make CI
-enforce it.
+The CI **Verify APK signer** step prints the built APK's SHA-1. Compare it
+with the value registered in Google Cloud, or set `ANDROID_CERT_SHA1` to make
+CI enforce it.
 
 ### Symptom → cause
 
@@ -150,8 +155,8 @@ flutter build apk --release \
 
 Never commit `android/key.properties`.
 
-The repository currently also contains `bitaqati.p12` (and its base64 copy) as
-a CI fallback. Treat the keystore as a secret: rotate it and register the new
+The repository also contains `bitaqati.p12` (and a base64 copy) as a CI
+fallback. Treat the keystore as a secret: rotate it and register the new
 SHA-1 in Google Cloud before a public release.
 
 `flutter run` uses the local debug keystore, which has a different SHA-1. Add
@@ -162,26 +167,73 @@ when testing Google Sign-In.
 
 The application id changed from `app.bitaqati.cards` to `com.bitaqati.app` to
 match the registered OAuth client (and the Supabase redirect scheme). Android
-treats it as a different app: uninstall the old build before installing the new
-one; its local data is not migrated.
+treats it as a different app: uninstall the old build before installing the
+new one; its local data is not migrated.
 
 ## Database migrations
 
-The SQL is committed in `supabase/migrations/`:
+The SQL is committed in `supabase/migrations/` and applied in filename order:
 
-1. `20261025000100_initial_schema.sql`
-2. `20261025000200_hardening.sql`
+| File | Scope |
+|---|---|
+| `20261025000100_initial_schema.sql` | Profiles, subjects, decks, cards, card states, review logs, ratings, reports |
+| `20261025000200_hardening.sql` | RLS policies, indexes, trigger functions |
+| `20261025000300_phase1_nested_content.sql` | Legacy nesting columns and `parent_id` cascade |
+| `20261027000100_library_usage_and_ratings.sql` | `install_count` and `deck_ratings` aggregation |
+| `20261027000100_phase_c_depth_limit.sql` | Legacy depth constraint |
+| `20261027000300_card_media_storage.sql` | Storage bucket and policies for card media |
+| `20261027000400_deck_share_codes.sql` | `share_code`, `new_share_code()`, uniqueness trigger, `resolve_share_code()` |
+| `20261027000500_profile_and_attribution.sql` | `decks.original_deck_id`, `decks.original_author_name`, `profiles.display_name_custom`, `profiles_insert_own`, flat `public_decks` |
 
-Apply via the Supabase MCP `apply_migration` tool, or with the Supabase CLI:
+Apply with the Supabase CLI:
 
 ```bash
 supabase link --project-ref mftghnvtdryxzochquee
 supabase db push
 ```
 
-The hardening migration clears all security advisor warnings. The only
-remaining advisor notice is unused indexes, which is expected while the tables
-are empty.
+Or run a single statement through the Management API:
+
+```bash
+curl -X POST \
+  "https://api.supabase.com/v1/projects/mftghnvtdryxzochquee/database/query" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @query.json   # {"query": "select 1"}
+```
+
+A multi-statement request returns only the **last** result set, so read
+earlier results with separate calls.
+
+### What the client must never write
+
+The cloud `decks` table still carries `parent_id`, `root_id`, `path` and
+`depth` from the nested era. They are legacy and unused: the client never
+sends them, and `public_decks` does not expose them. Writing to them from a
+new build would re-introduce a hierarchy the app no longer understands.
+
+## Share codes
+
+No configuration is required — codes are generated on the device and
+de-duplicated by the database. Two things are worth knowing:
+
+- The alphabet is `23456789ABCDEFGHJKMNPQRSTUVWXYZ` (31 characters, no vowels,
+  no `0`/`O`/`1`/`I`/`L`) and the format is enforced by the
+  `decks_share_code_format` CHECK constraint.
+- `resolve_share_code(p_code text)` is `security definer` and returns only
+  `(id, title, card_count)` for `public` or `unlisted` decks. Keep it that way:
+  widening the return type would leak private metadata to anyone who guesses a
+  code.
+
+## Third-party packages added for these features
+
+| Package | Used by |
+|---|---|
+| `url_launcher` | Developer info screen: mail, WhatsApp, Telegram, Instagram |
+
+No keys or platform configuration are needed for `url_launcher` on Android.
+On iOS it requires the `LSApplicationQueriesSchemes` entries for `mailto`,
+`https` and `tg`.
 
 ## APK
 

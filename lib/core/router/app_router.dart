@@ -7,11 +7,14 @@ import '../../features/create/card_editor_page.dart';
 import '../../features/deck/deck_detail_screen.dart';
 import '../../features/decks/decks_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/legal/privacy_policy_screen.dart';
+import '../../features/legal/terms_of_service_screen.dart';
 import '../../features/library/library_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/progress/progress_screen.dart';
 import '../../features/review/review_screen.dart';
 import '../../features/search/search_screen.dart';
+import '../../features/settings/developer_info_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../auth/auth_providers.dart';
@@ -110,6 +113,24 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/developer',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const DeveloperInfoScreen(),
+      ),
+      GoRoute(
+        path: '/privacy',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: '/terms',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const TermsOfServiceScreen(),
       ),
       GoRoute(
         path: '/search',

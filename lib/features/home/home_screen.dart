@@ -14,6 +14,7 @@ import '../../core/widgets/deck_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/tag_filter_bar.dart';
 import '../../data/content_providers.dart';
+import '../../data/profile_providers.dart';
 import '../../domain/models.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -128,10 +129,11 @@ class _HomeHeader extends ConsumerWidget {
 
     final int hour = DateTime.now().hour;
     final String timeGreeting = hour < 12 ? 'صباح الخير' : 'مساء الخير';
-    final String? firstName = userFirstName(user);
+    // A name chosen in Settings wins over the Google name here too.
+    final String displayName = ref.watch(displayNameProvider);
     final String greeting = user == null
         ? (guest ? 'أهلاً بك، تابع كزائر' : 'أهلاً بك')
-        : '$timeGreeting، ${firstName ?? 'صديقنا'}';
+        : '$timeGreeting، $displayName';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
@@ -150,7 +152,9 @@ class _HomeHeader extends ConsumerWidget {
               alignment: Alignment.center,
               child: _HeaderAvatar(
                 url: userAvatarUrl(user),
-                initial: userInitial(user),
+                initial: displayName.isEmpty
+                    ? userInitial(user)
+                    : displayName.substring(0, 1),
               ),
             ),
           ),

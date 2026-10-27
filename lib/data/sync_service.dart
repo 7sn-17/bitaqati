@@ -5,6 +5,7 @@ import '../core/config/app_config.dart';
 import '../domain/enums.dart';
 import 'local/app_database.dart';
 import 'local/tables.dart';
+import 'profile_repository.dart';
 
 /// What one sync pass did, for the settings screen and the status banner.
 class SyncReport {
@@ -74,6 +75,14 @@ class SyncService {
       pulled = await _pull(client, user.id);
     } catch (error) {
       return SyncReport(pushed: pushed, error: _describe(error));
+    }
+
+    // The display name is not part of the deck queue, so it is adopted here.
+    // This is what brings a custom name back after a reinstall.
+    try {
+      await ProfileRepository(_db).pullFromCloud(user.id);
+    } catch (_) {
+      // A missing profile row is normal for a brand-new account.
     }
 
     await _db
@@ -192,12 +201,10 @@ class SyncService {
           .write(DecksCompanion(ownerId: Value<String>(userId)));
     }
     if (removals.isNotEmpty) {
-      await client
-          .from('decks')
-          .update(<String, Object?>{
-            'deleted_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .inFilter('id', removals.toList());
+      // A real delete, not a tombstone: the deck was removed on the device and
+      // the user expects it gone everywhere. Postgres cascades the cards,
+      // card states and review logs for us.
+      await client.from('decks').delete().inFilter('id', removals.toList());
     }
   }
 
@@ -295,6 +302,8 @@ class SyncService {
       'settings': row.settings,
       'is_starter': row.isStarter,
       'share_code': row.shareCode,
+      'original_deck_id': row.originalDeckId,
+      'original_author_name': row.originalAuthorName,
     };
   }
 
@@ -410,6 +419,7 @@ class SyncService {
         .select(
           'id,position,title,description,color_hex,icon,cover_url,tags,'
           'settings,privacy,is_starter,share_code,published_at,'
+          'original_deck_id,original_author_name,'
           'created_at,updated_at,deleted_at',
         )
         .eq('owner_id', userId);
@@ -451,6 +461,10 @@ class SyncService {
                 _json(row['settings']) ?? const <String, Object?>{},
               ),
               isStarter: Value<bool>(row['is_starter'] == true),
+              originalDeckId: Value<String?>(_text(row['original_deck_id'])),
+              originalAuthorName: Value<String?>(
+                _text(row['original_author_name']),
+              ),
               publishedAt: Value<DateTime?>(_date(row['published_at'])),
               createdAt: Value<DateTime>(
                 _date(row['created_at']) ?? DateTime.now(),

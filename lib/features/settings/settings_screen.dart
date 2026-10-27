@@ -13,6 +13,8 @@ import '../../core/user_display.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/auth_service.dart';
+import '../../data/profile_providers.dart';
+import '../../data/profile_repository.dart';
 import '../../data/sync_providers.dart';
 import '../../data/sync_service.dart';
 
@@ -26,8 +28,7 @@ class SettingsScreen extends ConsumerWidget {
     final bool guestMode = ref.watch(guestModeProvider);
     final bool guest = user == null && guestMode;
     final String? avatarUrl = userAvatarUrl(user);
-    final String displayName =
-        userFirstName(user) ?? (guest ? 'زائر' : 'بطاقاتي');
+    final String displayName = ref.watch(displayNameProvider);
     final String accountSubtitle =
         user?.email ??
         (guest ? 'وضع الزائر · للتصفح فقط' : 'غير مسجل الدخول');
@@ -113,6 +114,12 @@ class SettingsScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (user != null) ...<Widget>[
+                      const SizedBox(width: 8),
+                      _EditNameButton(
+                        onTap: () => _editDisplayName(context, ref),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -239,6 +246,24 @@ class SettingsScreen extends ConsumerWidget {
             _Group(
               children: <Widget>[
                 _Row(
+                  icon: CupertinoIcons.person_crop_circle,
+                  title: 'المطور',
+                  subtitle: 'حسن المحمد · تواصل مباشر',
+                  onTap: () => context.push('/developer'),
+                ),
+                _Row(
+                  icon: CupertinoIcons.lock,
+                  title: 'سياسة الخصوصية',
+                  subtitle: 'كيف نحمي بياناتك وما نجمعه',
+                  onTap: () => context.push('/privacy'),
+                ),
+                _Row(
+                  icon: CupertinoIcons.doc_text,
+                  title: 'شروط الاستخدام',
+                  subtitle: 'قواعد استخدام التطبيق والمحتوى',
+                  onTap: () => context.push('/terms'),
+                ),
+                _Row(
                   icon: CupertinoIcons.info_circle,
                   title: 'الإصدار',
                   subtitle: AppConfig.appVersion,
@@ -266,7 +291,7 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Center(
               child: Text(
-                'صُنع بشغف للطلاب العرب',
+                'صُنع بحب للطلاب',
                 style: context.texts.bodySmall,
               ),
             ),
@@ -327,8 +352,160 @@ class SettingsScreen extends ConsumerWidget {
     await guestMode.exit();
     await auth.signOut();
   }
+
+  /// Opens the rename dialog and saves whatever the user confirms.
+  ///
+  /// The name is written locally first, so it survives a sign-out and shows
+  /// up immediately even if the push to Supabase has to wait for a network.
+  Future<void> _editDisplayName(BuildContext context, WidgetRef ref) async {
+    final String? name = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialog) =>
+          _NameDialog(initial: ref.read(displayNameProvider)),
+    );
+    if (name == null || !context.mounted) {
+      return;
+    }
+    try {
+      await ref.read(displayNameProvider.notifier).rename(name);
+      if (!context.mounted) {
+        return;
+      }
+      showAppMessage(
+        context,
+        'تم تحديث الاسم.',
+        kind: AppMessageKind.success,
+      );
+    } on ProfileFailure catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      showAppMessage(context, error.message, kind: AppMessageKind.error);
+    }
+  }
 }
 
+class _EditNameButton extends StatelessWidget {
+  const _EditNameButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'تعديل الاسم',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(30),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Icon(
+                CupertinoIcons.pencil,
+                size: 13,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 5),
+              const Text(
+                'تعديل',
+                style: TextStyle(
+                  fontFamily: 'ReadexPro',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small dialog for renaming. Kept local to this file because nothing else
+/// needs a single-field prompt.
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final TextEditingController _controller;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String value = _controller.text.trim();
+    if (value.length < ProfileRepository.minNameLength ||
+        value.length > ProfileRepository.maxNameLength) {
+      setState(() {
+        _error =
+            'الاسم يجب أن يكون بين حرفين و40 حرفاً.';
+      });
+      return;
+    }
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('تعديل الاسم'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'يظهر هذا الاسم لك في التطبيق، وكمؤلف لمجموعاتك في المكتبة.',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textInputAction: TextInputAction.done,
+            maxLength: ProfileRepository.maxNameLength,
+            onSubmitted: (String _) => _submit(),
+            decoration: InputDecoration(
+              hintText: 'اكتب اسمك',
+              errorText: _error,
+              counterText: '',
+            ),
+          ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('إلغاء'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('حفظ')),
+      ],
+    );
+  }
+}
 class _AccountAvatar extends StatelessWidget {
   const _AccountAvatar({required this.url, required this.initial});
 

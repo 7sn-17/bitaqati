@@ -2,77 +2,198 @@
 
 ## Product principles
 
-1. **Offline-first.** Studying must work on a plane, in a basement, or on a weak connection.
-2. **One source of truth for content.** The five subject names and colours are identical in the app and in Supabase.
-3. **Speed over chrome.** Navigation is instant; review actions are one tap.
-4. **AI assists, never blocks.** A review session never waits for a model.
-5. **Private by default.** Decks are private until the owner explicitly publishes them.
+1. **Offline first.** Studying works on a plane, in a basement, or on a weak
+   connection. The local database is the copy the app reads from.
+2. **One shape for content.** A deck is a flat list that owns its cards. There
+   are no sub-decks, no trees, and no special root deck.
+3. **Speed over chrome.** Navigation is instant; a review action is one tap.
+4. **Private by default.** A deck is private until its owner publishes it.
+5. **Attribution is permanent.** A copied deck always credits the person who
+   wrote the original, even after the original is deleted.
 
 ## Stack
 
 | Layer | Choice | Why |
 |---|---|---|
-| UI | Flutter + Material 3, Cupertino motion | One codebase, native-feeling Android, future iOS |
+| UI | Flutter + Material 3, Cupertino motion | One codebase, native-feeling Android |
 | State | Riverpod | Testable, no BuildContext dependency |
 | Routing | go_router + StatefulShellRoute | Persistent tab state per branch |
-| Local DB | Drift + SQLite (Phase 1) | Typed SQL, migrations, offline queries |
-| SRS | FSRS (Phase 1) | Better retention per review than SM-2 |
-| Cloud | Supabase Postgres + Auth + Storage + Edge Functions | Managed Postgres, RLS, cheap start |
-| AI | Supabase Edge Function → provider API | Keys stay server-side |
+| Local DB | Drift + SQLite | Typed SQL, migrations, offline queries |
+| SRS | FSRS | Better retention per review than SM-2 |
+| Cloud | Supabase Postgres + Auth + Storage | Managed Postgres, RLS, cheap start |
 | CI/CD | GitHub Actions | Reproducible APK builds, no local Android SDK required |
 
 ## Navigation
 
-```
+```text
 /onboarding
-└── /home                  (tab 1)
-├── /decks                 (tab 2)
-│   └── /deck/:id
-│       └── /review/:id
-├── /library               (tab 3)
-├── /progress              (tab 4)
-├── /settings
-└── /search
+/login
+/home                      (tab 1)
+/decks                     (tab 2)
+/library                   (tab 3)
+/progress                  (tab 4)
+
+/deck/:id                  root navigator
+/review/:id                root navigator
+/create-card               root navigator
+/edit-card/:id             root navigator
+/search                    root navigator
+/settings                  root navigator
+/developer                 root navigator
+/privacy                   root navigator
+/terms                     root navigator
 ```
 
-The shell uses `StatefulShellRoute.indexedStack`; tabs keep their scroll and
-form state. The centre create button opens a modal sheet, it is not a fifth
-branch. Detail, review, settings, and search are pushed on the root navigator so
-the tab bar disappears during focused tasks.
+The shell uses `StatefulShellRoute.indexedStack`, so each tab keeps its
+scroll position and form state. The centre create button opens a modal
+sheet, it is not a fifth branch. Everything else is pushed on the root
+navigator so the tab bar disappears during a focused task.
 
-## Offline-first data flow
+The legal pages are also reachable from the login and onboarding footers.
+Those two screens cannot use `context.push`: the router redirects anyone who
+is not signed in back to `/login`, which would bounce the user straight back
+where they started. `openLegalPage` pushes a `MaterialPageRoute` instead.
 
+## Data flow
+
+```text
+UI → Riverpod provider → repository → Drift (authoritative for study)
+                                    └→ sync_queue → Supabase (backup + library)
 ```
-UI → Riverpod controller → repository
-                              ├── Drift (local, authoritative for study)
-                              └── Supabase (sync + public library)
+
+Every local write happens first and returns immediately. The repository also
+appends a row to `sync_queue` in the same transaction, so a change can never
+be stored without a matching intent to push it.
+
+`SyncService` runs on app start and whenever the signed-in user changes:
+
+1. **Push.** Drain `sync_queue` in insertion order, grouped by entity and
+   ordered `decks → cards → card_states → review_logs` so a parent always
+   exists before its children.
+2. **Pull.** Fetch the account's rows and apply last-write-wins on
+   `updated_at`, skipping any row that still has a pending queue entry.
+3. **Profile.** Adopt a display name chosen on another device.
+
+A queue row that fails five times is dropped rather than blocking the queue
+forever; its `last_error` is kept for diagnosis.
+
+## Local schema (Drift v5)
+
+```text
+profiles(user_id PK, display_name, updated_at)
+decks(id PK, owner_id, share_code, position, title, description, color_hex,
+      icon, privacy, cover_url, tags, settings, is_starter, source_deck_id,
+      original_deck_id, original_author_name, source_version, forked_at,
+      published_at, created_at, updated_at, deleted_at)
+cards(id PK, deck_id FK→decks CASCADE, type, front, back, notes, hint, tags,
+      media, occlusion, source, ai_generated, favorite, position,
+      created_at, updated_at, deleted_at)
+card_states(card_id PK FK→cards CASCADE, status, due, stability, difficulty,
+            elapsed_days, scheduled_days, learning_steps, reps, lapses,
+            last_review, updated_at)
+review_logs(id PK, card_id FK→cards CASCADE, rating, reviewed_at, elapsed_ms,
+            scheduled_days, stability, difficulty, prev_state, next_state)
+sync_queue(id PK, entity, entity_id, operation, payload, created_at,
+           attempts, last_error)
+sync_meta(key PK, value)
 ```
 
-- A card review writes to Drift first and returns immediately.
-- A sync queue records changed entities (`decks`, `cards`, `card_states`,
-  `review_logs`) with an operation id.
-- The sync worker pushes in order when connectivity returns, then pulls remote
-  changes newer than the last cursor.
-- Conflicts are resolved per entity with `updated_at` plus a device id; review
-  logs are append-only and never conflict.
-- Public library decks are pulled into local storage as immutable snapshots with
-  `source_deck_id` and `source_version`. A subscriber can pull updates or detach.
+Foreign keys are enforced (`PRAGMA foreign_keys = ON` in `beforeOpen`) and
+every child relationship is `ON DELETE CASCADE`.
 
-## Local schema (Phase 1)
+### Migrations
 
+| Version | Change |
+|---|---|
+| 3 | `cards.favorite` |
+| 4 | Flattened `decks`: dropped `parent_id`, `root_id`, `path`, `depth`; added `share_code` |
+| 5 | Added `profiles`; added `decks.original_deck_id` and `decks.original_author_name` |
+
+Version 4 rebuilds the table with `TableMigration`, which copies every column
+that still exists, so existing decks and their cards survive the flattening.
+
+## Deleting a deck
+
+`ContentRepository.deleteDeck` removes the deck, its cards, their
+`card_states`, their `review_logs` and every queued entry that mentions any of
+those ids — in one transaction, in that order. It then queues a single `decks`
+delete.
+
+The queue purge matters: the queue has no foreign key to the deck, so a
+pending `upsert` left behind would push the deck back to the server and it
+would reappear on the next pull. Enqueuing the delete last keeps it from being
+swept away by that purge.
+
+On the server the same delete cascades: `cards.deck_id`, `card_states.card_id`
+and `review_logs.card_id` are all `ON DELETE CASCADE`, so removing the deck row
+takes the rest with it. `decks.original_deck_id` and `decks.source_deck_id`
+are `ON DELETE SET NULL`, because deleting an original must never delete the
+remixes made from it.
+
+## Share codes
+
+Every deck gets a six-character code the moment it is created, before it is
+ever published, so it can be handed to a friend offline.
+
+```text
+alphabet: 23456789ABCDEFGHJKMNPQRSTUVWXYZ   (31 chars, no vowels, no 0/O/1/I/L)
 ```
-subjects(id, name_ar, name_en, color, icon, sort_order)
-decks(id, subject_id, title, description, privacy, settings_json, updated_at, deleted_at)
-cards(id, deck_id, type, front, back, notes, tags, media_json, position, updated_at, deleted_at)
-card_states(card_id, due, stability, difficulty, elapsed_days, scheduled_days,
-            learning_steps, reps, lapses, state, last_review)
-review_logs(id, card_id, rating, reviewed_at, elapsed_ms, prev_state_json, next_state_json)
-sync_queue(id, entity, entity_id, operation, payload_json, created_at, attempts)
-```
+
+Uniqueness is enforced in two places:
+
+- **Locally**, `_freshShareCode` retries until the code is unused by any live
+  deck on the device.
+- **In the cloud**, a `BEFORE INSERT OR UPDATE` trigger regenerates the code if
+  another account already claimed it, backed by a unique index on
+  `upper(share_code)`.
+
+After publishing, the client reads `share_code` back from the server and
+stores whatever the server settled on, so the two can never disagree.
+
+`resolve_share_code(p_code)` is a `security definer` RPC that returns only
+`(id, title, card_count)` and only for `public` or `unlisted` decks. It never
+leaks the owner, the settings, or a private deck.
+
+## Public library and remixes
+
+`public_decks` is a flat view: one row per published deck, joined to
+`profiles` for `author_name` and aggregated against `deck_ratings` for the
+star average. It carries no nesting columns.
+
+Installing a deck deep-copies it: new deck id, new card ids, positions
+renumbered from zero, and scheduling state deliberately left empty so the
+copy starts fresh. Three fields record the lineage:
+
+| Column | Meaning |
+|---|---|
+| `source_deck_id` | The deck this copy was installed from |
+| `original_deck_id` | The first deck in the remix chain |
+| `original_author_name` | Display name of that original author, captured at install time |
+
+`original_deck_id` and `original_author_name` are inherited, not recomputed:
+a remix of a remix still credits the person who wrote the first version. The
+name is copied rather than joined so the credit survives the original being
+unpublished or deleted. The UI shows a **مقتبسة من …** badge on the library
+card and an attribution panel on the deck screen.
+
+## Display name
+
+`profiles.display_name` in Supabase is what the public library shows as the
+author. Google owns that value until the user overrides it.
+
+A rename writes to the local `profiles` table first, then pushes
+`{id, display_name, display_name_custom: true}`. The flag is what makes the
+value authoritative:
+
+- `DisplayNameController` prefers the local name and falls back to the Google
+  name, so every screen shows the same thing.
+- `ProfileRepository.pullFromCloud` only adopts a remote name when
+  `display_name_custom` is true **and** the remote `updated_at` is newer.
+
+The local row is keyed by user id, so a rename survives a sign-out, a
+reinstall, and an offline session.
 
 ## FSRS review engine
-
-The scheduler is seeded in Phase 1 behind a pure Dart interface:
 
 ```dart
 abstract interface class Scheduler {
@@ -84,66 +205,43 @@ abstract interface class Scheduler {
 }
 ```
 
-Rules:
-
 - Ratings: `1 again`, `2 hard`, `3 good`, `4 easy`.
 - Desired retention default: 90%.
-- New cards are introduced up to a daily limit (default 10).
+- New cards are introduced up to a daily limit (default 10, adjustable in
+  Settings from 0 to 200 in steps of 5).
+- Reviews per session default to 200, adjustable from 20 to 1000.
 - Review logs are immutable; state is derived and can be rebuilt.
-- A leech is a card with 8+ lapses; it is surfaced for rewriting.
-- Timezone is applied at the session level, not stored per card.
+- A leech is a card with 4+ lapses; it is surfaced for rewriting.
 
 ## Cloud schema
 
-The initial migration creates:
+Migrations live in `supabase/migrations/` and are applied in filename order:
 
-- `profiles`, `user_settings` (auto-created on signup)
-- `subjects` with the exact five subjects
-- `decks`, `cards`, `card_states`, `review_logs`
-- `ai_jobs`
-- `deck_ratings`, `deck_reports`, `deck_subscriptions`
-- `public_decks` view with author, rating, and card count
+| File | Scope |
+|---|---|
+| `20261025000100_initial_schema.sql` | Profiles, subjects, decks, cards, states, logs, ratings, reports |
+| `20261025000200_hardening.sql` | RLS, indexes, trigger functions |
+| `20261025000300_phase1_nested_content.sql` | Legacy nesting columns, unused by the client |
+| `20261027000100_library_usage_and_ratings.sql` | Install counts and star ratings |
+| `20261027000100_phase_c_depth_limit.sql` | Legacy depth constraint |
+| `20261027000300_card_media_storage.sql` | Storage bucket for card media |
+| `20261027000400_deck_share_codes.sql` | `share_code`, generator, uniqueness trigger, `resolve_share_code` |
+| `20261027000500_profile_and_attribution.sql` | Attribution columns, profile insert policy, flat `public_decks` |
 
-All user tables have RLS. Public read is limited to `decks.privacy = 'public'`
-(or `unlisted` by direct link). Cards inherit the visibility of their deck.
-
-## AI pipeline
-
-1. Client uploads a source (PDF/image/text) to a private Storage bucket.
-2. Client inserts an `ai_jobs` row (status `queued`).
-3. An Edge Function claims the job, extracts text, calls the provider with a
-   strict JSON schema, validates the cards, and writes a draft deck.
-4. Client subscribes to the job row; the user reviews generated cards before
-   saving.
-5. Provider keys live only in Edge Function secrets.
-
-The AI never writes directly to a user's study deck without confirmation.
+Every user table has RLS. The client only ever ships the publishable key.
 
 ## Security checklist
 
 - [x] RLS on every user table.
-- [x] No service role key in the client.
-- [x] Publishable key alone is shipped (safe by design).
-- [x] Public library requires explicit `privacy = 'public'`.
-- [ ] Storage bucket policies (Phase 2).
-- [ ] Rate limiting on AI jobs and auth (Phase 2).
+- [x] No `service_role` key in the client.
+- [x] Public read limited to `privacy = 'public'`.
+- [x] Share-code resolution exposed as a narrow `security definer` RPC.
+- [x] Profiles can only be written by their owner.
 - [x] Release signing with `bitaqati.p12`; passwords live in GitHub Secrets.
-- [ ] Remove the committed keystore from the repository and rotate it (with a
-  new Google Cloud SHA-1) before a public release.
+- [ ] Rotate the committed keystore and register the new SHA-1 before a public release.
 
 ## Deployment
 
 - Android package: `com.bitaqati.app`.
 - Supabase project ref: `mftghnvtdryxzochquee` (region `eu-central-1`).
-- APK artifacts are produced by GitHub Actions and signed with `bitaqati.p12`;
-  see `docs/CONFIGURATION.md` for the Google/Supabase client setup.
-
-## Roadmap
-
-| Phase | Scope |
-|---|---|
-| 0 | Foundation, navigation, design system, cloud schema, APK pipeline |
-| 1 | Drift, FSRS, deck/card editor, import, stats, notifications |
-| 2 | Auth, sync, public library, deck copy/update, storage |
-| 3 | AI import pipeline, review queue, moderation |
-| 4 | iOS, web, localization, subscription, analytics |
+- APKs are built and signed by GitHub Actions; see `docs/CONFIGURATION.md`.

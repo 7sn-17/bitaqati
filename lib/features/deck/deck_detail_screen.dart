@@ -1017,6 +1017,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           onCopyCode: () => _copyCode(context, deck),
         ),
       ),
+      if (deck.isRemix) ...<Widget>[
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _AttributionCard(deck: deck),
+        ),
+      ],
       if (deck.sourceDeckId != null) ...<Widget>[
         const SizedBox(height: 14),
         Padding(
@@ -2460,6 +2467,56 @@ class _MissingDeck extends StatelessWidget {
                   ),
                 ),
         ),
+      ),
+    );
+  }
+}
+
+/// Credits the author of the deck this one was copied from.
+///
+/// Attribution is written onto the row when the copy is installed, so the
+/// credit survives the original being unpublished or deleted.
+class _AttributionCard extends StatelessWidget {
+  const _AttributionCard({required this.deck});
+
+  final DeckNode deck;
+
+  @override
+  Widget build(BuildContext context) {
+    final String author = (deck.originalAuthorName ?? '').trim();
+    final Color tint = context.isDark ? AppColors.darkAccent : AppColors.blue;
+    final String title = author.isEmpty
+        ? 'مجموعة مقتبسة'
+        : 'مقتبسة من ' + author;
+    return SurfaceCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: tint.withValues(alpha: context.isDark ? 0.22 : 0.1),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            alignment: Alignment.center,
+            child: Icon(CupertinoIcons.doc_on_doc, size: 17, color: tint),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(title, style: context.texts.titleSmall),
+                const SizedBox(height: 3),
+                Text(
+                  'هذه نسخة معدّلة من عمل أصلي، ويُحفظ اسم مؤلفها الأصلي تقديراً لجهده.',
+                  style: context.texts.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

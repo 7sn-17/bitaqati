@@ -9,7 +9,15 @@ part 'app_database.g.dart';
 /// Offline-first store. This is the authoritative copy for studying; Supabase
 /// is only a sync target and the public library.
 @DriftDatabase(
-  tables: <Type>[Decks, Cards, CardStates, ReviewLogs, SyncQueue, SyncMeta],
+  tables: <Type>[
+    Profiles,
+    Decks,
+    Cards,
+    CardStates,
+    ReviewLogs,
+    SyncQueue,
+    SyncMeta,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   /// Pass an in-memory executor in tests; production uses the default file.
@@ -17,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'bitaqati'));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -37,6 +45,13 @@ class AppDatabase extends _$AppDatabase {
           // and their cards intact.
           // ignore: experimental_member_use
           await migrator.alterTable(TableMigration(decks));
+        }
+        if (from < 5) {
+          // Attribution for remixes, plus the local profile row that stores
+          // the display name the user picked in Settings.
+          await migrator.createTable(profiles);
+          await migrator.addColumn(decks, decks.originalDeckId);
+          await migrator.addColumn(decks, decks.originalAuthorName);
         }
       },
       beforeOpen: (OpeningDetails details) async {

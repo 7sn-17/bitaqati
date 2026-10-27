@@ -168,6 +168,8 @@ class DeckNode {
     this.isPublic = false,
     this.publishedAt,
     this.sourceDeckId,
+    this.originalDeckId,
+    this.originalAuthorName,
     this.shareCode,
     this.cardCount = 0,
     this.masteredCount = 0,
@@ -193,6 +195,12 @@ class DeckNode {
   final bool isPublic;
   final DateTime? publishedAt;
   final String? sourceDeckId;
+
+  /// First deck in the remix chain. Null when this deck is not a remix.
+  final String? originalDeckId;
+
+  /// Author of the original deck, captured when this copy was installed.
+  final String? originalAuthorName;
 
   /// Six-character code used to share and find the deck in the library.
   final String? shareCode;
@@ -220,6 +228,9 @@ class DeckNode {
 
   /// A deck that came from the public library or a share link.
   bool get isPreview => author != null;
+
+  /// True when this deck was installed from someone else's work.
+  bool get isRemix => (originalAuthorName ?? '').isNotEmpty;
 
   bool get isUnlisted => privacy == DeckPrivacy.unlisted;
 
@@ -282,6 +293,8 @@ class DeckNode {
       isPublic: isPublic ?? this.isPublic,
       publishedAt: publishedAt,
       sourceDeckId: sourceDeckId,
+      originalDeckId: originalDeckId,
+      originalAuthorName: originalAuthorName,
       shareCode: shareCode ?? this.shareCode,
       position: position ?? this.position,
       cardCount: cardCount ?? this.cardCount,
@@ -376,6 +389,8 @@ class DeckBundleNode {
     this.settings = const <String, Object?>{},
     this.coverUrl,
     this.sourceDeckId,
+    this.originalDeckId,
+    this.originalAuthorName,
     this.sourceVersion = 1,
     this.publishedAt,
     this.createdAt,
@@ -392,6 +407,8 @@ class DeckBundleNode {
   final Map<String, Object?> settings;
   final String? coverUrl;
   final String? sourceDeckId;
+  final String? originalDeckId;
+  final String? originalAuthorName;
   final int sourceVersion;
   final DateTime? publishedAt;
   final DateTime? createdAt;

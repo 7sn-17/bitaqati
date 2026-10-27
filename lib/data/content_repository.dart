@@ -90,6 +90,8 @@ ORDER BY d.position, d.created_at
           isPublic: deck.privacy == DeckPrivacy.public,
           publishedAt: deck.publishedAt,
           sourceDeckId: deck.sourceDeckId,
+          originalDeckId: deck.originalDeckId,
+          originalAuthorName: deck.originalAuthorName,
           shareCode: deck.shareCode,
           cardCount: row.read<int>('card_total'),
           masteredCount: row.read<int>('mastered'),
@@ -114,6 +116,8 @@ ORDER BY d.position, d.created_at
     String colorHex = kDefaultDeckColorHex,
     String icon = 'layers',
     List<String> tags = const <String>[],
+    String? originalDeckId,
+    String? originalAuthorName,
   }) {
     final String cleanTitle = title.trim();
     if (cleanTitle.isEmpty || cleanTitle.length > 160) {
@@ -141,6 +145,8 @@ ORDER BY d.position, d.created_at
               colorHex: Value(colorHex),
               icon: Value(icon),
               tags: Value(_cleanTags(tags)),
+              originalDeckId: Value<String?>(originalDeckId),
+              originalAuthorName: Value<String?>(originalAuthorName),
             ),
           );
       await _enqueue('decks', id, SyncOperation.upsert);
@@ -256,10 +262,19 @@ ORDER BY d.position, d.created_at
     });
   }
 
-  /// Soft-deletes a deck and every card inside it.
+  /// Deletes a deck and everything that hangs off it.
+  ///
+  /// Nothing is left behind: the deck row, its cards, their scheduling state,
+  /// their review history and any queued work for them all go in one
+  /// transaction. The child tables are cleared explicitly rather than left to
+  /// SQLite's cascades, because the queue has no foreign key to the deck and a
+  /// pending upsert would otherwise recreate the rows we just removed.
+  ///
+  /// The cloud copy is removed by the sync queue. Postgres has a real
+  /// `ON DELETE CASCADE` on the same relationships, so deleting the deck row
+  /// there takes the cards, states and logs with it.
   Future<void> deleteDeck(String deckId) {
     return _db.transaction(() async {
-      final DateTime now = _clock();
       final DeckRow? deck =
           await (_db.select(_db.decks)
                 ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
@@ -267,29 +282,47 @@ ORDER BY d.position, d.created_at
       if (deck == null) {
         throw StateError('Deck $deckId does not exist');
       }
-      final List<CardRow> cards = await (_db.select(_db.cards)
-            ..where((c) => c.deckId.equals(deckId) & c.deletedAt.isNull()))
-          .get();
-      await (_db.update(_db.cards)..where(
-            (c) => c.deckId.equals(deckId) & c.deletedAt.isNull(),
-          ))
-          .write(
-            CardsCompanion(
-              deletedAt: Value<DateTime>(now),
-              updatedAt: Value<DateTime>(now),
-            ),
-          );
-      await (_db.update(_db.decks)..where((d) => d.id.equals(deckId))).write(
-        DecksCompanion(
-          deletedAt: Value<DateTime>(now),
-          updatedAt: Value<DateTime>(now),
-        ),
-      );
-      for (final CardRow card in cards) {
-        await _enqueue('cards', card.id, SyncOperation.delete);
+      final List<String> cardIds = <String>[
+        for (final CardRow card
+            in await (_db.select(_db.cards)
+                  ..where((c) => c.deckId.equals(deckId)))
+                .get())
+          card.id,
+      ];
+
+      for (final List<String> chunk in _chunks(cardIds)) {
+        await (_db.delete(_db.cardStates)
+              ..where((s) => s.cardId.isIn(chunk)))
+            .go();
+        await (_db.delete(_db.reviewLogs)
+              ..where((r) => r.cardId.isIn(chunk)))
+            .go();
+        // Drop queued upserts first so a pending push cannot recreate the
+        // rows we are about to delete.
+        await (_db.delete(_db.syncQueue)
+              ..where((q) => q.entityId.isIn(chunk)))
+            .go();
       }
+
+      await (_db.delete(_db.cards)..where((c) => c.deckId.equals(deckId))).go();
+      await (_db.delete(_db.decks)..where((d) => d.id.equals(deckId))).go();
+      await (_db.delete(_db.syncQueue)
+            ..where((q) => q.entityId.equals(deckId)))
+          .go();
+
+      // Enqueued last, so purging the queue above cannot take it with it.
       await _enqueue('decks', deckId, SyncOperation.delete);
     });
+  }
+
+  /// Splits ids so a delete never exceeds SQLite's bound-variable limit,
+  /// which a deck with a few thousand cards would otherwise hit.
+  static Iterable<List<String>> _chunks(List<String> ids) sync* {
+    const int limit = 400;
+    for (int start = 0; start < ids.length; start += limit) {
+      final int end = start + limit;
+      yield ids.sublist(start, end > ids.length ? ids.length : end);
+    }
   }
 
   /// The stored privacy of one deck, or null when it no longer exists.
@@ -354,6 +387,8 @@ ORDER BY d.position, d.created_at
         settings: deck.settings,
         coverUrl: deck.coverUrl,
         sourceDeckId: deck.sourceDeckId,
+        originalDeckId: deck.originalDeckId,
+        originalAuthorName: deck.originalAuthorName,
         sourceVersion: deck.sourceVersion,
         publishedAt: deck.publishedAt,
         createdAt: deck.createdAt,
@@ -410,6 +445,14 @@ ORDER BY d.position, d.created_at
               tags: Value<List<String>>(source.tags),
               settings: Value<Map<String, Object?>>(source.settings),
               sourceDeckId: Value<String?>(bundle.deck.id),
+              // The chain keeps pointing at the first deck ever published, so
+              // a remix of a remix still credits the person who wrote it.
+              originalDeckId: Value<String?>(
+                bundle.deck.originalDeckId ?? bundle.deck.id,
+              ),
+              originalAuthorName: Value<String?>(
+                bundle.deck.originalAuthorName ?? bundle.deck.author,
+              ),
               sourceVersion: Value<int>(source.sourceVersion),
               forkedAt: Value<DateTime>(now),
             ),
@@ -1129,6 +1172,8 @@ ORDER BY d.position, d.created_at
       isPublic: row.privacy == DeckPrivacy.public,
       publishedAt: row.publishedAt,
       sourceDeckId: row.sourceDeckId,
+      originalDeckId: row.originalDeckId,
+      originalAuthorName: row.originalAuthorName,
       shareCode: row.shareCode,
       cardCount: cardCount,
     );

@@ -1,4 +1,8 @@
-# Phase 0 — Completion Record
+# Phase 0 — foundation record
+
+This file records the state of the project at the end of Phase 0. It is kept
+for history; the app has moved well past it. For how the app works today, read
+`docs/ARCHITECTURE.md`.
 
 ## Delivered
 
@@ -8,24 +12,24 @@
 - First installable APK: <https://github.com/7sn-17/bitaqati/releases/tag/v0.1.0-phase0>.
 - CI: `Build Android APK` on every push to `main`; `Release APK` on `v*` tags.
 
-## App surface in this phase
+## App surface at the time
 
-| Screen | Status |
+| Screen | Status then |
 |---|---|
-| Onboarding (3 pages) | Complete |
-| Home | Complete with daily review hero, subject filters, deck list |
-| Decks | Complete with search and filters |
-| Deck detail | Complete with cards, stats placeholder, settings placeholder |
-| Review | Complete demo flow, reveal, ratings, session summary |
-| Library | Complete public-library shell, subject tiles, add-copy action |
-| Progress | Complete with retention, heatmap, forecast, subject bars |
-| Settings | Complete with light/dark mode, notification toggle, sections |
-| Search | Complete across decks and cards |
-| Create sheet | Complete UI; actions intentionally show "next phase" |
+| Onboarding | Three pages, complete |
+| Home | Daily review hero, filters, deck list |
+| Decks | Search and filters |
+| Deck detail | Cards, stats placeholder |
+| Review | Demo flow: reveal, ratings, summary |
+| Library | Public-library shell |
+| Progress | Retention, heatmap, forecast |
+| Settings | Theme, notification toggle |
+| Search | Decks and cards |
+| Create sheet | UI only; actions were placeholders |
 
-## Database
+## Database then
 
-Applied migrations:
+Migrations applied at the end of Phase 0:
 
 1. `20261025000100_initial_schema.sql`
 2. `20261025000200_hardening.sql`
@@ -34,34 +38,59 @@ Tables: `profiles`, `user_settings`, `subjects`, `decks`, `cards`,
 `card_states`, `review_logs`, `ai_jobs`, `deck_ratings`, `deck_reports`,
 `deck_subscriptions`. View: `public_decks`.
 
-The five subjects are seeded with the exact approved Arabic names. All security
-advisors are clean; only unused-index notices remain because the tables are
-empty.
+The schema at that point still modelled decks as a tree with a hardcoded
+subject list. Both are gone now; see below.
 
 ## Verification
 
-- `flutter analyze` passes on Flutter `3.47.8`.
-- `flutter build apk --release` passes in GitHub Actions.
+- `flutter analyze` passed on Flutter `3.47.8`.
+- `flutter build apk --release` passed in GitHub Actions.
 - Security advisor: 0 findings.
-- Performance advisor: unused indexes only (expected at zero traffic).
 
-## What is deliberately not in Phase 0
+## What was deliberately missing
 
-- Drift/SQLite local database and FSRS scheduler.
-- Deck/card editor and import pipeline.
-- Supabase Auth, sync, and storage.
+- Drift/SQLite local database and the FSRS scheduler.
+- Deck and card editors, import pipeline.
+- Supabase Auth, sync, storage.
 - AI generation.
-- Real starter card content beyond demo cards.
-- Release keystore (added after Phase 0; CI now signs with `bitaqati.p12`).
+- Real starter content beyond demo cards.
 
-## Next phase (Phase 1)
+## What has shipped since
 
-1. Add Drift schema and migrations.
-2. Port the FSRS scheduler with unit tests.
-3. Wire review sessions to local storage and real due counts.
-4. Build deck/card editor and text import.
-5. Add notification scheduling.
-6. Replace demo data with the professional starter decks.
+### Content model
 
-Phase 2 then adds Auth, sync, public library persistence, and storage. Phase 3
-adds the AI job pipeline.
+Decks were flattened. There are no sub-decks, no root deck, no `path` or
+`depth`: a deck owns its cards directly, and `decks.share_code` replaced the
+whole nesting apparatus. The five hardcoded subjects were replaced by
+free-form tags.
+
+### Study engine
+
+Drift (schema version 5) is the authoritative store, FSRS schedules every
+card, review logs are immutable, and the daily new/review limits are
+adjustable in Settings.
+
+### Accounts and sync
+
+Google sign-in through Supabase Auth, guest mode for browsing without an
+account, and a two-way `SyncService` that drains a local queue and then pulls
+remote changes with last-write-wins conflict resolution.
+
+### Community
+
+A public library with install counts and star ratings, six-character share
+codes, deep links, and permanent attribution for remixes.
+
+### Profile and legal
+
+An editable display name that overrides the Google name everywhere and
+survives a reinstall, a privacy policy and terms of service inside the app,
+and a developer contact screen.
+
+## Where to read next
+
+| Question | File |
+|---|---|
+| How is the code organised? | `docs/ARCHITECTURE.md` |
+| How do I build and configure it? | `docs/CONFIGURATION.md` |
+| How does sharing work? | `docs/DEEP_LINKS.md` |

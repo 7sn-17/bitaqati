@@ -8,6 +8,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/legal_footer.dart';
+import '../legal/privacy_policy_screen.dart';
+import '../legal/terms_of_service_screen.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -162,10 +165,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   .fadeIn(duration: const Duration(milliseconds: 320))
                   .slideY(begin: 0.35, end: 0, curve: Curves.easeOutCubic),
               const SizedBox(height: 8),
-              Text(
-                'بالمتابعة أنت توافق على سياسة الخصوصية وشروط الاستخدام',
-                textAlign: TextAlign.center,
-                style: context.texts.bodySmall?.copyWith(fontSize: 10.5),
+              LegalFooterLinks(
+                onPrivacy: () =>
+                    openLegalPage(context, const PrivacyPolicyScreen()),
+                onTerms: () =>
+                    openLegalPage(context, const TermsOfServiceScreen()),
               ),
             ],
           ),

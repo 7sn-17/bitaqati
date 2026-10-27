@@ -42,6 +42,7 @@ class LibraryRepository {
           .from('public_decks')
           .select(
             'id,title,description,color_hex,icon,tags,settings,author_name,'
+            'original_deck_id,original_author_name,'
             'rating,rating_count,card_count,published_at,source_deck_id,'
             'install_count,created_at',
           )
@@ -140,6 +141,8 @@ class LibraryRepository {
           settings: _map(deckRow['settings']) ?? const <String, Object?>{},
           coverUrl: _string(deckRow['cover_url']),
           sourceDeckId: _string(deckRow['source_deck_id']),
+          originalDeckId: _string(deckRow['original_deck_id']),
+          originalAuthorName: _string(deckRow['original_author_name']),
           sourceVersion: _int(deckRow['source_version'], fallback: 1),
           publishedAt: _date(deckRow['published_at']),
           createdAt: _date(deckRow['created_at']),
@@ -183,7 +186,7 @@ class LibraryRepository {
         .select(
           'id,owner_id,position,title,description,color_hex,icon,cover_url,'
           'tags,settings,privacy,source_deck_id,source_version,published_at,'
-          'created_at,updated_at',
+          'original_deck_id,original_author_name,created_at,updated_at',
         )
         .eq('id', deckId)
         .isFilter('deleted_at', null)
@@ -250,6 +253,8 @@ class LibraryRepository {
       isPublic: privacy == DeckPrivacy.public,
       publishedAt: _date(row['published_at']),
       sourceDeckId: _string(row['source_deck_id']),
+      originalDeckId: _string(row['original_deck_id']),
+      originalAuthorName: _string(row['original_author_name']),
       cardCount: countRows.length,
       author: author,
       rating: averageRating,
@@ -271,6 +276,8 @@ class LibraryRepository {
       isPublic: true,
       publishedAt: _date(row['published_at']),
       sourceDeckId: _string(row['source_deck_id']),
+      originalDeckId: _string(row['original_deck_id']),
+      originalAuthorName: _string(row['original_author_name']),
       cardCount: cardCount,
       author: _string(row['author_name']),
       rating: rating > 0 ? rating : null,

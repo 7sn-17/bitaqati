@@ -53,6 +53,25 @@ CardStatus cardStatusFromCloud(String value) {
   }
 }
 
+/// The signed-in user's profile, as this device knows it.
+///
+/// The display name lives here so a name chosen in Settings survives a
+/// sign-out, a reinstall, and a device that is offline. Supabase keeps the
+/// authoritative copy for the public library.
+@DataClassName('ProfileRow')
+class Profiles extends Table {
+  TextColumn get userId => text()();
+
+  /// Empty until the user picks a name; the UI then falls back to the name
+  /// Google returned.
+  TextColumn get displayName => text().withDefault(const Constant(''))();
+
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userId};
+}
+
 /// A deck. Decks are a flat list: each one owns its cards directly.
 ///
 /// Ids are client-generated UUID strings so rows can be created offline and
@@ -96,6 +115,13 @@ class Decks extends Table {
 
   /// Set when this deck is a copy of a public deck.
   TextColumn get sourceDeckId => text().nullable()();
+
+  /// First deck in the remix chain. Null when this deck is not a remix.
+  TextColumn get originalDeckId => text().nullable()();
+
+  /// Display name of the original author, captured when the deck was
+  /// installed so the credit survives the original being deleted.
+  TextColumn get originalAuthorName => text().nullable()();
 
   IntColumn get sourceVersion => integer().withDefault(const Constant(1))();
 

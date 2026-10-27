@@ -8,7 +8,10 @@ import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
+import '../../core/widgets/legal_footer.dart';
 import '../../data/auth_service.dart';
+import '../legal/privacy_policy_screen.dart';
+import '../legal/terms_of_service_screen.dart';
 
 /// Entry screen shown after onboarding: native Google sign-in or guest mode.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -227,10 +230,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
-                'بالمتابعة أنت توافق على سياسة الخصوصية وشروط الاستخدام',
-                textAlign: TextAlign.center,
-                style: context.texts.bodySmall?.copyWith(fontSize: 10.5),
+              LegalFooterLinks(
+                onPrivacy: () =>
+                    openLegalPage(context, const PrivacyPolicyScreen()),
+                onTerms: () =>
+                    openLegalPage(context, const TermsOfServiceScreen()),
               ),
     ];
   }
