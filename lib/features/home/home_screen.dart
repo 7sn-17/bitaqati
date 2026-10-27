@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -210,14 +211,13 @@ class _HeaderAvatar extends StatelessWidget {
     if (url == null) {
       return label;
     }
-    return Image.network(
-      url!,
+    return CachedNetworkImage(
+      imageUrl: url!,
       width: 46,
       height: 46,
       fit: BoxFit.cover,
-      errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
-        return label;
-      },
+      fadeInDuration: const Duration(milliseconds: 200),
+      errorWidget: (BuildContext context, String url, Object error) => label,
     );
   }
 }

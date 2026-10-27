@@ -1,0 +1,1080 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/card_markup.dart';
+import '../../core/widgets/confetti_burst.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
+
+/// Multiple-choice test built from a deck.
+///
+/// The screen is deliberately self-contained: it reads the deck once, freezes
+/// the question list, and then never touches the database again. That keeps the
+/// session fast and makes "أعد الاختبار" a pure in-memory rebuild.
+class TestModeScreen extends ConsumerWidget {
+  const TestModeScreen({required this.deckId, super.key});
+
+  final String deckId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final DeckNode? deck = ref.watch(deckByIdProvider(deckId));
+    final List<ReviewCard>? cards = ref
+        .watch(deckCardsProvider(deckId))
+        .valueOrNull;
+    if (cards == null) {
+      return const Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+    final List<ReviewCard> usable = <ReviewCard>[
+      for (final ReviewCard card in cards)
+        if (plainMarkup(card.back).trim().isNotEmpty) card,
+    ];
+    if (usable.length < 2) {
+      return _NotEnough(deckTitle: deck?.title ?? '');
+    }
+    return _TestSession(deckTitle: deck?.title ?? 'اختبار', cards: usable);
+  }
+}
+
+class _Question {
+  const _Question({
+    required this.card,
+    required this.options,
+    required this.correct,
+  });
+
+  final ReviewCard card;
+  final List<String> options;
+  final int correct;
+}
+
+List<_Question> _buildQuestions(List<ReviewCard> cards) {
+  final math.Random random = math.Random();
+  final List<ReviewCard> pool = List<ReviewCard>.of(cards)..shuffle(random);
+  final List<String> answers = <String>{
+    for (final ReviewCard card in pool) plainMarkup(card.back).trim(),
+  }.toList();
+  final int count = math.min(10, pool.length);
+  final List<_Question> questions = <_Question>[];
+  for (int index = 0; index < count; index++) {
+    final ReviewCard card = pool[index];
+    final String answer = plainMarkup(card.back).trim();
+    final List<String> others = <String>[
+      for (final String candidate in answers)
+        if (candidate != answer) candidate,
+    ]..shuffle(random);
+    final List<String> options = <String>[answer, ...others.take(3)]
+      ..shuffle(random);
+    questions.add(
+      _Question(card: card, options: options, correct: options.indexOf(answer)),
+    );
+  }
+  return questions;
+}
+
+class _TestSession extends StatefulWidget {
+  const _TestSession({required this.deckTitle, required this.cards});
+
+  final String deckTitle;
+  final List<ReviewCard> cards;
+
+  @override
+  State<_TestSession> createState() => _TestSessionState();
+}
+
+class _TestSessionState extends State<_TestSession> {
+  late List<_Question> _questions = _buildQuestions(widget.cards);
+  Timer? _advance;
+  int _index = 0;
+  int _correct = 0;
+  int? _picked;
+  bool _finished = false;
+
+  @override
+  void dispose() {
+    _advance?.cancel();
+    super.dispose();
+  }
+
+  bool get _answered => _picked != null;
+
+  void _choose(int option) {
+    if (_answered) {
+      return;
+    }
+    final _Question question = _questions[_index];
+    final bool right = option == question.correct;
+    setState(() {
+      _picked = option;
+      if (right) {
+        _correct++;
+      }
+    });
+    if (right) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.heavyImpact();
+    }
+    _advance = Timer(const Duration(milliseconds: 980), _next);
+  }
+
+  void _next() {
+    if (!mounted) {
+      return;
+    }
+    if (_index + 1 >= _questions.length) {
+      setState(() => _finished = true);
+      return;
+    }
+    setState(() {
+      _index++;
+      _picked = null;
+    });
+  }
+
+  void _restart() {
+    _advance?.cancel();
+    setState(() {
+      _questions = _buildQuestions(widget.cards);
+      _index = 0;
+      _correct = 0;
+      _picked = null;
+      _finished = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double progress = _finished
+        ? 1
+        : (_index + (_answered ? 1 : 0)) / _questions.length;
+
+    return Scaffold(
+      backgroundColor: (context.isDark
+          ? AppColors.darkCanvas
+          : AppColors.canvas),
+      body: SafeArea(
+        bottom: false,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 420),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: _finished
+              ? _ResultView(
+                  key: const ValueKey<String>('result'),
+                  deckTitle: widget.deckTitle,
+                  correct: _correct,
+                  total: _questions.length,
+                  onRetry: _restart,
+                  onClose: () => Navigator.of(context).maybePop(),
+                )
+              : Column(
+                  key: const ValueKey<String>('session'),
+                  children: <Widget>[
+                    _SessionBar(
+                      progress: progress,
+                      index: _index,
+                      total: _questions.length,
+                      correct: _correct,
+                      onClose: () => Navigator.of(context).maybePop(),
+                    ),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 380),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder:
+                            (Widget child, Animation<double> animation) {
+                              final Animation<Offset> slide =
+                                  Tween<Offset>(
+                                    begin: const Offset(-0.08, 0),
+                                    end: Offset.zero,
+                                  ).animate(
+                                    CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeOutCubic,
+                                    ),
+                                  );
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: slide,
+                                  child: child,
+                                ),
+                              );
+                            },
+                        child: _QuestionView(
+                          key: ValueKey<int>(_index),
+                          question: _questions[_index],
+                          deckTitle: widget.deckTitle,
+                          position: _index + 1,
+                          total: _questions.length,
+                          picked: _picked,
+                          onPick: _choose,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SessionBar extends StatelessWidget {
+  const _SessionBar({
+    required this.progress,
+    required this.index,
+    required this.total,
+    required this.correct,
+    required this.onClose,
+  });
+
+  final double progress;
+  final int index;
+  final int total;
+  final int correct;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              _RoundIcon(
+                icon: CupertinoIcons.xmark,
+                label: 'إغلاق',
+                onTap: onClose,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'سؤال ${index + 1} من $total',
+                      style: TextStyle(
+                        color: context.ink,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'اختر الإجابة الصحيحة',
+                      style: TextStyle(
+                        color: context.muted,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accentSoft,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const Icon(
+                      CupertinoIcons.checkmark_seal_fill,
+                      size: 13,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$correct',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 7,
+              child: Stack(
+                children: <Widget>[
+                  Positioned.fill(
+                    child: Container(color: context.raisedSurface),
+                  ),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0, end: progress),
+                    duration: const Duration(milliseconds: 520),
+                    curve: Curves.easeOutCubic,
+                    builder: (BuildContext context, double value, Widget? _) {
+                      return FractionallySizedBox(
+                        alignment: AlignmentDirectional.centerStart,
+                        widthFactor: value.clamp(0.0, 1.0),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: <Color>[
+                                AppColors.accent,
+                                Color(0xFF63C13A),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionView extends StatelessWidget {
+  const _QuestionView({
+    required this.question,
+    required this.deckTitle,
+    required this.position,
+    required this.total,
+    required this.picked,
+    required this.onPick,
+    super.key,
+  });
+
+  final _Question question;
+  final String deckTitle;
+  final int position;
+  final int total;
+  final int? picked;
+  final ValueChanged<int> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    const List<String> letters = <String>['أ', 'ب', 'ج', 'د'];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: <Widget>[
+        Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: context.isDark
+                      ? <Color>[
+                          AppColors.darkSurfaceHigh,
+                          AppColors.darkSurface,
+                        ]
+                      : <Color>[Colors.white, const Color(0xFFF3F7EE)],
+                ),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: context.hairline),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: context.isDark ? 0.35 : 0.05,
+                    ),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Row(
+                    children: <Widget>[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentSoft,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                        child: Text(
+                          deckTitle,
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$position / $total',
+                        style: TextStyle(
+                          color: context.muted,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  if (question.card.type == 'occlusion')
+                    OcclusionView(
+                      imageUrl: occlusionImageUrl(question.card.front),
+                      boxes: occlusionBoxes(question.card.occlusion),
+                      masked: true,
+                      height: 190,
+                    )
+                  else
+                    CardMarkup(
+                      text: question.card.front,
+                      revealCloze: false,
+                      mediaFirst: true,
+                      style: TextStyle(
+                        fontFamily: 'ReadexPro',
+                        fontSize: 21,
+                        height: 1.55,
+                        fontWeight: FontWeight.w700,
+                        color: context.ink,
+                      ),
+                      mediaHeight: 170,
+                    ),
+                ],
+              ),
+            )
+            .animate()
+            .fadeIn(duration: 300.ms)
+            .slideY(
+              begin: 0.06,
+              end: 0,
+              duration: 380.ms,
+              curve: Curves.easeOutCubic,
+            ),
+        const SizedBox(height: 18),
+        for (int index = 0; index < question.options.length; index++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _OptionTile(
+              letter: letters[index % letters.length],
+              label: question.options[index],
+              state: _stateFor(index),
+              delay: 90 + index * 60,
+              onTap: () => onPick(index),
+            ),
+          ),
+      ],
+    );
+  }
+
+  _OptionState _stateFor(int index) {
+    final int? chosen = picked;
+    if (chosen == null) {
+      return _OptionState.idle;
+    }
+    if (index == question.correct) {
+      return _OptionState.correct;
+    }
+    if (index == chosen) {
+      return _OptionState.wrong;
+    }
+    return _OptionState.muted;
+  }
+}
+
+enum _OptionState { idle, correct, wrong, muted }
+
+class _OptionTile extends StatefulWidget {
+  const _OptionTile({
+    required this.letter,
+    required this.label,
+    required this.state,
+    required this.delay,
+    required this.onTap,
+  });
+
+  final String letter;
+  final String label;
+  final _OptionState state;
+  final int delay;
+  final VoidCallback onTap;
+
+  @override
+  State<_OptionTile> createState() => _OptionTileState();
+}
+
+class _OptionTileState extends State<_OptionTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shake = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+
+  @override
+  void didUpdateWidget(_OptionTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state == _OptionState.wrong &&
+        oldWidget.state != _OptionState.wrong) {
+      _shake.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _shake.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final _OptionState state = widget.state;
+    final bool correct = state == _OptionState.correct;
+    final bool wrong = state == _OptionState.wrong;
+    final bool muted = state == _OptionState.muted;
+
+    final Color border = correct
+        ? AppColors.accent
+        : wrong
+        ? AppColors.danger
+        : context.hairline;
+    final Color fill = correct
+        ? AppColors.accentSoft
+        : wrong
+        ? AppColors.danger.withValues(alpha: 0.09)
+        : context.cardSurface;
+
+    return AnimatedBuilder(
+          animation: _shake,
+          builder: (BuildContext context, Widget? child) {
+            final double offset =
+                math.sin(_shake.value * math.pi * 5) * (1 - _shake.value) * 9;
+            return Transform.translate(offset: Offset(offset, 0), child: child);
+          },
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: muted ? 0.45 : 1,
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: border,
+                    width: correct || wrong ? 1.8 : 1,
+                  ),
+                  boxShadow: correct || wrong
+                      ? <BoxShadow>[
+                          BoxShadow(
+                            color:
+                                (correct ? AppColors.accent : AppColors.danger)
+                                    .withValues(alpha: 0.35),
+                            blurRadius: 20,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 6),
+                          ),
+                        ]
+                      : <BoxShadow>[
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: context.isDark ? 0.3 : 0.04,
+                            ),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                ),
+                child: Row(
+                  children: <Widget>[
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 240),
+                      width: 30,
+                      height: 30,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: correct
+                            ? AppColors.accent
+                            : wrong
+                            ? AppColors.danger
+                            : context.raisedSurface,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        widget.letter,
+                        style: TextStyle(
+                          color: correct
+                              ? AppColors.primary
+                              : wrong
+                              ? Colors.white
+                              : context.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        style: TextStyle(
+                          color: correct
+                              ? AppColors.primary
+                              : wrong
+                              ? AppColors.danger
+                              : context.ink,
+                          fontSize: 13.5,
+                          height: 1.5,
+                          fontWeight: correct || wrong
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (correct || wrong) ...<Widget>[
+                      const SizedBox(width: 8),
+                      Icon(
+                        correct
+                            ? CupertinoIcons.checkmark_circle_fill
+                            : CupertinoIcons.xmark_circle_fill,
+                        size: 20,
+                        color: correct ? AppColors.primary : AppColors.danger,
+                      ).animate().scale(
+                        begin: const Offset(0.4, 0.4),
+                        end: const Offset(1, 1),
+                        duration: 260.ms,
+                        curve: Curves.easeOutBack,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        )
+        .animate()
+        .fadeIn(
+          duration: 280.ms,
+          delay: Duration(milliseconds: widget.delay),
+        )
+        .slideY(
+          begin: 0.10,
+          end: 0,
+          duration: 340.ms,
+          delay: Duration(milliseconds: widget.delay),
+          curve: Curves.easeOutCubic,
+        );
+  }
+}
+
+class _ResultView extends StatelessWidget {
+  const _ResultView({
+    required this.deckTitle,
+    required this.correct,
+    required this.total,
+    required this.onRetry,
+    required this.onClose,
+    super.key,
+  });
+
+  final String deckTitle;
+  final int correct;
+  final int total;
+  final VoidCallback onRetry;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final double score = total == 0 ? 0 : correct / total;
+    final bool great = score >= 0.8;
+    final String headline = score >= 0.8
+        ? 'أداء ممتاز!'
+        : score >= 0.5
+        ? 'جيد جدًا'
+        : 'تحتاج مراجعة';
+    final String note = score >= 0.8
+        ? 'أنت تتقن هذه المجموعة، حافظ على الزخم.'
+        : score >= 0.5
+        ? 'أساس جيد، وراجع البطاقات التي أخطأت فيها.'
+        : 'لا بأس، المراجعة أولًا ثم أعد الاختبار.';
+
+    return Stack(
+      children: <Widget>[
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: <Color>[AppColors.primary, AppColors.primaryDeep],
+              ),
+            ),
+          ),
+        ),
+        const Positioned(
+          top: -60,
+          left: -40,
+          child: _Blob(color: AppColors.accent, size: 220),
+        ),
+        const Positioned(
+          bottom: -80,
+          right: -50,
+          child: _Blob(color: AppColors.blue, size: 260),
+        ),
+        if (great)
+          const Positioned.fill(child: IgnorePointer(child: ConfettiBurst())),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
+            child: Column(
+              children: <Widget>[
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _RoundIcon(
+                    icon: CupertinoIcons.xmark,
+                    label: 'إغلاق',
+                    onTap: onClose,
+                    onDark: true,
+                  ),
+                ),
+                const Spacer(),
+                _ScoreRing(score: score)
+                    .animate()
+                    .fadeIn(duration: 400.ms)
+                    .scale(
+                      begin: const Offset(0.86, 0.86),
+                      end: const Offset(1, 1),
+                      duration: 620.ms,
+                      curve: Curves.easeOutBack,
+                    ),
+                const SizedBox(height: 26),
+                Text(
+                  headline,
+                  style: const TextStyle(
+                    fontFamily: 'ReadexPro',
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ).animate().fadeIn(duration: 380.ms, delay: 180.ms),
+                const SizedBox(height: 8),
+                Text(
+                  note,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 12.5,
+                    height: 1.6,
+                  ),
+                ).animate().fadeIn(duration: 380.ms, delay: 260.ms),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
+                    ),
+                  ),
+                  child: Text(
+                    deckTitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onRetry,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.primary,
+                      minimumSize: const Size(52, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    icon: const Icon(CupertinoIcons.refresh, size: 18),
+                    label: const Text(
+                      'أعد الاختبار',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: onClose,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white.withValues(alpha: 0.75),
+                  ),
+                  child: const Text('إنهاء'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Blob extends StatelessWidget {
+  const _Blob({required this.color, required this.size});
+
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: <Color>[
+            color.withValues(alpha: 0.28),
+            color.withValues(alpha: 0),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScoreRing extends StatelessWidget {
+  const _ScoreRing({required this.score});
+
+  final double score;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: score),
+      duration: const Duration(milliseconds: 1200),
+      curve: Curves.easeOutCubic,
+      builder: (BuildContext context, double value, Widget? _) {
+        return SizedBox(
+          width: 208,
+          height: 208,
+          child: CustomPaint(
+            painter: _RingPainter(value),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    '${(value * 100).round()}%',
+                    style: const TextStyle(
+                      fontFamily: 'ReadexPro',
+                      color: Colors.white,
+                      fontSize: 42,
+                      fontWeight: FontWeight.w700,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'إجابات صحيحة',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  const _RingPainter(this.value);
+
+  final double value;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Offset center = size.center(Offset.zero);
+    final double radius = size.shortestSide / 2 - 12;
+    final Rect rect = Rect.fromCircle(center: center, radius: radius);
+
+    final Paint track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 13
+      ..color = Colors.white.withValues(alpha: 0.12);
+    canvas.drawCircle(center, radius, track);
+
+    if (value <= 0) {
+      return;
+    }
+    final Paint arc = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 13
+      ..strokeCap = StrokeCap.round
+      ..shader = const SweepGradient(
+        colors: <Color>[AppColors.accent, Color(0xFF5FD13A)],
+        transform: GradientRotation(-math.pi / 2),
+      ).createShader(rect);
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      2 * math.pi * value.clamp(0.0, 1.0),
+      false,
+      arc,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter oldDelegate) => oldDelegate.value != value;
+}
+
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.onDark = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: onDark
+            ? Colors.white.withValues(alpha: 0.12)
+            : context.raisedSurface,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(
+              icon,
+              size: 17,
+              color: onDark ? Colors.white : context.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotEnough extends StatelessWidget {
+  const _NotEnough({required this.deckTitle});
+
+  final String deckTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: (context.isDark
+          ? AppColors.darkCanvas
+          : AppColors.canvas),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: Icon(CupertinoIcons.chevron_forward, color: context.ink),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(26),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Container(
+              width: 84,
+              height: 84,
+              decoration: const BoxDecoration(
+                color: AppColors.accentSoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                CupertinoIcons.checkmark_seal,
+                size: 34,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'تحتاج بطاقتين على الأقل',
+              style: TextStyle(
+                fontFamily: 'ReadexPro',
+                color: context.ink,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              deckTitle.isEmpty
+                  ? 'أضف بطاقات إلى هذه المجموعة ثم أعد المحاولة.'
+                  : 'أضف بطاقات إلى «$deckTitle» ثم أعد المحاولة.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: context.muted,
+                fontSize: 12.5,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

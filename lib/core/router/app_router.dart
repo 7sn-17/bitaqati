@@ -19,6 +19,8 @@ import '../../features/search/search_screen.dart';
 import '../../features/settings/developer_info_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/app_shell.dart';
+import '../../features/study/match_game_screen.dart';
+import '../../features/study/test_mode_screen.dart';
 import '../auth/auth_providers.dart';
 import '../providers.dart';
 
@@ -188,6 +190,18 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             ReviewScreen(deckId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/test/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            TestModeScreen(deckId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/match/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            MatchGameScreen(deckId: state.pathParameters['id']!),
       ),
     ],
   );

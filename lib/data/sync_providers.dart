@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -28,11 +29,33 @@ final NotifierProvider<SyncController, SyncState> syncControllerProvider =
 
 class SyncController extends Notifier<SyncState> {
   bool _alive = true;
+  bool _wasOffline = false;
+  StreamSubscription<List<ConnectivityResult>>? _network;
 
   @override
   SyncState build() {
     _alive = true;
     ref.onDispose(() => _alive = false);
+
+    // Studying works entirely from the local database, so the app can sit
+    // offline indefinitely. The moment the radio comes back we drain the queue
+    // in the background, without the user having to ask for it.
+    _network = Connectivity().onConnectivityChanged.listen(
+      (List<ConnectivityResult> results) {
+        final bool online = results.any(
+          (ConnectivityResult result) => result != ConnectivityResult.none,
+        );
+        if (!online) {
+          _wasOffline = true;
+          return;
+        }
+        if (_wasOffline) {
+          _wasOffline = false;
+          unawaited(Future<void>.microtask(syncNow));
+        }
+      },
+    );
+    ref.onDispose(() => _network?.cancel());
     ref.listen<AsyncValue<User?>>(
       currentUserProvider,
       (AsyncValue<User?>? previous, AsyncValue<User?> next) {

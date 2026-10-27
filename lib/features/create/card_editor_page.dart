@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/card_markup.dart';
+import '../../core/widgets/speak_button.dart';
 import '../../data/content_providers.dart';
 import '../../data/media_upload.dart';
 import '../../domain/card_draft.dart';
@@ -714,6 +715,11 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     return <Widget>[
       _FieldCard(
         label: cloze ? 'النص مع الفراغ' : 'وجه البطاقة',
+        trailing: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _front,
+          builder: (BuildContext context, TextEditingValue value, Widget? _) =>
+              SpeakButton(text: value.text, size: 32),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -762,6 +768,11 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       const SizedBox(height: 16),
       _FieldCard(
         label: cloze ? 'شرح إضافي (اختياري)' : 'الإجابة',
+        trailing: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _back,
+          builder: (BuildContext context, TextEditingValue value, Widget? _) =>
+              SpeakButton(text: value.text, size: 32),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -1418,10 +1429,13 @@ class _KindSpec {
 }
 
 class _FieldCard extends StatelessWidget {
-  const _FieldCard({required this.label, required this.child});
+  const _FieldCard({required this.label, required this.child, this.trailing});
 
   final String label;
   final Widget child;
+
+  /// Optional control shown at the end of the label row (e.g. a speak button).
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1435,9 +1449,16 @@ class _FieldCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            label,
-            style: context.texts.labelLarge?.copyWith(fontSize: 13),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  label,
+                  style: context.texts.labelLarge?.copyWith(fontSize: 13),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
           ),
           const SizedBox(height: 10),
           child,

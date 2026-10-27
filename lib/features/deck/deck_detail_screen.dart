@@ -23,6 +23,7 @@ import '../../domain/models.dart';
 import '../create/deck_editor_sheet.dart';
 import '../create/editor_common.dart';
 import '../library/install_library_deck.dart';
+import '../study/study_mode_sheet.dart';
 
 /// A deck screen with two strict modes, matching the two-level hierarchy:
 ///
@@ -58,8 +59,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     final DeckNode? found = local ?? remote.valueOrNull;
     if (found == null) {
       return _MissingDeck(
-        loading:
-            ref.watch(deckListProvider).isLoading || remote.isLoading,
+        loading: ref.watch(deckListProvider).isLoading || remote.isLoading,
+        offline: remote.hasError,
       );
     }
 
@@ -70,14 +71,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         ref.watch(deckCardsProvider(deck.id)).valueOrNull ??
         const <ReviewCard>[];
     final List<ReviewCard> visibleCards = _matching(cards);
-    final bool canStudy =
-        !isPreview && deck.cardCount > 0 && deck.dueCount > 0;
+    final bool canStudy = !isPreview && deck.cardCount > 0;
     final String studyLabel = isPreview
         ? (_installing ? 'جارٍ الإضافة' : 'أضف نسخة إلى مجموعاتي')
         : deck.cardCount == 0
         ? 'لا بطاقات للمراجعة بعد'
         : deck.dueCount == 0
-        ? 'لا بطاقات مستحقة الآن'
+        ? 'ادرس هذه المجموعة'
         : 'ادرس هذه المجموعة · ${deck.dueCount} مستحقة';
 
     return Scaffold(
@@ -231,9 +231,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                       ? (_installing
                             ? null
                             : () => _installPreview(context, deck))
-                      : (canStudy
-                            ? () => context.push('/review/${deck.id}')
-                            : null),
+                      : (canStudy ? () => _openStudyModes(deck) : null),
                   style: FilledButton.styleFrom(
                     backgroundColor: isPreview
                         ? AppColors.primary
@@ -733,6 +731,27 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     );
     if (message != null && context.mounted) {
       showAppMessage(context, message);
+    }
+  }
+
+  /// Opens the mode chooser, then pushes the screen that was picked.
+  Future<void> _openStudyModes(DeckNode deck) async {
+    final StudyMode? mode = await showStudyModeSheet(
+      context,
+      deckTitle: deck.title,
+      cardCount: deck.cardCount,
+      dueCount: deck.dueCount,
+    );
+    if (mode == null || !mounted) {
+      return;
+    }
+    switch (mode) {
+      case StudyMode.review:
+        await context.push('/review/${deck.id}');
+      case StudyMode.test:
+        await context.push('/test/${deck.id}');
+      case StudyMode.match:
+        await context.push('/match/${deck.id}');
     }
   }
 
@@ -2453,9 +2472,13 @@ class _RoundButton extends StatelessWidget {
 }
 
 class _MissingDeck extends StatelessWidget {
-  const _MissingDeck({required this.loading});
+  const _MissingDeck({required this.loading, this.offline = false});
 
   final bool loading;
+
+  /// True when the catalog could not be reached, which is a connection problem
+  /// rather than a deleted deck.
+  final bool offline;
 
   @override
   Widget build(BuildContext context) {
@@ -2470,15 +2493,27 @@ class _MissingDeck extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       Icon(
-                        CupertinoIcons.rectangle_stack,
+                        offline
+                            ? CupertinoIcons.exclamationmark_circle
+                            : CupertinoIcons.rectangle_stack,
                         size: 40,
                         color: context.texts.bodySmall?.color,
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'لم نعثر على هذه المجموعة',
+                        offline
+                            ? 'تعذّر الوصول إلى المجموعة'
+                            : 'لم نعثر على هذه المجموعة',
                         style: context.texts.titleMedium,
                       ),
+                      if (offline) ...<Widget>[
+                        const SizedBox(height: 6),
+                        Text(
+                          'تحقّق من اتصالك بالإنترنت، أو افتح المجموعات المحفوظة على جهازك.',
+                          textAlign: TextAlign.center,
+                          style: context.texts.bodySmall,
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       OutlinedButton(
                         onPressed: () {

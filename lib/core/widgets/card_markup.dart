@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -354,31 +355,25 @@ class CardImage extends StatelessWidget {
       child: Icon(Icons.image_outlined, size: 26, color: context.brandInk),
     );
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      return Image.network(
-        url,
+      // Cached on disk, so a card that was opened once still shows its image
+      // with no connection at all.
+      return CachedNetworkImage(
+        imageUrl: url,
         height: height,
         width: double.infinity,
         fit: fit,
-        loadingBuilder: (
-          BuildContext context,
-          Widget child,
-          ImageChunkEvent? progress,
-        ) {
-          if (progress == null) {
-            return child;
-          }
-          return Container(
-            height: height,
-            alignment: Alignment.center,
-            color: context.softAccent,
-            child: const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          );
-        },
-        errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+        fadeInDuration: const Duration(milliseconds: 220),
+        placeholder: (BuildContext context, String url) => Container(
+          height: height,
+          alignment: Alignment.center,
+          color: context.softAccent,
+          child: const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (BuildContext context, String url, Object error) =>
             fallback,
       );
     }

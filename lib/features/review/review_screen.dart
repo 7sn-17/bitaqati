@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
+import '../../core/widgets/speak_button.dart';
 import '../../data/content_providers.dart';
 import '../../domain/models.dart';
 
@@ -650,14 +651,24 @@ class _CardBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            Text(
-              'السؤال',
-              style: TextStyle(
-                color: muted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.4,
-              ),
+            Row(
+              children: <Widget>[
+                Text(
+                  'السؤال',
+                  style: TextStyle(
+                    color: muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const Spacer(),
+                SpeakButton(
+                  text: card.front,
+                  size: 34,
+                  tint: AppColors.primary,
+                ),
+              ],
             ),
             const SizedBox(height: 5),
             if (card.type == 'occlusion')
@@ -744,14 +755,24 @@ class _CardBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  const Text(
-                    'الإجابة',
-                    style: TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4,
-                    ),
+                  Row(
+                    children: <Widget>[
+                      const Text(
+                        'الإجابة',
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                      const Spacer(),
+                      SpeakButton(
+                        text: card.back,
+                        size: 34,
+                        tint: AppColors.accent,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 5),
                   if (card.type == 'occlusion') ...<Widget>[
