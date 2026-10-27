@@ -68,7 +68,6 @@ class MediaUploadService {
   Future<PickedMedia?> pickAudio() async {
     final List<PlatformFile> files = await FilePicker.pickFiles(
       type: FileType.audio,
-      allowMultiple: false,
       dialogTitle: 'اختر ملفاً صوتياً',
     );
     if (files.isEmpty) {
