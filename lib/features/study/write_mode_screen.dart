@@ -126,7 +126,7 @@ class _WriteSessionState extends ConsumerState<_WriteSession> {
   /// credit for, which is not always what the matcher decided: the override
   /// button exists because a synonym is not a memory failure.
   void _advance({required bool good}) {
-    if (_advancing) {
+    if (_advancing || !mounted) {
       return;
     }
     _advancing = true;
@@ -196,6 +196,7 @@ class _WriteSessionState extends ConsumerState<_WriteSession> {
       _advancing = false;
       _shownAt = DateTime.now();
     });
+    _focus.requestFocus();
   }
 
   @override
