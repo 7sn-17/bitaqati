@@ -7,6 +7,8 @@ import '../../core/auth/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
+import '../../data/content_providers.dart';
+import '../../domain/models.dart';
 import 'deck_editor_sheet.dart';
 
 Future<void> showCreateSheet(BuildContext context) {
@@ -81,6 +83,12 @@ class _CreateSheet extends ConsumerWidget {
                 subtitle: 'أساسية، ملء فراغ، أو تغطية صورة',
                 onTap: () => _openCardEditor(context, ref),
               ),
+              _Option(
+                icon: CupertinoIcons.arrow_down_circle,
+                title: 'الاستيراد الذكي',
+                subtitle: 'الصق نصاً كاملاً وحوّله إلى بطاقات',
+                onTap: () => _openSmartImport(context, ref),
+              ),
             ],
           ),
         ),
@@ -116,6 +124,94 @@ class _CreateSheet extends ConsumerWidget {
       return;
     }
     _pushCardEditor(parentContext);
+  }
+
+  void _openSmartImport(BuildContext context, WidgetRef ref) {
+    final bool allowed = ref.read(authServiceProvider).currentUser != null;
+    Navigator.of(context).pop();
+    if (!allowed) {
+      showAppMessage(
+        parentContext,
+        'الاستيراد متاح للحسابات. سجّل الدخول من الإعدادات بحساب Google.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    _pickDeckForImport(parentContext, ref);
+  }
+
+  /// Importing needs a destination. One deck goes straight there; several ask
+  /// which one, because putting a hundred cards in the wrong deck is worse than
+  /// one extra tap.
+  Future<void> _pickDeckForImport(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final List<DeckNode> decks = ref.read(allDecksProvider);
+    if (decks.isEmpty) {
+      showAppMessage(
+        context,
+        'أنشئ مجموعة أولاً، ثم استورد بطاقاتك إليها.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    String target = decks.first.id;
+    if (decks.length > 1) {
+      final String? picked = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (BuildContext sheet) => SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+            decoration: BoxDecoration(
+              color: context.isDark ? AppColors.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(6, 8, 6, 10),
+                  child: Text(
+                    'استيراد إلى أي مجموعة؟',
+                    style: context.texts.titleMedium,
+                  ),
+                ),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: <Widget>[
+                      for (final DeckNode node in decks)
+                        ListTile(
+                          leading: Icon(
+                            kDeckIcons[node.iconKey] ?? CupertinoIcons.folder,
+                            color: node.color,
+                          ),
+                          title: Text(node.title),
+                          subtitle: Text('${node.cardCount} بطاقة'),
+                          onTap: () => Navigator.of(sheet).pop(node.id),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (picked == null || !context.mounted) {
+        return;
+      }
+      target = picked;
+    }
+    final String? message = await context.push<String>('/import-cards/$target');
+    if (message != null && context.mounted) {
+      showAppMessage(context, message);
+    }
   }
 
   /// Opens the full-screen editor and reports the result on the screen that

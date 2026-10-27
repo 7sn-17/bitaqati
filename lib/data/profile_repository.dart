@@ -93,6 +93,52 @@ class ProfileRepository {
     });
   }
 
+  /// Pushes the local name when the cloud does not have it yet.
+  ///
+  /// A rename that happens offline only writes to Drift; without this the
+  /// library would keep showing the old name until the user renamed again on a
+  /// connected device. Returns true when a push was made.
+  Future<bool> syncToCloud(String userId) async {
+    if (!AppConfig.hasSupabase) {
+      return false;
+    }
+    final ProfileRow? local =
+        await (_db.select(_db.profiles)
+              ..where((Profiles p) => p.userId.equals(userId)))
+            .getSingleOrNull();
+    final String name = local?.displayName.trim() ?? '';
+    if (name.isEmpty) {
+      return false;
+    }
+    final List<Map<String, dynamic>> rows = await Supabase.instance.client
+        .from('profiles')
+        .select('display_name,display_name_custom,updated_at')
+        .eq('id', userId)
+        .limit(1);
+    if (rows.isNotEmpty) {
+      final Map<String, dynamic> remote = rows.first;
+      final Object? rawName = remote['display_name'];
+      final String remoteName = rawName is String ? rawName.trim() : '';
+      if (remoteName == name) {
+        return false;
+      }
+      // A newer cloud name means another device already changed it; let the
+      // pull that follows adopt it instead of overwriting it here.
+      final Object? rawUpdated = remote['updated_at'];
+      final DateTime? remoteUpdated = rawUpdated is String
+          ? DateTime.tryParse(rawUpdated)?.toLocal()
+          : null;
+      final ProfileRow? row = local;
+      if (row != null &&
+          remoteUpdated != null &&
+          remoteUpdated.isAfter(row.updatedAt)) {
+        return false;
+      }
+    }
+    await pushToCloud(userId);
+    return true;
+  }
+
   /// Adopts the cloud name when it was chosen deliberately and is newer than
   /// what this device has. Returns true when the local row changed.
   Future<bool> pullFromCloud(String userId) async {

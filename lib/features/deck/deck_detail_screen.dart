@@ -761,6 +761,15 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(CupertinoIcons.doc_text),
+                title: const Text('استيراد بطاقات'),
+                subtitle: const Text('لصق نص وتقسيمه تلقائياً'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openImport(screenContext, deck);
+                },
+              ),
+              ListTile(
                 leading: const Icon(CupertinoIcons.gear),
                 title: const Text('الإعدادات والمشاركة'),
                 onTap: () {
@@ -791,6 +800,24 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         ),
       ),
     );
+  }
+
+  /// Opens the smart import screen for this deck and reports how many cards
+  /// landed once it closes.
+  Future<void> _openImport(BuildContext context, DeckNode deck) async {
+    if (!ensureSignedIn(
+      context,
+      ref,
+      message: 'الاستيراد يحتاج حساباً. سجّل الدخول من الإعدادات بحساب Google.',
+    )) {
+      return;
+    }
+    final String? message = await context.push<String>(
+      '/import-cards/${deck.id}',
+    );
+    if (message != null && context.mounted) {
+      showAppMessage(context, message);
+    }
   }
 
   void _editDeck(BuildContext context, DeckNode deck) {

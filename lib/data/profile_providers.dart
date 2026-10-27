@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/auth/auth_providers.dart';
 import '../core/user_display.dart';
+import 'library_providers.dart';
 import 'local/database_provider.dart';
 import 'profile_repository.dart';
 
@@ -64,5 +65,8 @@ class DisplayNameController extends Notifier<String> {
       throw const ProfileFailure('سجّل الدخول أولاً لتغيير الاسم.');
     }
     await ref.read(profileRepositoryProvider).setDisplayName(user.id, name);
+    // The library shows this name as the author of every published deck, so
+    // drop the cached catalog rather than let the old name linger on screen.
+    ref.invalidate(libraryDecksProvider);
   }
 }

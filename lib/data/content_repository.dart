@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../domain/card_draft.dart';
 import '../domain/enums.dart';
 import '../domain/models.dart';
 import 'local/app_database.dart';
@@ -572,6 +573,66 @@ ORDER BY d.position, d.created_at
           );
       await _enqueue('cards', id, SyncOperation.upsert);
       return id;
+    });
+  }
+
+  /// Inserts a batch of drafts in one transaction.
+  ///
+  /// Used by the smart import preview: the user confirms once, and either every
+  /// card lands or none does. Positions continue from the deck's last card so
+  /// the pasted order is the order they appear in.
+  Future<List<String>> addCards({
+    required String deckId,
+    required List<CardDraft> drafts,
+  }) async {
+    final List<CardDraft> ready = <CardDraft>[
+      for (final CardDraft draft in drafts)
+        if (draft.isReady) draft,
+    ];
+    if (ready.isEmpty) {
+      return const <String>[];
+    }
+    return _db.transaction(() async {
+      final DeckRow? deck =
+          await (_db.select(_db.decks)
+                ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
+              .getSingleOrNull();
+      if (deck == null) {
+        throw StateError('Deck $deckId does not exist');
+      }
+      final QueryRow next = await _db
+          .customSelect(
+            'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM cards '
+            'WHERE deck_id = ? AND deleted_at IS NULL',
+            variables: <Variable<Object>>[Variable<String>(deckId)],
+            readsFrom: <ResultSetImplementation<Object, Object>>{_db.cards},
+          )
+          .getSingle();
+      final int start = next.read<int>('next');
+      final List<String> ids = <String>[];
+      for (int index = 0; index < ready.length; index++) {
+        final CardDraft draft = ready[index];
+        final String id = _uuid.v4();
+        ids.add(id);
+        await _db
+            .into(_db.cards)
+            .insert(
+              CardsCompanion.insert(
+                id: id,
+                deckId: deckId,
+                type: Value<CardType>(_cardTypeFromName(draft.type)),
+                front: Value<String>(draft.front.trim()),
+                back: Value<String>(draft.back.trim()),
+                hint: Value<String>(draft.hint.trim()),
+                notes: Value<String>(draft.note.trim()),
+                tags: Value<List<String>>(_cleanTags(draft.tags)),
+                occlusion: Value<Map<String, Object?>?>(draft.occlusion),
+                position: Value<int>(start + index),
+              ),
+            );
+        await _enqueue('cards', id, SyncOperation.upsert);
+      }
+      return ids;
     });
   }
 

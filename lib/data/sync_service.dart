@@ -77,10 +77,13 @@ class SyncService {
       return SyncReport(pushed: pushed, error: _describe(error));
     }
 
-    // The display name is not part of the deck queue, so it is adopted here.
-    // This is what brings a custom name back after a reinstall.
+    // The display name is not part of the deck queue, so it is handled here.
+    // Pushing first means a rename made offline reaches the library; pulling
+    // second is what brings a custom name back after a reinstall.
+    final ProfileRepository profiles = ProfileRepository(_db);
     try {
-      await ProfileRepository(_db).pullFromCloud(user.id);
+      await profiles.syncToCloud(user.id);
+      await profiles.pullFromCloud(user.id);
     } catch (_) {
       // A missing profile row is normal for a brand-new account.
     }

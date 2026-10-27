@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/card_draft.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/create/card_editor_page.dart';
 import '../../features/deck/deck_detail_screen.dart';
 import '../../features/decks/decks_screen.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/import/smart_import_screen.dart';
 import '../../features/legal/privacy_policy_screen.dart';
 import '../../features/legal/terms_of_service_screen.dart';
 import '../../features/library/library_screen.dart';
@@ -150,6 +152,28 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) => CardEditorPage(
           deckId: state.uri.queryParameters['deckId'],
         ),
+      ),
+      GoRoute(
+        path: '/import-cards/:deckId',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            SmartImportScreen(deckId: state.pathParameters['deckId']!),
+      ),
+      GoRoute(
+        path: '/draft-card',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          // The draft travels in memory, so this route only makes sense when
+          // something pushed it. A direct visit falls back to a blank editor
+          // instead of crashing.
+          final Object? extra = state.extra;
+          final CardDraft? draft = extra is CardDraft ? extra : null;
+          return CardEditorPage(
+            deckId: state.uri.queryParameters['deckId'],
+            initial: draft,
+            collectOnly: draft != null,
+          );
+        },
       ),
       GoRoute(
         path: '/edit-card/:id',

@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../data/content_providers.dart';
 import '../../data/media_upload.dart';
+import '../../domain/card_draft.dart';
 import '../../domain/models.dart';
 import 'editor_common.dart';
 import 'occlusion_editor.dart';
@@ -17,10 +18,24 @@ import 'occlusion_editor.dart';
 /// Replaces the old bottom sheet: the sheet could not hold a media toolbar,
 /// a live preview and an occlusion canvas at the same time.
 class CardEditorPage extends ConsumerStatefulWidget {
-  const CardEditorPage({this.deckId, this.cardId, super.key});
+  const CardEditorPage({
+    this.deckId,
+    this.cardId,
+    this.initial,
+    this.collectOnly = false,
+    super.key,
+  });
 
   final String? deckId;
   final String? cardId;
+
+  /// Pre-filled content for a brand-new card. Used by the smart import
+  /// preview, where the card already exists as a draft.
+  final CardDraft? initial;
+
+  /// When true the editor returns the edited [CardDraft] instead of writing to
+  /// the database, so the caller keeps owning the card until it saves.
+  final bool collectOnly;
 
   @override
   ConsumerState<CardEditorPage> createState() => _CardEditorPageState();
@@ -64,7 +79,12 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     _backFocus.addListener(_onFocusChange);
     _front.addListener(_refresh);
     _back.addListener(_refresh);
-    if (_editing) {
+    final CardDraft? initial = widget.initial;
+    if (initial != null) {
+      // The draft is already in memory, so there is nothing to load.
+      _hydrated = true;
+      _applyDraft(initial);
+    } else if (_editing) {
       _hydrate(notify: false);
     }
   }
@@ -149,6 +169,41 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     if (notify && mounted) {
       setState(() {});
     }
+  }
+
+  /// Copies a draft into the controllers. Mirrors [_hydrate], but the content
+  /// comes from memory instead of the database.
+  void _applyDraft(CardDraft draft) {
+    _front.text = draft.front;
+    _back.text = draft.back;
+    _hint.text = draft.hint;
+    _note.text = draft.note;
+    _tags = List<String>.of(draft.tags);
+    switch (draft.type) {
+      case 'cloze':
+        _kind = _CardKind.cloze;
+      case 'occlusion':
+        _kind = _CardKind.occlusion;
+        final RegExpMatch? image = kImageRegex.firstMatch(draft.front);
+        _imageUrl = image?.group(2);
+        _boxes = occlusionBoxes(draft.occlusion);
+        _syncBoxControllers();
+      default:
+        _kind = _CardKind.basic;
+    }
+  }
+
+  /// Snapshots the editor into a draft without touching the database.
+  CardDraft _collectDraft() {
+    return CardDraft(
+      front: _resolvedFront(),
+      back: _resolvedBack(),
+      hint: _hint.text.trim(),
+      note: _note.text.trim(),
+      tags: List<String>.of(_tags),
+      type: _typeName,
+      occlusion: _kind == _CardKind.occlusion ? occlusionPayload(_boxes) : null,
+    );
   }
 
   MarkupTextController get _activeField =>
@@ -379,6 +434,12 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       _saving = true;
       _error = null;
     });
+    if (widget.collectOnly) {
+      // Nothing is persisted here: the caller owns the draft until it decides
+      // to save the whole batch.
+      setState(() => _saving = false);
+      return true;
+    }
     final Map<String, Object?>? occlusion = _kind == _CardKind.occlusion
         ? occlusionPayload(_boxes)
         : null;
@@ -425,6 +486,10 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
   Future<void> _saveAndClose() async {
     if (!await _store() || !mounted) {
+      return;
+    }
+    if (widget.collectOnly) {
+      context.pop(_collectDraft());
       return;
     }
     context.pop(_editing ? 'تم تحديث البطاقة.' : 'تمت إضافة البطاقة.');
@@ -496,7 +561,13 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     return Scaffold(
       appBar: AppBar(
         leading: _closeButton(context),
-        title: Text(_editing ? 'تعديل البطاقة' : 'بطاقة جديدة'),
+        title: Text(
+          widget.collectOnly
+              ? 'تعديل المسودة'
+              : _editing
+              ? 'تعديل البطاقة'
+              : 'بطاقة جديدة',
+        ),
         actions: <Widget>[
           Padding(
             padding: const EdgeInsetsDirectional.only(end: 12),
@@ -558,6 +629,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       bottomNavigationBar: _BottomBar(
         saving: _saving,
         editing: _editing,
+        collectOnly: widget.collectOnly,
         onSave: _saveAndClose,
         onSaveAnother: _saveAndContinue,
       ),
@@ -1590,12 +1662,14 @@ class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.saving,
     required this.editing,
+    required this.collectOnly,
     required this.onSave,
     required this.onSaveAnother,
   });
 
   final bool saving;
   final bool editing;
+  final bool collectOnly;
   final VoidCallback onSave;
   final VoidCallback onSaveAnother;
 
@@ -1614,7 +1688,7 @@ class _BottomBar extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          if (!editing) ...<Widget>[
+          if (!editing && !collectOnly) ...<Widget>[
             Expanded(
               child: OutlinedButton(
                 onPressed: saving ? null : onSaveAnother,
@@ -1629,6 +1703,8 @@ class _BottomBar extends StatelessWidget {
               child: Text(
                 saving
                     ? 'جارٍ الحفظ…'
+                    : collectOnly
+                    ? 'اعتماد التعديل'
                     : editing
                     ? 'حفظ التعديلات'
                     : 'حفظ البطاقة',
