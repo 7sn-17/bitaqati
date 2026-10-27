@@ -31,6 +31,7 @@ class SyncController extends Notifier<SyncState> {
   bool _alive = true;
   bool _wasOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _network;
+  Timer? _beat;
 
   @override
   SyncState build() {
@@ -56,6 +57,20 @@ class SyncController extends Notifier<SyncState> {
       },
     );
     ref.onDispose(() => _network?.cancel());
+
+    // A quiet heartbeat so a study session's writes do not have to wait for
+    // the next launch: every five minutes, and only when the queue is not
+    // empty, so an idle app never touches the network.
+    _beat = Timer.periodic(const Duration(minutes: 5), (Timer _) async {
+      if (!_alive || state.running) {
+        return;
+      }
+      final int pending = await ref.read(syncServiceProvider).pendingCount();
+      if (pending > 0 && _alive) {
+        unawaited(Future<void>.microtask(syncNow));
+      }
+    });
+    ref.onDispose(() => _beat?.cancel());
     ref.listen<AsyncValue<User?>>(
       currentUserProvider,
       (AsyncValue<User?>? previous, AsyncValue<User?> next) {

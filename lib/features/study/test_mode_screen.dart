@@ -294,22 +294,22 @@ class _SessionBar extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
+                  color: context.softAccent,
                   borderRadius: BorderRadius.circular(99),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    const Icon(
+                    Icon(
                       CupertinoIcons.checkmark_seal_fill,
                       size: 13,
-                      color: AppColors.primary,
+                      color: context.onSoftAccent,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '$correct',
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: TextStyle(
+                        color: context.onSoftAccent,
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
@@ -421,13 +421,13 @@ class _QuestionView extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.accentSoft,
+                          color: context.softAccent,
                           borderRadius: BorderRadius.circular(99),
                         ),
                         child: Text(
                           deckTitle,
-                          style: const TextStyle(
-                            color: AppColors.primary,
+                          style: TextStyle(
+                            color: context.onSoftAccent,
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                           ),
@@ -564,7 +564,7 @@ class _OptionTileState extends State<_OptionTile>
         ? AppColors.danger
         : context.hairline;
     final Color fill = correct
-        ? AppColors.accentSoft
+        ? context.softAccent
         : wrong
         ? AppColors.danger.withValues(alpha: 0.09)
         : context.cardSurface;
@@ -647,7 +647,7 @@ class _OptionTileState extends State<_OptionTile>
                         widget.label,
                         style: TextStyle(
                           color: correct
-                              ? AppColors.primary
+                              ? context.onSoftAccent
                               : wrong
                               ? AppColors.danger
                               : context.ink,
@@ -666,7 +666,7 @@ class _OptionTileState extends State<_OptionTile>
                             ? CupertinoIcons.checkmark_circle_fill
                             : CupertinoIcons.xmark_circle_fill,
                         size: 20,
-                        color: correct ? AppColors.primary : AppColors.danger,
+                        color: correct ? context.onSoftAccent : AppColors.danger,
                       ).animate().scale(
                         begin: const Offset(0.4, 0.4),
                         end: const Offset(1, 1),

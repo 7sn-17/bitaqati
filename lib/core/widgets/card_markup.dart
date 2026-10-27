@@ -357,11 +357,20 @@ class CardImage extends StatelessWidget {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       // Cached on disk, so a card that was opened once still shows its image
       // with no connection at all.
+      // Decoding at the width the card actually paints keeps a 4K photo from
+      // being held in memory at full size, and the disk cache is capped so a
+      // deck with hundreds of images cannot grow without bound.
+      final int decodeWidth =
+          (MediaQuery.sizeOf(context).width *
+                  MediaQuery.devicePixelRatioOf(context))
+              .round();
       return CachedNetworkImage(
         imageUrl: url,
         height: height,
         width: double.infinity,
         fit: fit,
+        memCacheWidth: decodeWidth,
+        maxWidthDiskCache: decodeWidth,
         fadeInDuration: const Duration(milliseconds: 220),
         placeholder: (BuildContext context, String url) => Container(
           height: height,

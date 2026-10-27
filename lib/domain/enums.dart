@@ -9,7 +9,7 @@ extension DeckPrivacyLabels on DeckPrivacy {
       case DeckPrivacy.private:
         return 'خاصة';
       case DeckPrivacy.unlisted:
-        return 'رابط فقط';
+        return 'بالرمز فقط';
       case DeckPrivacy.public:
         return 'مكتبة عامة';
     }
@@ -20,7 +20,7 @@ extension DeckPrivacyLabels on DeckPrivacy {
       case DeckPrivacy.private:
         return 'لا يمكن لأحد غيرك رؤيتها.';
       case DeckPrivacy.unlisted:
-        return 'تُفتح فقط لمن يملك رابط المشاركة.';
+        return 'تُفتح فقط لمن يملك رمز المشاركة.';
       case DeckPrivacy.public:
         return 'تظهر في المكتبة العامة ويمكن لأي متعلّم إضافتها.';
     }
@@ -31,7 +31,7 @@ extension DeckPrivacyLabels on DeckPrivacy {
       case DeckPrivacy.private:
         return 'خاصة';
       case DeckPrivacy.unlisted:
-        return 'رابط';
+        return 'رمز';
       case DeckPrivacy.public:
         return 'عامة';
     }

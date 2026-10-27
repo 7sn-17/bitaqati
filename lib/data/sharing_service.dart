@@ -43,7 +43,7 @@ class SharingService {
     required DeckPrivacy privacy,
   }) async {
     if (privacy == DeckPrivacy.private) {
-      throw const SharingFailure('اختر «رابط فقط» أو «مكتبة عامة» للنشر.');
+      throw const SharingFailure('اختر «بالرمز فقط» أو «مكتبة عامة» للنشر.');
     }
     final User user = _requireUser();
     final SupabaseClient client = _client();

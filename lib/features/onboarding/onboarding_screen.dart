@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
@@ -11,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/legal_footer.dart';
 import '../legal/privacy_policy_screen.dart';
 import '../legal/terms_of_service_screen.dart';
+import 'onboarding_scene.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -28,7 +28,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: 'راجع أقل، تذكّر أكثر',
       body: 'بطاقاتي يستخدم التكرار المتباعد ليعرض لك البطاقة المناسبة في '
           'الوقت المناسب، لا أكثر ولا أقل.',
-      asset: 'assets/onboarding/review_less.svg',
+      scene: 0,
       chips: <_ChipSpec>[
         _ChipSpec('٣ بطاقات فقط', Icons.bolt_rounded, 0.08, 0.16),
         _ChipSpec('تذكّر ٩٢٪', Icons.trending_up_rounded, 0.74, 0.72),
@@ -39,7 +39,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: 'أنشئ بطاقات بطريقتك',
       body: 'اختر بطاقة أساسية أو ملء فراغ أو تغطية صورة، وأضف التنسيق '
           'والوسوم والتلميحات قبل الحفظ.',
-      asset: 'assets/onboarding/file_to_cards.svg',
+      scene: 1,
       chips: <_ChipSpec>[
         _ChipSpec('ملء فراغ', Icons.data_object, 0.06, 0.7),
         _ChipSpec('صورة', Icons.image_outlined, 0.76, 0.14),
@@ -50,7 +50,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: 'مكتبة من المتعلّمين',
       body: 'اكتشف مجموعات جاهزة في العلوم واللغات والتاريخ والمهارات '
           'وأي مجال تريد إتقانه، ثم أضف ما يناسبك إلى مساحتك.',
-      asset: 'assets/onboarding/student_library.svg',
+      scene: 2,
       chips: <_ChipSpec>[
         _ChipSpec('+٤٠٠ مجموعة', Icons.library_books_rounded, 0.72, 0.14),
         _ChipSpec('تقييم ٤.٨', Icons.star_rounded, 0.08, 0.74),
@@ -350,10 +350,7 @@ class _AnimatedIllustrationState extends State<_AnimatedIllustration>
                 ],
               ),
               padding: const EdgeInsets.all(16),
-              child: SvgPicture.asset(
-                widget.page.asset,
-                semanticsLabel: widget.page.title,
-              ),
+              child: OnboardingScene(index: widget.page.scene),
             ),
           )
               .animate()
@@ -478,14 +475,16 @@ class _OnboardingPage {
   const _OnboardingPage({
     required this.title,
     required this.body,
-    required this.asset,
+    required this.scene,
     required this.chips,
     required this.arrows,
   });
 
   final String title;
   final String body;
-  final String asset;
+
+  /// Which live scene to draw inside the card (0 review, 1 create, 2 library).
+  final int scene;
   final List<_ChipSpec> chips;
   final bool arrows;
 }

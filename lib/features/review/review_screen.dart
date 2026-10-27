@@ -568,10 +568,13 @@ class _CardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color ink = revealed ? Colors.white : context.ink;
+    // The card itself is a light island on the green page in both themes, so
+    // its contents use the fixed light palette. Theme-aware colours here would
+    // paint near-white text on a white card in dark mode.
+    final Color ink = revealed ? Colors.white : AppColors.ink;
     final Color muted = revealed
         ? Colors.white.withValues(alpha: 0.62)
-        : context.muted;
+        : AppColors.muted;
 
     return SingleChildScrollView(
       child: Column(
@@ -585,9 +588,7 @@ class _CardBody extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: revealed
-                      ? AppColors.primaryDeep
-                      : AppColors.accentSoft,
+                  color: revealed ? AppColors.primaryDeep : AppColors.accentSoft,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -641,7 +642,7 @@ class _CardBody extends StatelessWidget {
                     right: 14,
                     child: Text(
                       deck.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primaryDeep,
                         fontSize: 10,
                       ),
@@ -816,7 +817,7 @@ class _CardBody extends StatelessWidget {
                       ),
                       child: Text(
                         tag,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppColors.primary,
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,

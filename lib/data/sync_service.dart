@@ -40,6 +40,11 @@ class SyncService {
 
   static const String _lastSyncKey = 'last_sync_at';
 
+  /// PostgREST payloads are sent in slices: one request per few hundred rows
+  /// keeps the body small, keeps a single failure from losing the whole
+  /// batch, and stays well inside the free tier's request size.
+  static const int _pushChunk = 400;
+
   SupabaseClient? _clientOrNull() {
     if (!AppConfig.hasSupabase) {
       return null;
@@ -233,8 +238,10 @@ class SyncService {
       }
       upserts.add(_cardPayload(row));
     }
-    if (upserts.isNotEmpty) {
-      await client.from('cards').upsert(upserts);
+    for (int start = 0; start < upserts.length; start += _pushChunk) {
+      await client
+          .from('cards')
+          .upsert(upserts.skip(start).take(_pushChunk).toList());
     }
     if (removals.isNotEmpty) {
       await client
@@ -260,11 +267,14 @@ class SyncService {
     if (rows.isEmpty) {
       return;
     }
-    await client.from('card_states').upsert(
-      <Map<String, Object?>>[
-        for (final CardStateRow row in rows) _cardStatePayload(row, userId),
-      ],
-    );
+    final List<Map<String, Object?>> payload = <Map<String, Object?>>[
+      for (final CardStateRow row in rows) _cardStatePayload(row, userId),
+    ];
+    for (int start = 0; start < payload.length; start += _pushChunk) {
+      await client
+          .from('card_states')
+          .upsert(payload.skip(start).take(_pushChunk).toList());
+    }
   }
 
   Future<void> _pushReviewLogs(
@@ -282,12 +292,15 @@ class SyncService {
       return;
     }
     // client_id is unique in the cloud, so replaying a log is harmless.
-    await client.from('review_logs').upsert(
-      <Map<String, Object?>>[
-        for (final ReviewLogRow row in rows) _reviewLogPayload(row, userId),
-      ],
-      onConflict: 'client_id',
-    );
+    final List<Map<String, Object?>> payload = <Map<String, Object?>>[
+      for (final ReviewLogRow row in rows) _reviewLogPayload(row, userId),
+    ];
+    for (int start = 0; start < payload.length; start += _pushChunk) {
+      await client.from('review_logs').upsert(
+        payload.skip(start).take(_pushChunk).toList(),
+        onConflict: 'client_id',
+      );
+    }
   }
 
   Map<String, Object?> _deckPayload(DeckRow row, String userId) {
@@ -405,11 +418,16 @@ class SyncService {
       for (final SyncQueueRow row in await _db.select(_db.syncQueue).get())
         '${row.entity}:${row.entityId}',
     };
-    int changed = 0;
-    changed += await _pullDecks(client, userId, busy);
-    changed += await _pullCards(client, userId, busy);
-    changed += await _pullCardStates(client, userId, busy);
-    return changed;
+    // One transaction for the whole pull: without it every row is its own
+    // implicit transaction, which is hundreds of commits and fsyncs for a
+    // large library.
+    return _db.transaction(() async {
+      int changed = 0;
+      changed += await _pullDecks(client, userId, busy);
+      changed += await _pullCards(client, userId, busy);
+      changed += await _pullCardStates(client, userId, busy);
+      return changed;
+    });
   }
 
   Future<int> _pullDecks(
@@ -505,8 +523,8 @@ class SyncService {
     };
 
     int changed = 0;
-    for (int start = 0; start < deckIds.length; start += 40) {
-      final List<String> slice = deckIds.skip(start).take(40).toList();
+    for (int start = 0; start < deckIds.length; start += 100) {
+      final List<String> slice = deckIds.skip(start).take(100).toList();
       final List<Map<String, dynamic>> rows = await client
           .from('cards')
           .select(

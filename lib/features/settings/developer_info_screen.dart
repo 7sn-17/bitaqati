@@ -121,7 +121,7 @@ class DeveloperInfoScreen extends StatelessWidget {
     }
     showAppMessage(
       context,
-      'تعذّر فتح الرابط على هذا الجهاز.',
+      'تعذّر فتح هذا العنوان على هذا الجهاز.',
       kind: AppMessageKind.error,
     );
   }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/guest_guard.dart';
 import '../../core/widgets/glass_tab_bar.dart';
 import '../../data/content_providers.dart';
+import '../../data/sync_providers.dart';
 import '../create/create_sheet.dart';
 
 class AppShell extends ConsumerWidget {
@@ -17,6 +18,13 @@ class AppShell extends ConsumerWidget {
     // The floating bar would ride above the keyboard, so hide it while typing.
     final bool keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final int due = ref.watch(totalDueProvider);
+
+    // Keeps the sync controller alive for the whole session. It is the only
+    // thing that starts a background pass, and the shell is the one widget
+    // that is always mounted, so listening here is what makes syncing
+    // invisible to the user instead of a button in Settings. A listener rather
+    // than a watch, so a sync starting never rebuilds the tab bar.
+    ref.listen<SyncState>(syncControllerProvider, (SyncState? _, SyncState __) {});
 
     return Scaffold(
       body: Stack(

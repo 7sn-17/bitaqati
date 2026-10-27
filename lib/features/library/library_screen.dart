@@ -194,30 +194,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           'مجموعات جاهزة من متعلّمين حول العالم',
                           style: context.texts.bodySmall,
                         ),
+                        const SizedBox(height: 6),
+                        _ShareCodeLink(onTap: _enterShareCode),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: _enterShareCode,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: context.colors.surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(CupertinoIcons.number, size: 21),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: context.colors.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(CupertinoIcons.globe, size: 21),
+                  _RefreshButton(
+                    busy: catalog.isLoading,
+                    onTap: _refresh,
                   ),
                 ],
               ),
@@ -708,6 +692,84 @@ class _LibraryState extends StatelessWidget {
                 label: Text(actionLabel!),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Round action in the library header that pulls the catalog again.
+///
+/// Replaces the old hashtag button: the share-code entry point moved to a
+/// text link under the subtitle, where it reads as an action instead of an
+/// unexplained icon.
+class _RefreshButton extends StatelessWidget {
+  const _RefreshButton({required this.busy, required this.onTap});
+
+  final bool busy;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'تحديث المكتبة',
+      child: GestureDetector(
+        onTap: busy ? null : onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: context.colors.surfaceContainerHighest,
+            shape: BoxShape.circle,
+          ),
+          child: busy
+              ? const Padding(
+                  padding: EdgeInsets.all(13),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  CupertinoIcons.arrow_clockwise,
+                  size: 20,
+                  color: context.ink,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The only way into the "I have a code" flow, since the header icon is now
+/// refresh.
+class _ShareCodeLink extends StatelessWidget {
+  const _ShareCodeLink({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              CupertinoIcons.number,
+              size: 12,
+              color: context.colors.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'لديك رمز مشاركة؟',
+              style: context.texts.bodySmall?.copyWith(
+                color: context.colors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),

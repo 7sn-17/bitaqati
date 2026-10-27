@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_providers.dart';
-import '../../core/config/app_config.dart';
 import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -796,15 +795,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                   setState(() => _tab = 2);
                 },
               ),
-              if (deck.isPublished)
-                ListTile(
-                  leading: const Icon(CupertinoIcons.link),
-                  title: const Text('نسخ رابط المشاركة'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _copyLink(screenContext, deck);
-                  },
-                ),
               if (deck.isPublished && deck.isShareable)
                 ListTile(
                   leading: const Icon(CupertinoIcons.number),
@@ -921,14 +911,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       if (mounted) {
         setState(() => _publishing = false);
       }
-    }
-  }
-
-  Future<void> _copyLink(BuildContext context, DeckNode deck) async {
-    final String link = AppConfig.deckShareLink(deck.id);
-    await Clipboard.setData(ClipboardData(text: link));
-    if (context.mounted) {
-      showAppMessage(context, 'تم نسخ رابط المشاركة.');
     }
   }
 
@@ -1059,7 +1041,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           publishing: _publishing,
           onSelect: (DeckPrivacy privacy) =>
               _setPrivacy(context, deck, privacy),
-          onCopy: () => _copyLink(context, deck),
           onCopyCode: () => _copyCode(context, deck),
         ),
       ),
@@ -2167,7 +2148,6 @@ class _PrivacyCard extends StatelessWidget {
     required this.signedIn,
     required this.publishing,
     required this.onSelect,
-    required this.onCopy,
     required this.onCopyCode,
   });
 
@@ -2175,12 +2155,10 @@ class _PrivacyCard extends StatelessWidget {
   final bool signedIn;
   final bool publishing;
   final ValueChanged<DeckPrivacy> onSelect;
-  final VoidCallback onCopy;
   final VoidCallback onCopyCode;
 
   @override
   Widget build(BuildContext context) {
-    final String link = AppConfig.deckShareLink(deck.id);
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2208,7 +2186,7 @@ class _PrivacyCard extends StatelessWidget {
                     Text('الخصوصية والمشاركة', style: context.texts.titleMedium),
                     const SizedBox(height: 1),
                     Text(
-                      'انشر المجموعة لمشاركتها برابط أو برمز.',
+                      'انشر المجموعة واحصل على رمز مشاركة من 6 خانات.',
                       style: context.texts.bodySmall,
                     ),
                   ],
@@ -2227,17 +2205,15 @@ class _PrivacyCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.accentSoft.withValues(
-                  alpha: context.isDark ? 0.15 : 1,
-                ),
+                color: context.softAccent,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: <Widget>[
-                  const Icon(
+                  Icon(
                     CupertinoIcons.person_crop_circle,
                     size: 16,
-                    color: AppColors.primary,
+                    color: context.onSoftAccent,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -2264,9 +2240,7 @@ class _PrivacyCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                 decoration: BoxDecoration(
-                  color: AppColors.accentSoft.withValues(
-                    alpha: context.isDark ? 0.2 : 1,
-                  ),
+                  color: context.softAccent,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -2309,37 +2283,6 @@ class _PrivacyCard extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-              decoration: BoxDecoration(
-                color: context.colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: SelectableText(
-                      link,
-                      maxLines: 2,
-                      style: context.texts.bodySmall?.copyWith(
-                        fontSize: 10.5,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: onCopy,
-                    icon: const Icon(CupertinoIcons.doc_on_doc, size: 14),
-                    label: const Text('نسخ'),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 34),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      textStyle: const TextStyle(fontSize: 11),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ],
       ),
@@ -2379,11 +2322,7 @@ class _PrivacyOption extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
           decoration: BoxDecoration(
-            color: selected
-                ? AppColors.accentSoft.withValues(
-                    alpha: context.isDark ? 0.18 : 1,
-                  )
-                : Colors.transparent,
+            color: selected ? context.selectedFill : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
@@ -2397,7 +2336,7 @@ class _PrivacyOption extends StatelessWidget {
                 icon,
                 size: 17,
                 color: selected
-                    ? AppColors.primary
+                    ? context.onSoftAccent
                     : context.texts.bodySmall?.color,
               ),
               const SizedBox(width: 9),
@@ -2411,7 +2350,7 @@ class _PrivacyOption extends StatelessWidget {
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                         color: selected
-                            ? AppColors.primary
+                            ? context.onSoftAccent
                             : context.colors.onSurface,
                       ),
                     ),
@@ -2428,7 +2367,7 @@ class _PrivacyOption extends StatelessWidget {
                     : CupertinoIcons.circle,
                 size: 18,
                 color: selected
-                    ? AppColors.primary
+                    ? context.onSoftAccent
                     : context.colors.outlineVariant,
               ),
             ],

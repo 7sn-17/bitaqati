@@ -16,8 +16,6 @@ import '../../core/widgets/surface_card.dart';
 import '../../data/auth_service.dart';
 import '../../data/profile_providers.dart';
 import '../../data/profile_repository.dart';
-import '../../data/sync_providers.dart';
-import '../../data/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -39,8 +37,6 @@ class SettingsScreen extends ConsumerWidget {
     final bool notificationsEnabled = ref.watch(notificationsEnabledProvider);
     final int newLimit = ref.watch(dailyNewLimitProvider);
     final int reviewLimit = ref.watch(dailyReviewLimitProvider);
-    final SyncState sync = ref.watch(syncControllerProvider);
-    final bool signedIn = user != null;
 
     return Scaffold(
       body: SafeArea(
@@ -165,13 +161,16 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            const _SectionLabel('أهداف المراجعة'),
+            _SectionLabel(
+              'أهداف المراجعة',
+              onHelp: () => _showGoalsHelp(context),
+            ),
             _Group(
               children: <Widget>[
                 _StepperRow(
                   icon: CupertinoIcons.sparkles,
-                  title: 'بطاقات جديدة في الجلسة',
-                  subtitle: 'كم بطاقة جديدة تُقدَّم لك في كل جلسة دراسة',
+                  title: 'بطاقات جديدة',
+                  subtitle: 'كم بطاقة جديدة تتعلّمها يومياً',
                   value: newLimit,
                   onIncrease: newLimit >= 200
                       ? null
@@ -186,8 +185,8 @@ class SettingsScreen extends ConsumerWidget {
                 ),
                 _StepperRow(
                   icon: CupertinoIcons.repeat,
-                  title: 'بطاقات المراجعة في الجلسة',
-                  subtitle: 'حد أقصى للمراجعات في الجلسة الواحدة',
+                  title: 'بطاقات المراجعة',
+                  subtitle: 'أقصى عدد من البطاقات القديمة يومياً',
                   value: reviewLimit,
                   onIncrease: reviewLimit >= 1000
                       ? null
@@ -199,47 +198,6 @@ class SettingsScreen extends ConsumerWidget {
                       : () => ref
                             .read(dailyReviewLimitProvider.notifier)
                             .decrement(),
-                ),
-              ],
-            ),
-            const _SectionLabel('المزامنة'),
-            _Group(
-              children: <Widget>[
-                _Row(
-                  icon: CupertinoIcons.arrow_2_circlepath,
-                  title: sync.running ? 'جارٍ المزامنة…' : 'مزامنة الآن',
-                  subtitle: _syncSubtitle(sync.report, signedIn),
-                  trailing: sync.running
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2.2),
-                        )
-                      : null,
-                  onTap: signedIn && !sync.running
-                      ? () async {
-                          await ref
-                              .read(syncControllerProvider.notifier)
-                              .syncNow();
-                          final SyncReport? report =
-                              ref.read(syncControllerProvider).report;
-                          if (!context.mounted || report == null) {
-                            return;
-                          }
-                          showAppMessage(
-                            context,
-                            report.error ??
-                                (report.idle
-                                    ? 'كل شيء محدّث بالفعل.'
-                                    : 'تمت المزامنة: '
-                                          '${report.pushed} رفع، '
-                                          '${report.pulled} تنزيل.'),
-                            kind: report.ok
-                                ? AppMessageKind.success
-                                : AppMessageKind.error,
-                          );
-                        }
-                      : null,
                 ),
               ],
             ),
@@ -302,21 +260,45 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  /// One line explaining where the last sync left off.
-  String _syncSubtitle(SyncReport? report, bool signedIn) {
-    if (!signedIn) {
-      return 'سجّل الدخول لمزامنة بطاقاتك بين أجهزتك';
-    }
-    if (report == null) {
-      return 'لم تتم مزامنة بعد';
-    }
-    if (report.error != null) {
-      return report.error!;
-    }
-    if (report.idle) {
-      return 'كل شيء محدّث';
-    }
-    return 'رفع ${report.pushed} · نزّل ${report.pulled}';
+  /// Explains the two daily goals in plain language. The row titles alone
+  /// ("new cards" / "review cards") do not say whether the number is per
+  /// session or per day, which is exactly what confused people.
+  Future<void> _showGoalsHelp(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        title: const Text('أهداف المراجعة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _HelpPoint(
+              icon: CupertinoIcons.sparkles,
+              title: 'بطاقات جديدة',
+              body: 'كم بطاقة جديدة تريد تعلّمها يومياً.',
+            ),
+            const SizedBox(height: 14),
+            _HelpPoint(
+              icon: CupertinoIcons.repeat,
+              title: 'بطاقات المراجعة',
+              body: 'الحد الأقصى للبطاقات القديمة التي ستتم مراجعتها يومياً.',
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'البطاقات الزائدة عن الحد تبقى في الانتظار وتظهر في اليوم التالي، '
+              'لذلك لا تفوتك أي بطاقة.',
+              style: context.texts.bodySmall,
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () => Navigator.of(dialog).pop(),
+            child: const Text('فهمت'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Leaves guest mode. The router then shows the login screen, where the
@@ -532,6 +514,8 @@ class _AccountAvatar extends StatelessWidget {
       width: 54,
       height: 54,
       fit: BoxFit.cover,
+      memCacheWidth: 162,
+      maxWidthDiskCache: 162,
       fadeInDuration: const Duration(milliseconds: 200),
       errorWidget: (BuildContext context, String url, Object error) => label,
     );
@@ -539,20 +523,44 @@ class _AccountAvatar extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
+  const _SectionLabel(this.label, {this.onHelp});
 
   final String label;
 
+  /// Shows a small (?) next to the label when the section needs explaining.
+  final VoidCallback? onHelp;
+
   @override
   Widget build(BuildContext context) {
+    final TextStyle? style = context.texts.labelMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: context.texts.bodySmall?.color,
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
-      child: Text(
-        label,
-        style: context.texts.labelMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: context.texts.bodySmall?.color,
-        ),
+      padding: EdgeInsets.fromLTRB(24, 22, onHelp == null ? 24 : 14, 8),
+      child: Row(
+        children: <Widget>[
+          Text(label, style: style),
+          if (onHelp != null) ...<Widget>[
+            const SizedBox(width: 4),
+            Semantics(
+              button: true,
+              label: 'شرح أهداف المراجعة',
+              child: InkWell(
+                onTap: onHelp,
+                customBorder: const CircleBorder(),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    CupertinoIcons.question_circle,
+                    size: 15,
+                    color: context.colors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -791,6 +799,52 @@ class _RoundButton extends StatelessWidget {
           child: Icon(icon, size: 20, color: context.colors.onSurface),
         ),
       ),
+    );
+  }
+}
+
+class _HelpPoint extends StatelessWidget {
+  const _HelpPoint({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: context.softAccent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 16, color: context.onSoftAccent),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: context.texts.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(body, style: context.texts.bodySmall),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

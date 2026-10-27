@@ -216,6 +216,8 @@ class _HeaderAvatar extends StatelessWidget {
       width: 46,
       height: 46,
       fit: BoxFit.cover,
+      memCacheWidth: 138,
+      maxWidthDiskCache: 138,
       fadeInDuration: const Duration(milliseconds: 200),
       errorWidget: (BuildContext context, String url, Object error) => label,
     );

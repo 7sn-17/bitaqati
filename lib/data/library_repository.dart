@@ -117,7 +117,9 @@ class LibraryRepository {
       if (deckRow == null) {
         return null;
       }
-      final DeckNode deck = await _deckById(deckId);
+      // Reuses the row we just fetched: asking for it again was a second
+      // round trip for data already in hand.
+      final DeckNode deck = await _deckById(deckId, prefetched: deckRow);
       final List<Map<String, dynamic>> cardRows = await _client
           .from('cards')
           .select(
@@ -171,7 +173,7 @@ class LibraryRepository {
       );
     } on PostgrestException {
       throw const LibraryFailure(
-        'تعذّر فتح المجموعة. قد يكون الرابط قديماً أو أُوقفت المشاركة.',
+        'تعذّر فتح المجموعة. قد يكون الرمز قديماً أو أُوقفت المشاركة.',
       );
     } catch (_) {
       throw const LibraryFailure(
@@ -195,8 +197,11 @@ class LibraryRepository {
   }
 
   /// Reads the deck plus its author and rating summary.
-  Future<DeckNode> _deckById(String deckId) async {
-    final Map<String, dynamic>? row = await _deckRow(deckId);
+  Future<DeckNode> _deckById(
+    String deckId, {
+    Map<String, dynamic>? prefetched,
+  }) async {
+    final Map<String, dynamic>? row = prefetched ?? await _deckRow(deckId);
     if (row == null) {
       throw const LibraryFailure('هذه المجموعة لم تعد متاحة.');
     }

@@ -345,6 +345,20 @@ extension AppThemeContext on BuildContext {
       ? AppColors.accent.withValues(alpha: 0.16)
       : AppColors.accentSoft;
 
+  /// Foreground for anything drawn on [softAccent].
+  ///
+  /// The light palette pairs the pale wash with dark green ink; on a dark
+  /// surface the same dark green disappears, so the pair flips to lime. Every
+  /// "selected" chip, badge and privacy row must use both getters together --
+  /// using [AppColors.primary] on [softAccent] is what made dark mode
+  /// unreadable.
+  Color get onSoftAccent => isDark ? AppColors.darkAccent : AppColors.primary;
+
+  /// Stronger brand fill for a selected row: lime on dark, deep green on
+  /// light, always with a foreground that clears 4.5:1.
+  Color get selectedFill =>
+      isDark ? AppColors.accent.withValues(alpha: 0.22) : AppColors.accentSoft;
+
   /// Danger colour that stays legible on both themes.
   Color get dangerInk => isDark ? AppColors.darkDanger : AppColors.danger;
 

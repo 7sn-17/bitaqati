@@ -749,14 +749,14 @@ class _ReviewNowCard extends StatelessWidget {
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: empty ? AppColors.accentSoft : AppColors.warning,
+              color: empty ? context.softAccent : AppColors.warning,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               empty
                   ? CupertinoIcons.checkmark_seal
                   : CupertinoIcons.clock_fill,
-              color: empty ? AppColors.primary : AppColors.warningInk,
+              color: empty ? context.onSoftAccent : AppColors.warningInk,
               size: 22,
             ),
           ),

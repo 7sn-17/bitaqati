@@ -413,22 +413,22 @@ class _Header extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: AppColors.accentSoft,
+              color: context.softAccent,
               borderRadius: BorderRadius.circular(99),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                const Icon(
+                Icon(
                   CupertinoIcons.checkmark_alt,
                   size: 12,
-                  color: AppColors.primary,
+                  color: context.onSoftAccent,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '$cleared',
-                  style: const TextStyle(
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    color: context.onSoftAccent,
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -623,7 +623,7 @@ class _TileViewState extends State<_TileView> with TickerProviderStateMixin {
     final bool on = widget.selected;
 
     final Color base = question ? AppColors.primary : context.cardSurface;
-    final Color deep = question ? AppColors.primaryDeep : AppColors.accentSoft;
+    final Color deep = question ? AppColors.primaryDeep : context.softAccent;
     final Color ink = question ? Colors.white : context.ink;
     final Color sub = question
         ? AppColors.accent.withValues(alpha: 0.9)
