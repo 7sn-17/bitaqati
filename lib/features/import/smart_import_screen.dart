@@ -511,7 +511,7 @@ class _LiveStatus extends StatelessWidget {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       child: Row(
-        key: ValueKey<String>('$ready-${skipped}'),
+        key: ValueKey<String>('$ready-$skipped'),
         children: <Widget>[
           Icon(
             empty
