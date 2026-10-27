@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
+import '../domain/gamification.dart';
 import '../domain/models.dart';
 import 'content_repository.dart';
 import 'local/database_provider.dart';
@@ -124,6 +125,29 @@ final StreamProvider<List<ReviewActivityDay>> reviewActivityProvider =
     StreamProvider<List<ReviewActivityDay>>(
       (Ref ref) => ref.watch(contentRepositoryProvider).watchReviewActivity(),
     );
+
+/// The gamified view of the local database: XP, level, streaks and the
+/// per-day counts behind the calendar and the heatmap.
+///
+/// Every number is derived from [reviewActivityProvider] and the deck list, so
+/// there is no separate XP table to fall out of sync with the history.
+final Provider<ProgressSummary> progressSummaryProvider =
+    Provider<ProgressSummary>((Ref ref) {
+      final List<ReviewActivityDay> activity =
+          ref.watch(reviewActivityProvider).valueOrNull ??
+          const <ReviewActivityDay>[];
+      final List<DeckNode> decks = ref.watch(allDecksProvider);
+      int cards = 0;
+      for (final DeckNode deck in decks) {
+        cards += deck.cardCount;
+      }
+      return ProgressSummary.fromActivity(
+        activity: activity,
+        deckCount: decks.length,
+        cardCount: cards,
+        now: DateTime.now(),
+      );
+    });
 
 /// Real due counts for the next seven days.
 final StreamProvider<List<DueForecastDay>> dueForecastProvider =

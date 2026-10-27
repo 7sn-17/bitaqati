@@ -338,6 +338,39 @@ answer carries the real latency of the question on screen. Nothing else about
 the session touches the database: the questions are built once and
 «أعد الاختبار» is a pure in-memory rebuild.
 
+## The progress dashboard
+
+`lib/domain/gamification.dart` holds the pure maths; `progressSummaryProvider` in
+`lib/data/content_providers.dart` feeds it from two live streams and nothing else.
+
+| Signal | Source |
+|---|---|
+| Reviews per day, and how many were recalled | `review_logs` grouped by local date |
+| Deck count | `decks` (non-deleted) |
+| Upcoming workload | `card_states.due` for the next seven days |
+
+XP is never stored. It is recomputed as `reviews * 10 + recalled * 5 + decks * 50`,
+so a deleted deck or an undone review cannot leave a phantom balance behind.
+"Recalled" means `rating >= 2`, the same threshold the deck statistics and the
+heatmap already use, which keeps one definition of a successful review across the
+app.
+
+Levels follow `50 * n * (n - 1)`: 0, 100, 300, 600, 1000 XP and so on. The
+inverse is a loop, not a closed form, because the curve is quadratic and the loop
+runs a few dozen times at most.
+
+Streaks are computed in Dart from the same day set that draws the calendar, rather
+than from a second SQL query. Two sources would eventually disagree, and the
+calendar is the thing the learner can count with their own eyes.
+
+Badges read `bestStreak`, not the current streak: a badge that vanishes the
+morning after a missed day is a punishment, not a reward. Badge colours are
+mid-tone and lifted toward white in dark mode rather than replaced, so each badge
+keeps its identity in both themes.
+
+Charts use `fl_chart`. The forecast bars draw a `backDrawRodData` track behind every
+day so a zero day still reads as "nothing due" instead of an empty slot.
+
 ## Reminders
 
 `lib/core/notifications/reminder_service.dart` wraps
