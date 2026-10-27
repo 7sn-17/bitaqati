@@ -296,10 +296,12 @@ class SyncService {
       for (final ReviewLogRow row in rows) _reviewLogPayload(row, userId),
     ];
     for (int start = 0; start < payload.length; start += _pushChunk) {
-      await client.from('review_logs').upsert(
-        payload.skip(start).take(_pushChunk).toList(),
-        onConflict: 'client_id',
-      );
+      await client
+          .from('review_logs')
+          .upsert(
+            payload.skip(start).take(_pushChunk).toList(),
+            onConflict: 'client_id',
+          );
     }
   }
 
@@ -318,8 +320,15 @@ class SyncService {
       'settings': row.settings,
       'is_starter': row.isStarter,
       'share_code': row.shareCode,
+      // The remix chain travels with the deck: without these a copy installed
+      // on one device looks like an original on another, so the duplicate
+      // check misses it and the library offers the same deck again.
+      'source_deck_id': row.sourceDeckId,
+      'source_version': row.sourceVersion,
+      'forked_at': row.forkedAt?.toUtc().toIso8601String(),
       'original_deck_id': row.originalDeckId,
       'original_author_name': row.originalAuthorName,
+      'created_at': row.createdAt.toUtc().toIso8601String(),
     };
   }
 
@@ -378,18 +387,15 @@ class SyncService {
 
   Future<void> _deleteQueue(List<SyncQueueRow> items) async {
     await (_db.delete(_db.syncQueue)..where(
-          (SyncQueue q) => q.id.isIn(<int>{
-            for (final SyncQueueRow row in items) row.id,
-          }),
+          (SyncQueue q) =>
+              q.id.isIn(<int>{for (final SyncQueueRow row in items) row.id}),
         ))
         .go();
   }
 
   Future<void> _recordFailure(List<SyncQueueRow> items, Object error) async {
     final String message = _describe(error);
-    final Set<int> ids = <int>{
-      for (final SyncQueueRow row in items) row.id,
-    };
+    final Set<int> ids = <int>{for (final SyncQueueRow row in items) row.id};
     final int attempts = items.first.attempts + 1;
     await (_db.update(
       _db.syncQueue,
@@ -440,6 +446,7 @@ class SyncService {
         .select(
           'id,position,title,description,color_hex,icon,cover_url,tags,'
           'settings,privacy,is_starter,share_code,published_at,'
+          'source_deck_id,source_version,forked_at,'
           'original_deck_id,original_author_name,'
           'created_at,updated_at,deleted_at',
         )
@@ -482,6 +489,13 @@ class SyncService {
                 _json(row['settings']) ?? const <String, Object?>{},
               ),
               isStarter: Value<bool>(row['is_starter'] == true),
+              sourceDeckId: Value<String?>(_text(row['source_deck_id'])),
+              sourceVersion: Value<int>(
+                _number(row['source_version']) == 0
+                    ? 1
+                    : _number(row['source_version']),
+              ),
+              forkedAt: Value<DateTime?>(_date(row['forked_at'])),
               originalDeckId: Value<String?>(_text(row['original_deck_id'])),
               originalAuthorName: Value<String?>(
                 _text(row['original_author_name']),
@@ -505,9 +519,10 @@ class SyncService {
     Set<String> busy,
   ) async {
     final List<String> deckIds = <String>[
-      for (final DeckRow row in await (_db.select(_db.decks)..where(
-            (Decks d) => d.ownerId.equals(userId) & d.deletedAt.isNull(),
-          ))
+      for (final DeckRow row
+          in await (_db.select(_db.decks)..where(
+                (Decks d) => d.ownerId.equals(userId) & d.deletedAt.isNull(),
+              ))
               .get())
         row.id,
     ];
