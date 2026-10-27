@@ -187,7 +187,16 @@ leaks the owner, the settings, or a private deck.
 
 `public_decks` is a flat view: one row per published deck, joined to
 `profiles` for `author_name` and aggregated against `deck_ratings` for the
-star average. It carries no nesting columns.
+star average and the review count. It also carries `install_count`, bumped by
+`record_deck_install`. It carries no nesting columns.
+
+`deck_ratings` holds one row per user per deck: `rating` (1-5) and an optional
+`review` comment, unique on `(deck_id, user_id)`. Ratings are public to read;
+writing requires the signed-in owner, and only for a deck that is currently
+public. The statistics tab reads them through `LibraryRepository.fetchReviews`,
+which fetches the rows first and then resolves display names from `profiles` in
+a second query, because `deck_ratings` references profiles by user id and an
+embedded select would depend on a foreign key the client does not own.
 
 Installing a deck deep-copies it: new deck id, new card ids, positions
 renumbered from zero, and scheduling state deliberately left empty so the
@@ -318,6 +327,16 @@ which became a lie the moment real scheduling arrived.
 Daily limits are unchanged and still applied in `studyQueue`: new cards first
 capped at `dailyNewLimit`, then learning, then reviews capped at
 `dailyReviewLimit`.
+
+### Test mode is a review
+
+A multiple-choice answer is evidence about memory, so it is written through the
+same `recordReview` path as the review screen: a correct answer is rating 3
+(Good), a wrong answer is rating 1 (Again). It passes `allowEarly: true`
+because the learner deliberately tested themselves over the whole deck, and the
+answer carries the real latency of the question on screen. Nothing else about
+the session touches the database: the questions are built once and
+«أعد الاختبار» is a pure in-memory rebuild.
 
 ## Reminders
 

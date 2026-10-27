@@ -114,6 +114,12 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                   ),
                   const Spacer(),
                   if (!isPreview) ...<Widget>[
+                    _RoundButton(
+                      icon: CupertinoIcons.add,
+                      label: 'بطاقة جديدة',
+                      onTap: () => _addCard(context, deck),
+                    ),
+                    const SizedBox(width: 8),
                     if (deck.isShareable)
                       _RoundButton(
                         icon: CupertinoIcons.number,
@@ -241,42 +247,40 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: isPreview
-                      ? (_installing
-                            ? null
-                            : () => _installPreview(context, deck))
-                      : (canStudy ? () => _openStudyModes(deck) : null),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: isPreview
-                        ? AppColors.primary
-                        : AppColors.accent,
-                    foregroundColor: isPreview
-                        ? AppColors.accent
-                        : AppColors.primary,
+            // Study moved to the bottom bar: it is the action a learner
+            // repeats, and a thumb reaches it. The header keeps only the
+            // preview install, which belongs to a deck that is not yours yet.
+            if (isPreview)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _installing
+                        ? null
+                        : () => _installPreview(context, deck),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.accent,
+                    ),
+                    child: _installing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: AppColors.accent,
+                            ),
+                          )
+                        : Text(studyLabel),
                   ),
-                  child: _installing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: AppColors.accent,
-                          ),
-                        )
-                      : Text(studyLabel),
                 ),
               ),
-            ),
             if (!isPreview && deck.cardCount == 0)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Text(
-                  'أضف أول بطاقة من الزر أدناه لتبدأ المراجعة.',
+                  'أضف أول بطاقة من زر + في الأعلى لتبدأ المراجعة.',
                   textAlign: TextAlign.center,
                   style: context.texts.bodySmall,
                 ),
@@ -334,10 +338,19 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
                 child: SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => _addCard(context, deck),
-                    icon: const Icon(CupertinoIcons.plus, size: 18),
-                    label: const Text('بطاقة جديدة'),
+                  child: FilledButton(
+                    onPressed: canStudy ? () => _openStudyModes(deck) : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.primary,
+                      minimumSize: const Size(0, 50),
+                      textStyle: const TextStyle(
+                        fontFamily: 'ReadexPro',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    child: Text(studyLabel),
                   ),
                 ),
               ),
@@ -1562,19 +1575,25 @@ class _SelectableCardRow extends StatelessWidget {
                   width: selected ? 1.4 : 1,
                 ),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              // The state stripe used to be a Row child with
+              // CrossAxisAlignment.stretch. A list hands every card an
+              // unbounded height, so "stretch to the row's height" meant
+              // "stretch to infinity": the Row never laid out, and each card
+              // painted nothing while still holding a tap target. That is
+              // the bug that made the card list look empty. A positioned
+              // stripe inside a Stack takes its height from the content
+              // instead, with no intrinsic pass.
+              child: Stack(
                 children: <Widget>[
-                  // State stripe: the fastest way to read a long list.
-                  Container(
-                    width: 4,
-                    color: status.color.withValues(
-                      alpha: context.isDark ? 0.85 : 0.9,
+                  Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(
+                      17,
+                      12,
+                      13,
+                      13,
                     ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
+                    child: SizedBox(
+                      width: double.infinity,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
@@ -1687,6 +1706,17 @@ class _SelectableCardRow extends StatelessWidget {
                             ),
                           ],
                         ],
+                      ),
+                    ),
+                  ),
+                  PositionedDirectional(
+                    start: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 4,
+                    child: ColoredBox(
+                      color: status.color.withValues(
+                        alpha: context.isDark ? 0.85 : 0.9,
                       ),
                     ),
                   ),
@@ -2312,11 +2342,510 @@ class _DeckStatisticsTab extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 22),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _DeckSocialSection(deck: deck),
+            ),
+            const SizedBox(height: 22),
           ],
         );
       },
     );
   }
+}
+
+/// Installs, average stars and written reviews for a deck.
+///
+/// Ratings belong to the library copy of the deck, so an installed deck reads
+/// the numbers of the deck it came from.
+class _DeckSocialSection extends ConsumerWidget {
+  const _DeckSocialSection({required this.deck});
+
+  final DeckNode deck;
+
+  String get _cloudId => deck.sourceDeckId ?? deck.id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final DeckSocialStats social =
+        ref.watch(deckSocialProvider(_cloudId)).valueOrNull ??
+        const DeckSocialStats();
+    final List<DeckReview> reviews =
+        ref.watch(deckReviewsProvider(_cloudId)).valueOrNull ??
+        const <DeckReview>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Text('التقييمات والتنزيلات', style: context.texts.titleMedium),
+            const Spacer(),
+            if (social.ratingCount > 0)
+              Text(
+                '${social.ratingCount} تقييم',
+                style: context.texts.bodySmall?.copyWith(fontSize: 11),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: _SocialTile(
+                icon: CupertinoIcons.arrow_down_circle_fill,
+                value: '${social.installCount}',
+                label: 'عدد التنزيلات',
+                color: AppColors.blue,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SocialTile(
+                icon: CupertinoIcons.star_fill,
+                value: social.hasRating
+                    ? social.averageRating!.toStringAsFixed(1)
+                    : '—',
+                label: social.hasRating ? 'متوسط التقييم' : 'لا تقييمات',
+                color: const Color(0xFFE0A200),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _ReviewComposer(deck: deck, cloudId: _cloudId, reviews: reviews),
+        const SizedBox(height: 14),
+        if (reviews.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
+            decoration: BoxDecoration(
+              color: context.colors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: <Widget>[
+                Icon(
+                  CupertinoIcons.chat_bubble_2,
+                  size: 26,
+                  color: context.muted,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'لا توجد مراجعات بعد.',
+                  style: context.texts.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'كن أول من يشارك رأيه في هذه المجموعة.',
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodySmall?.copyWith(
+                    fontSize: 11,
+                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (final DeckReview review in reviews) _ReviewRow(review: review),
+      ],
+    );
+  }
+}
+
+/// One number with an icon, sized to share a row with its sibling.
+class _SocialTile extends StatelessWidget {
+  const _SocialTile({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: context.isDark ? 0.22 : 0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, size: 17, color: context.legible(color)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'ReadexPro',
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    color: context.ink,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.texts.bodySmall?.copyWith(fontSize: 10.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Star picker plus a comment box, saved as one upsert.
+class _ReviewComposer extends ConsumerStatefulWidget {
+  const _ReviewComposer({
+    required this.deck,
+    required this.cloudId,
+    required this.reviews,
+  });
+
+  final DeckNode deck;
+  final String cloudId;
+  final List<DeckReview> reviews;
+
+  @override
+  ConsumerState<_ReviewComposer> createState() => _ReviewComposerState();
+}
+
+class _ReviewComposerState extends ConsumerState<_ReviewComposer> {
+  final TextEditingController _controller = TextEditingController();
+  int _stars = 0;
+  bool _saving = false;
+  bool _prefilled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefill();
+  }
+
+  @override
+  void didUpdateWidget(_ReviewComposer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _prefill();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  /// Copies the user's existing rating and comment in once, so editing a
+  /// review starts from what is already published.
+  void _prefill() {
+    if (_prefilled || widget.reviews.isEmpty) {
+      return;
+    }
+    final String? uid = ref.read(currentUserProvider).valueOrNull?.id;
+    if (uid == null) {
+      return;
+    }
+    _prefilled = true;
+    for (final DeckReview review in widget.reviews) {
+      if (review.userId == uid) {
+        if (review.rating > 0) {
+          _stars = review.rating;
+        }
+        if (review.hasComment) {
+          _controller.text = review.comment;
+        }
+        return;
+      }
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_saving) {
+      return;
+    }
+    if (_stars == 0) {
+      showAppMessage(
+        context,
+        'اختر عدد النجوم أولاً.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    if (!ensureSignedIn(
+      context,
+      ref,
+      message: 'التقييم يحتاج حساباً. سجّل الدخول بحساب Google.',
+    )) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _saving = true);
+    try {
+      await ref
+          .read(libraryRepositoryProvider)
+          .rateDeck(widget.cloudId, _stars, review: _controller.text);
+      if (!mounted) {
+        return;
+      }
+      ref.invalidate(deckReviewsProvider(widget.cloudId));
+      ref.invalidate(deckSocialProvider(widget.cloudId));
+      ref.invalidate(myDeckRatingProvider(widget.cloudId));
+      ref.invalidate(myDeckRatingProvider(widget.deck.id));
+      ref.invalidate(libraryBundleProvider(widget.deck.id));
+      ref.invalidate(libraryDeckProvider(widget.deck.id));
+      ref.invalidate(libraryDecksProvider);
+      showAppMessage(context, 'تم حفظ تقييمك ومراجعتك.');
+    } on LibraryFailure catch (error) {
+      if (mounted) {
+        showAppMessage(context, error.message, kind: AppMessageKind.error);
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppMessage(
+          context,
+          'تعذّر حفظ المراجعة. حاول مرة أخرى.',
+          kind: AppMessageKind.error,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: context.colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              for (int star = 1; star <= 5; star++)
+                GestureDetector(
+                  onTap: _saving ? null : () => setState(() => _stars = star),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 3),
+                    child: Icon(
+                      star <= _stars
+                          ? CupertinoIcons.star_fill
+                          : CupertinoIcons.star,
+                      size: 25,
+                      color: star <= _stars
+                          ? const Color(0xFFE0A200)
+                          : context.colors.outlineVariant,
+                    ),
+                  ),
+                ),
+              const Spacer(),
+              Text(
+                _stars == 0 ? 'اختر التقييم' : '$_stars من 5',
+                style: context.texts.bodySmall?.copyWith(fontSize: 10.5),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _controller,
+            enabled: !_saving,
+            minLines: 2,
+            maxLines: 4,
+            maxLength: 400,
+            textInputAction: TextInputAction.newline,
+            style: context.texts.bodyMedium?.copyWith(height: 1.6),
+            decoration: InputDecoration(
+              hintText: 'اكتب مراجعتك (اختياري)',
+              hintStyle: context.texts.bodySmall,
+              counterText: '',
+              filled: true,
+              fillColor: context.cardSurface,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _saving ? null : _submit,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 42),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+              ),
+              child: _saving
+                  ? const SizedBox(
+                      width: 17,
+                      height: 17,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'نشر التقييم',
+                      style: TextStyle(
+                        fontFamily: 'ReadexPro',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One published review: avatar, name, stars, date and the comment.
+class _ReviewRow extends StatelessWidget {
+  const _ReviewRow({required this.review});
+
+  final DeckReview review;
+
+  @override
+  Widget build(BuildContext context) {
+    final String name = review.authorName.trim();
+    final String initial = name.isEmpty ? '؟' : name.substring(0, 1);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
+        decoration: BoxDecoration(
+          color: context.cardSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: context.hairline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: context.softAccent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      fontFamily: 'ReadexPro',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: context.onSoftAccent,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    review.authorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.texts.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                for (int star = 1; star <= 5; star++)
+                  Icon(
+                    star <= review.rating
+                        ? CupertinoIcons.star_fill
+                        : CupertinoIcons.star,
+                    size: 12,
+                    color: star <= review.rating
+                        ? const Color(0xFFE0A200)
+                        : context.colors.outlineVariant,
+                  ),
+              ],
+            ),
+            if (review.hasComment) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                review.comment,
+                style: context.texts.bodySmall?.copyWith(height: 1.7),
+              ),
+            ],
+            if (review.createdAt != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                _relativeDate(review.createdAt!),
+                style: context.texts.bodySmall?.copyWith(
+                  fontSize: 10,
+                  color: context.muted,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _relativeDate(DateTime value) {
+  final Duration diff = DateTime.now().difference(value);
+  if (diff.inMinutes < 1) {
+    return 'الآن';
+  }
+  if (diff.inHours < 1) {
+    return 'قبل ${diff.inMinutes} دقيقة';
+  }
+  if (diff.inDays < 1) {
+    return 'قبل ${diff.inHours} ساعة';
+  }
+  if (diff.inDays < 30) {
+    return 'قبل ${diff.inDays} يوم';
+  }
+  if (diff.inDays < 365) {
+    return 'قبل ${diff.inDays ~/ 30} شهر';
+  }
+  return 'قبل ${diff.inDays ~/ 365} سنة';
 }
 
 class _StatBox extends StatelessWidget {

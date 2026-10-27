@@ -178,6 +178,8 @@ class CardMarkup extends StatelessWidget {
     this.mediaHeight = 180,
     this.mediaFirst = false,
     this.textHeader,
+    this.textAlign,
+    this.onTapImage,
     super.key,
   });
 
@@ -198,6 +200,13 @@ class CardMarkup extends StatelessWidget {
   /// names the side and carries the speaker button, then the words — without
   /// the label sitting above the picture.
   final Widget? textHeader;
+
+  /// Centres the words. The review screen centres its card, so the text has
+  /// to follow or it hangs off one edge of a centred picture.
+  final TextAlign? textAlign;
+
+  /// Called with the URL when a picture in the body is tapped.
+  final ValueChanged<String>? onTapImage;
 
   @override
   Widget build(BuildContext context) {
@@ -222,6 +231,7 @@ class CardMarkup extends StatelessWidget {
           ),
           style: style,
         ),
+        textAlign: textAlign,
         maxLines: maxLines,
         overflow: maxLines == null ? null : TextOverflow.ellipsis,
       );
@@ -243,7 +253,13 @@ class CardMarkup extends StatelessWidget {
         final RegExpMatch? image = kImageRegex.firstMatch(token);
         if (image != null) {
           leading.add(
-            CardImage(url: image.group(2) ?? '', height: mediaHeight),
+            CardImage(
+              url: image.group(2) ?? '',
+              height: mediaHeight,
+              onTap: onTapImage == null
+                  ? null
+                  : () => onTapImage!(image.group(2) ?? ''),
+            ),
           );
         } else {
           leading.add(
@@ -276,6 +292,7 @@ class CardMarkup extends StatelessWidget {
                 ),
                 style: style,
               ),
+              textAlign: textAlign,
               maxLines: maxLines,
               overflow: maxLines == null ? null : TextOverflow.ellipsis,
             ),
@@ -308,7 +325,15 @@ class CardMarkup extends StatelessWidget {
       final String token = match.group(0)!;
       final RegExpMatch? image = kImageRegex.firstMatch(token);
       if (image != null) {
-        blocks.add(CardImage(url: image.group(2) ?? '', height: mediaHeight));
+        blocks.add(
+          CardImage(
+            url: image.group(2) ?? '',
+            height: mediaHeight,
+            onTap: onTapImage == null
+                ? null
+                : () => onTapImage!(image.group(2) ?? ''),
+          ),
+        );
       } else {
         final RegExpMatch? audio = kAudioRegex.firstMatch(token);
         blocks.add(AudioAttachment(url: audio?.group(2) ?? ''));
@@ -350,6 +375,7 @@ class CardImage extends StatelessWidget {
     this.height = 180,
     this.fit = BoxFit.cover,
     this.radius = 16,
+    this.onTap,
     super.key,
   });
 
@@ -358,14 +384,47 @@ class CardImage extends StatelessWidget {
   final BoxFit fit;
   final double radius;
 
+  /// Opens the picture full screen. The card crops to keep its shape, so a
+  /// diagram is only readable in the viewer.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
+    final Widget picture = ClipRRect(
       borderRadius: BorderRadius.circular(radius),
       child: SizedBox(
         height: height,
         width: double.infinity,
         child: _image(context),
+      ),
+    );
+    final VoidCallback? tap = onTap;
+    if (tap == null) {
+      return picture;
+    }
+    return GestureDetector(
+      onTap: tap,
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        children: <Widget>[
+          picture,
+          PositionedDirectional(
+            bottom: 8,
+            end: 8,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Icon(
+                Icons.open_in_full_rounded,
+                size: 13,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -590,11 +649,17 @@ class OcclusionBox {
   /// What the hidden region says. Shown once the learner taps the mask.
   final String answer;
 
-  Rect toRect(Size size) => Rect.fromLTWH(
-    left * size.width,
-    top * size.height,
-    width * size.width,
-    height * size.height,
+  /// Places the box inside [frame], the rectangle the picture itself covers.
+  ///
+  /// Taking the frame rather than the widget size is what keeps a box on the
+  /// same part of the image in the editor and in the review: under
+  /// BoxFit.contain the picture is letterboxed, so the widget and the picture
+  /// are not the same rectangle.
+  Rect toRect(Rect frame) => Rect.fromLTWH(
+    frame.left + left * frame.width,
+    frame.top + top * frame.height,
+    width * frame.width,
+    height * frame.height,
   );
 
   Map<String, Object?> toJson() => <String, Object?>{
@@ -662,6 +727,57 @@ Map<String, Object?>? occlusionPayload(List<OcclusionBox> boxes) {
 /// Each box hides one region until the learner taps it, which reveals the
 /// answer written for that box. This is what makes occlusion work as a real
 /// study card instead of a picture with black squares on it.
+/// The rectangle a picture of [aspect] covers inside [canvas] under
+/// BoxFit.contain: full width or full height, whichever runs out first.
+Rect containRect(Size canvas, double aspect) {
+  if (!aspect.isFinite || aspect <= 0 || canvas.isEmpty) {
+    return Offset.zero & canvas;
+  }
+  final double canvasAspect = canvas.width / canvas.height;
+  if (aspect > canvasAspect) {
+    final double height = canvas.width / aspect;
+    return Rect.fromLTWH(0, (canvas.height - height) / 2, canvas.width, height);
+  }
+  final double width = canvas.height * aspect;
+  return Rect.fromLTWH((canvas.width - width) / 2, 0, width, canvas.height);
+}
+
+/// The image provider for a stored URL, local file or remote.
+ImageProvider imageProviderForUrl(String url) {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return NetworkImage(url);
+  }
+  final String path = url.startsWith('file://')
+      ? Uri.parse(url).toFilePath()
+      : url;
+  return FileImage(File(path));
+}
+
+/// Reports an image's width/height ratio once it decodes.
+///
+/// Both the editor canvas and the review need it: without it neither knows
+/// where the picture sits inside its box, and the boxes drift off the image.
+void resolveImageAspect(String url, ValueChanged<double> onRatio) {
+  if (url.trim().isEmpty) {
+    return;
+  }
+  final ImageStream stream = imageProviderForUrl(url)
+      .resolve(const ImageConfiguration());
+  late final ImageStreamListener listener;
+  listener = ImageStreamListener(
+    (ImageInfo info, bool synchronousCall) {
+      final double ratio = info.image.width / info.image.height;
+      if (ratio.isFinite && ratio > 0) {
+        onRatio(ratio);
+      }
+      stream.removeListener(listener);
+    },
+    onError: (Object error, StackTrace? stack) =>
+        stream.removeListener(listener),
+  );
+  stream.addListener(listener);
+}
+
 class OcclusionView extends StatefulWidget {
   const OcclusionView({
     required this.imageUrl,
@@ -683,6 +799,14 @@ class OcclusionView extends StatefulWidget {
 class _OcclusionViewState extends State<OcclusionView> {
   final Set<int> _revealed = <int>{};
 
+  double _aspect = 4 / 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveAspect();
+  }
+
   @override
   void didUpdateWidget(covariant OcclusionView oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -690,43 +814,59 @@ class _OcclusionViewState extends State<OcclusionView> {
         oldWidget.boxes.length != widget.boxes.length) {
       _revealed.clear();
     }
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _resolveAspect();
+    }
+  }
+
+  void _resolveAspect() {
+    resolveImageAspect(widget.imageUrl, (double ratio) {
+      if (mounted && ratio != _aspect) {
+        setState(() => _aspect = ratio);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // BoxFit.contain, not cover: cropping the picture hid the very regions
+    // boxes were drawn on, and the crop factor differed between the editor and
+    // the review, so the preview never matched the card.
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
         height: widget.height,
         width: double.infinity,
-        child: Stack(
-          fit: StackFit.expand,
-          children: <Widget>[
-            CardImage(url: widget.imageUrl, height: widget.height, radius: 0),
-            if (widget.masked)
-              LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  final Size size = Size(constraints.maxWidth, widget.height);
-                  return Stack(
-                    children: <Widget>[
-                      for (int index = 0; index < widget.boxes.length; index++)
-                        Positioned.fromRect(
-                          rect: widget.boxes[index].toRect(size),
-                          child: _OcclusionMask(
-                            box: widget.boxes[index],
-                            revealed: _revealed.contains(index),
-                            onTap: () => setState(() {
-                              if (!_revealed.remove(index)) {
-                                _revealed.add(index);
-                              }
-                            }),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-          ],
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final Size size = Size(constraints.maxWidth, widget.height);
+            final Rect frame = containRect(size, _aspect);
+            return Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                CardImage(
+                  url: widget.imageUrl,
+                  height: widget.height,
+                  radius: 0,
+                  fit: BoxFit.contain,
+                ),
+                if (widget.masked)
+                  for (int index = 0; index < widget.boxes.length; index++)
+                    Positioned.fromRect(
+                      rect: widget.boxes[index].toRect(frame),
+                      child: _OcclusionMask(
+                        box: widget.boxes[index],
+                        revealed: _revealed.contains(index),
+                        onTap: () => setState(() {
+                          if (!_revealed.remove(index)) {
+                            _revealed.add(index);
+                          }
+                        }),
+                      ),
+                    ),
+              ],
+            );
+          },
         ),
       ),
     );

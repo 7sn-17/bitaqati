@@ -1,21 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/card_markup.dart';
+import '../../core/widgets/image_viewer.dart';
 
 /// Resolves a stored URL to an image provider (network or on-device file).
-ImageProvider imageProviderFor(String url) {
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return NetworkImage(url);
-  }
-  final String path = url.startsWith('file://')
-      ? Uri.parse(url).toFilePath()
-      : url;
-  return FileImage(File(path));
-}
+ImageProvider imageProviderFor(String url) => imageProviderForUrl(url);
 
 /// Interactive canvas for image occlusion.
 ///
@@ -80,14 +71,14 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
     stream.addListener(listener);
   }
 
-  Offset _clamp(Offset position, Size size) {
+  Offset _clamp(Offset position, Rect frame) {
     return Offset(
-      position.dx.clamp(0.0, size.width),
-      position.dy.clamp(0.0, size.height),
+      position.dx.clamp(frame.left, frame.right),
+      position.dy.clamp(frame.top, frame.bottom),
     );
   }
 
-  void _finish(Size size) {
+  void _finish(Rect frame) {
     final Offset? start = _start;
     final Offset? end = _current;
     setState(() {
@@ -98,16 +89,19 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
       return;
     }
     final Rect rect = Rect.fromPoints(start, end);
-    if (rect.width / size.width < 0.04 || rect.height / size.height < 0.04) {
+    if (rect.width / frame.width < 0.04 || rect.height / frame.height < 0.04) {
       return;
     }
+    // Normalised against the picture, not the widget: the review draws the
+    // same picture letterboxed inside a box of a different size, and only the
+    // picture's own rectangle is common to both.
     widget.onChanged(<OcclusionBox>[
       ...widget.boxes,
       OcclusionBox(
-        left: rect.left / size.width,
-        top: rect.top / size.height,
-        width: rect.width / size.width,
-        height: rect.height / size.height,
+        left: (rect.left - frame.left) / frame.width,
+        top: (rect.top - frame.top) / frame.height,
+        width: rect.width / frame.width,
+        height: rect.height / frame.height,
       ),
     ]);
   }
@@ -125,24 +119,26 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
       children: <Widget>[
         ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: AspectRatio(
-            aspectRatio: _aspect,
+          child: SizedBox(
+            height: widget.height,
+            width: double.infinity,
             child: LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
-                final Size size = Size(
-                  constraints.maxWidth,
-                  constraints.maxHeight,
-                );
+                final Size size = Size(constraints.maxWidth, widget.height);
+                // The picture sits inside this frame, not across the whole
+                // box. Drawing against the frame is what makes the editor and
+                // the review agree.
+                final Rect frame = containRect(size, _aspect);
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onPanStart: (DragStartDetails details) => setState(() {
-                    _start = _clamp(details.localPosition, size);
+                    _start = _clamp(details.localPosition, frame);
                     _current = _start;
                   }),
                   onPanUpdate: (DragUpdateDetails details) => setState(() {
-                    _current = _clamp(details.localPosition, size);
+                    _current = _clamp(details.localPosition, frame);
                   }),
-                  onPanEnd: (DragEndDetails details) => _finish(size),
+                  onPanEnd: (DragEndDetails details) => _finish(frame),
                   onPanCancel: () => setState(() {
                     _start = null;
                     _current = null;
@@ -152,7 +148,7 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                     children: <Widget>[
                       Image(
                         image: imageProviderFor(widget.imageUrl),
-                        fit: BoxFit.fill,
+                        fit: BoxFit.contain,
                         errorBuilder:
                             (
                               BuildContext context,
@@ -169,8 +165,8 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                       ),
                       for (int index = 0; index < widget.boxes.length; index++)
                         _BoxOverlay(
-                          rect: widget.boxes[index].toRect(size),
-                          canvas: size,
+                          rect: widget.boxes[index].toRect(frame),
+                          canvas: frame.size,
                           box: widget.boxes[index],
                           index: index,
                           onChanged: (OcclusionBox box) => _replace(index, box),
@@ -195,6 +191,27 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                             ),
                           ),
                         ),
+                      PositionedDirectional(
+                        top: 8,
+                        end: 8,
+                        child: Material(
+                          color: Colors.black.withValues(alpha: 0.42),
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () =>
+                                showImageViewer(context, widget.imageUrl),
+                            child: const Padding(
+                              padding: EdgeInsets.all(7),
+                              child: Icon(
+                                Icons.open_in_full_rounded,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 );

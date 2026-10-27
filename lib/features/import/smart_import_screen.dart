@@ -859,10 +859,11 @@ class _MiniChip extends StatelessWidget {
   }
 }
 
-/// Hands the user a prompt they can paste into an AI assistant.
+/// Explains, in three steps, how to turn notes into cards with a chat model.
 ///
-/// The text is selectable and copyable because most people will paste it into
-/// a chat app rather than read it here.
+/// The previous text asked the reader to "paste the prompt, then add your text
+/// at the end" in one dense sentence, which is the kind of instruction you have
+/// to read twice. Three numbered steps, one action each, is the whole fix.
 class _HelpDialog extends StatelessWidget {
   const _HelpDialog();
 
@@ -871,48 +872,109 @@ class _HelpDialog extends StatelessWidget {
     if (!context.mounted) {
       return;
     }
-    showAppMessage(context, 'تم نسخ الطلب. ألصقه في مساعدك المفضّل.');
+    showAppMessage(context, 'تم نسخ الطلب.');
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('جهّز نصك بمساعدة الذكاء الاصطناعي'),
+      title: const Text('اصنع البطاقات بالذكاء الاصطناعي'),
       content: SizedBox(
         width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              'انسخ الطلب التالي، ألصقه في مساعدك، ثم أضف نصك في آخره. '
-              'ستحصل على سطور جاهزة للصق هنا.',
-              style: context.texts.bodySmall?.copyWith(height: 1.8),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 240),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.isDark
-                    ? AppColors.darkSurfaceHigh
-                    : AppColors.canvas,
-                borderRadius: BorderRadius.circular(14),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const _Step(
+                number: '1',
+                text: 'انسخ الطلب من الصندوق في الأسفل.',
               ),
-              child: SingleChildScrollView(
-                child: SelectableText(
-                  kSmartImportPrompt,
-                  style: TextStyle(
-                    fontFamily: 'IBMPlexSansArabic',
-                    fontSize: 11.5,
-                    height: 1.85,
-                    color: context.texts.bodySmall?.color,
+              const _Step(
+                number: '2',
+                text:
+                    'افتح ChatGPT أو Claude، ألصق الطلب، ثم اكتب ملاحظاتك '
+                    'بعد كلمة «النص:».',
+              ),
+              const _Step(
+                number: '3',
+                text:
+                    'انسخ الجواب الذي يردّه، وارجع إلى هذه الشاشة وألصقه '
+                    'في المربع.',
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: context.softAccent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      CupertinoIcons.checkmark_seal,
+                      size: 14,
+                      color: context.onSoftAccent,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(
+                        'كل سطر في الجواب يصبح بطاقة واحدة.',
+                        style: context.texts.bodySmall?.copyWith(
+                          color: context.onSoftAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: <Widget>[
+                  Text('الطلب', style: context.texts.labelLarge),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _copy(context),
+                    icon: const Icon(CupertinoIcons.doc_on_doc, size: 14),
+                    label: const Text('نسخ'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      textStyle: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 190),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? AppColors.darkSurfaceHigh
+                      : AppColors.canvas,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.hairline),
+                ),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    kSmartImportPrompt,
+                    style: TextStyle(
+                      fontFamily: 'IBMPlexSansArabic',
+                      fontSize: 11.5,
+                      height: 1.85,
+                      color: context.texts.bodySmall?.color,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: <Widget>[
@@ -926,6 +988,50 @@ class _HelpDialog extends StatelessWidget {
           label: const Text('نسخ الطلب'),
         ),
       ],
+    );
+  }
+}
+
+/// One numbered instruction.
+class _Step extends StatelessWidget {
+  const _Step({required this.number, required this.text});
+
+  final String number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: context.softAccent,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              number,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: context.onSoftAccent,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: context.texts.bodyMedium?.copyWith(height: 1.7),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

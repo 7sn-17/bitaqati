@@ -14,6 +14,40 @@ class LibraryFailure implements Exception {
   String toString() => message;
 }
 
+/// One published review: a star rating plus the comment left with it.
+class DeckReview {
+  const DeckReview({
+    required this.userId,
+    required this.authorName,
+    required this.rating,
+    this.comment = '',
+    this.createdAt,
+  });
+
+  final String userId;
+  final String authorName;
+  final int rating;
+  final String comment;
+  final DateTime? createdAt;
+
+  bool get hasComment => comment.trim().isNotEmpty;
+}
+
+/// Public numbers for a deck that lives in the library.
+class DeckSocialStats {
+  const DeckSocialStats({
+    this.installCount = 0,
+    this.averageRating,
+    this.ratingCount = 0,
+  });
+
+  final int installCount;
+  final double? averageRating;
+  final int ratingCount;
+
+  bool get hasRating => averageRating != null && ratingCount > 0;
+}
+
 /// Reads the public catalog, resolves share codes, and loads deck snapshots.
 ///
 /// The catalog uses the `public_decks` projection. Share codes and direct
@@ -242,9 +276,7 @@ class LibraryRepository {
         .select('id')
         .eq('deck_id', deckId)
         .isFilter('deleted_at', null);
-    final DeckPrivacy privacy = deckPrivacyFromCloud(
-      _string(row['privacy']),
-    );
+    final DeckPrivacy privacy = deckPrivacyFromCloud(_string(row['privacy']));
 
     return DeckNode(
       id: deckId,
@@ -308,22 +340,26 @@ class LibraryRepository {
   }
 
   /// Saves a 1-5 star rating for the signed-in user.
-  Future<void> rateDeck(String deckId, int rating) async {
+  ///
+  /// [review] is the optional comment. Pass null to leave an existing comment
+  /// untouched, or an empty string to remove it.
+  Future<void> rateDeck(String deckId, int rating, {String? review}) async {
     _ensureAvailable();
     if (rating < 1 || rating > 5) {
       throw const LibraryFailure('اختر تقييماً من 1 إلى 5 نجوم.');
     }
     final User? user = _client.auth.currentUser;
     if (user == null) {
-      throw const LibraryFailure(
-        'سجّل الدخول بحساب Google لتقييم المجموعات.',
-      );
+      throw const LibraryFailure('سجّل الدخول بحساب Google لتقييم المجموعات.');
     }
     try {
+      final String? comment = review?.trim();
       await _client.from('deck_ratings').upsert(<String, Object?>{
         'deck_id': deckId,
         'user_id': user.id,
         'rating': rating,
+        if (review != null)
+          'review': comment == null || comment.isEmpty ? null : comment,
       }, onConflict: 'deck_id,user_id');
     } on PostgrestException {
       throw const LibraryFailure(
@@ -356,6 +392,89 @@ class LibraryRepository {
       return _int(rows.first['rating']);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Every rating left on a deck, newest first, with the reviewer's name.
+  ///
+  /// Names need a second query: `deck_ratings` references `profiles` by user
+  /// id and an embedded select would depend on a foreign key we do not own.
+  Future<List<DeckReview>> fetchReviews(String deckId) async {
+    if (!isAvailable) {
+      return const <DeckReview>[];
+    }
+    try {
+      final List<Map<String, dynamic>> rows = await _client
+          .from('deck_ratings')
+          .select('user_id,rating,review,created_at')
+          .eq('deck_id', deckId)
+          .order('created_at', ascending: false)
+          .limit(80);
+      if (rows.isEmpty) {
+        return const <DeckReview>[];
+      }
+      final Set<String> ids = <String>{};
+      for (final Map<String, dynamic> row in rows) {
+        final String? id = _string(row['user_id']);
+        if (id != null) {
+          ids.add(id);
+        }
+      }
+      final Map<String, String> names = <String, String>{};
+      if (ids.isNotEmpty) {
+        final List<Map<String, dynamic>> profiles = await _client
+            .from('profiles')
+            .select('id,display_name')
+            .inFilter('id', ids.toList());
+        for (final Map<String, dynamic> profile in profiles) {
+          final String? id = _string(profile['id']);
+          final String? name = _string(profile['display_name'])?.trim();
+          if (id != null && name != null && name.isNotEmpty) {
+            names[id] = name;
+          }
+        }
+      }
+      return <DeckReview>[
+        for (final Map<String, dynamic> row in rows)
+          DeckReview(
+            userId: _string(row['user_id']) ?? '',
+            authorName: names[_string(row['user_id'])] ?? 'مستخدم',
+            rating: _int(row['rating']),
+            comment: _string(row['review']) ?? '',
+            createdAt: _date(row['created_at']),
+          ),
+      ];
+    } catch (_) {
+      return const <DeckReview>[];
+    }
+  }
+
+  /// Installs and average stars for a deck, or zeros when it is not published.
+  Future<DeckSocialStats> fetchSocialStats(String deckId) async {
+    if (!isAvailable) {
+      return const DeckSocialStats();
+    }
+    try {
+      final List<Map<String, dynamic>> rows = await _client
+          .from('public_decks')
+          .select('install_count,rating,rating_count')
+          .eq('id', deckId)
+          .limit(1);
+      if (rows.isEmpty) {
+        return const DeckSocialStats();
+      }
+      final Map<String, dynamic> row = rows.first;
+      final Object? average = row['rating'];
+      final double? stars = average is num && average > 0
+          ? average.toDouble()
+          : null;
+      return DeckSocialStats(
+        installCount: _int(row['install_count']),
+        averageRating: stars,
+        ratingCount: _int(row['rating_count']),
+      );
+    } catch (_) {
+      return const DeckSocialStats();
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/card_markup.dart';
+import '../../core/widgets/image_viewer.dart';
 import '../../core/widgets/speak_button.dart';
 import '../../data/content_providers.dart';
 import '../../data/media_upload.dart';
@@ -366,7 +367,14 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     );
   }
 
-  Future<void> _attach({required bool image}) async {
+  /// Attaches a file to one side of the card.
+  ///
+  /// [toFront] comes from the button that was pressed, never from
+  /// [_frontActive]. The old signature inferred the target from whichever
+  /// field had focus last, so tapping the answer's image button while the
+  /// question still held focus dropped the picture into the question - the
+  /// bug where a picture attached to the answer showed up on the front.
+  Future<void> _attach({required bool image, required bool toFront}) async {
     if (_uploading) {
       return;
     }
@@ -395,7 +403,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         return;
       }
       setState(() {
-        (_frontActive ? _frontMedia : _backMedia).add(
+        (toFront ? _frontMedia : _backMedia).add(
           _Attachment(
             markup: media.markup,
             url: media.url,
@@ -906,8 +914,12 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               onMath: () => _toggleWrap(r'$', r'$', 'x^2'),
               onCloze: _kind == _CardKind.occlusion ? null : _makeCloze,
               onTags: () => _openTagSheet(context),
-              onImage: _uploading ? null : () => _attach(image: true),
-              onAudio: _uploading ? null : () => _attach(image: false),
+              onImage: _uploading
+                  ? null
+                  : () => _attach(image: true, toFront: true),
+              onAudio: _uploading
+                  ? null
+                  : () => _attach(image: false, toFront: true),
               uploading: _uploading,
             ),
             const SizedBox(height: 8),
@@ -955,8 +967,12 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               onMath: () => _toggleWrap(r'$', r'$', 'x^2'),
               onCloze: null,
               onTags: () => _openTagSheet(context),
-              onImage: _uploading ? null : () => _attach(image: true),
-              onAudio: _uploading ? null : () => _attach(image: false),
+              onImage: _uploading
+                  ? null
+                  : () => _attach(image: true, toFront: false),
+              onAudio: _uploading
+                  ? null
+                  : () => _attach(image: false, toFront: false),
               uploading: _uploading,
             ),
             const SizedBox(height: 8),
@@ -988,7 +1004,9 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         children: <Widget>[
           if (_imageUrl == null)
             InkWell(
-              onTap: _uploading ? null : () => _attach(image: true),
+              onTap: _uploading
+                  ? null
+                  : () => _attach(image: true, toFront: true),
               borderRadius: BorderRadius.circular(18),
               child: Container(
                 height: 160,
@@ -1081,7 +1099,9 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
             Row(
               children: <Widget>[
                 TextButton.icon(
-                  onPressed: _uploading ? null : () => _attach(image: true),
+                  onPressed: _uploading
+                      ? null
+                      : () => _attach(image: true, toFront: true),
                   icon: const Icon(CupertinoIcons.arrow_2_circlepath, size: 16),
                   label: const Text('تغيير الصورة'),
                 ),
@@ -1375,7 +1395,12 @@ class _MediaChip extends StatelessWidget {
               width: 46,
               height: 46,
               child: item.image
-                  ? CardImage(url: item.url, height: 46, radius: 0)
+                  ? CardImage(
+                      url: item.url,
+                      height: 46,
+                      radius: 0,
+                      onTap: () => showImageViewer(context, item.url),
+                    )
                   : ColoredBox(
                       color: context.softAccent,
                       child: Icon(

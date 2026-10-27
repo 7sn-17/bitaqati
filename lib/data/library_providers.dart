@@ -41,3 +41,17 @@ final FutureProviderFamily<int?, String> myDeckRatingProvider =
       (Ref ref, String deckId) =>
           ref.watch(libraryRepositoryProvider).fetchMyRating(deckId),
     );
+
+/// Installs and average stars for a published deck.
+final FutureProviderFamily<DeckSocialStats, String> deckSocialProvider =
+    FutureProvider.family<DeckSocialStats, String>(
+      (Ref ref, String deckId) =>
+          ref.watch(libraryRepositoryProvider).fetchSocialStats(deckId),
+    );
+
+/// Every star rating and comment left on a deck, newest first.
+final FutureProviderFamily<List<DeckReview>, String> deckReviewsProvider =
+    FutureProvider.family<List<DeckReview>, String>(
+      (Ref ref, String deckId) =>
+          ref.watch(libraryRepositoryProvider).fetchReviews(deckId),
+    );

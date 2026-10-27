@@ -10,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
+import '../../core/widgets/image_viewer.dart';
 import '../../core/widgets/speak_button.dart';
 import '../../data/content_providers.dart';
 import '../../domain/models.dart';
@@ -238,6 +239,12 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
         _favorites.remove(card.id);
       }
     });
+    // Confirmed immediately: the star is a small target and the colour change
+    // alone was easy to miss, which made the button feel dead.
+    showAppMessage(
+      context,
+      next ? 'أُضيفت البطاقة إلى المفضلة.' : 'أُزيلت البطاقة من المفضلة.',
+    );
     try {
       await ref.read(contentRepositoryProvider).setCardFavorite(card.id, next);
     } catch (_) {
@@ -677,7 +684,11 @@ class _SideLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Centred rather than pinned to an edge: the words under it are centred,
+    // and a label hanging off one side made the whole card look misaligned.
     return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
         Text(
           label,
@@ -685,11 +696,11 @@ class _SideLabel extends StatelessWidget {
             color: color,
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            letterSpacing: 0.4,
+            letterSpacing: 0.6,
           ),
         ),
-        const Spacer(),
-        SpeakButton(text: text, size: 34, tint: tint),
+        const SizedBox(width: 8),
+        SpeakButton(text: text, size: 32, tint: tint),
       ],
     );
   }
@@ -714,6 +725,11 @@ class _CardBody extends StatelessWidget {
   final bool favorite;
   final VoidCallback onToggleFavorite;
 
+  /// Gold is legible on the white question card and on the dark green answer
+  /// card. The brand lime was not, which is why a starred card still looked
+  /// unstarred to anyone who tapped it.
+  static const Color _starInk = Color(0xFFE0A200);
+
   @override
   Widget build(BuildContext context) {
     // The card itself is a light island on the green page in both themes, so
@@ -724,228 +740,243 @@ class _CardBody extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.62)
         : AppColors.muted;
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
+    return Column(
+      children: <Widget>[
+        _header(muted),
+        const SizedBox(height: 6),
+        // The card is a fixed-size island: the content is centred in whatever
+        // height is left over, and scrolls only when it is genuinely taller
+        // than that.
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              child: SizedBox(
+                width: double.infinity,
+                child: revealed
+                    ? _answer(context, muted)
+                    : _question(context, ink, muted),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _header(Color muted) {
+    return Row(
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: revealed ? AppColors.primaryDeep : AppColors.accentSoft,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            deck.title,
+            style: TextStyle(
+              color: revealed ? AppColors.accent : AppColors.primary,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const Spacer(),
+        Text('بطاقة $position', style: TextStyle(color: muted, fontSize: 11)),
+        const SizedBox(width: 2),
+        IconButton(
+          onPressed: onToggleFavorite,
+          tooltip: favorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة',
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+          padding: EdgeInsets.zero,
+          icon: Icon(
+            favorite ? CupertinoIcons.star_fill : CupertinoIcons.star,
+            size: 21,
+            color: favorite ? _starInk : muted,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _question(BuildContext context, Color ink, Color muted) {
+    if (card.type == 'occlusion') {
+      return OcclusionView(
+        imageUrl: occlusionImageUrl(card.front),
+        boxes: occlusionBoxes(card.occlusion),
+        masked: true,
+        height: 250,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        CardMarkup(
+          text: card.front,
+          revealCloze: false,
+          mediaFirst: true,
+          alignment: CrossAxisAlignment.center,
+          textAlign: TextAlign.center,
+          onTapImage: (String url) => showImageViewer(context, url),
+          textHeader: _SideLabel(
+            label: 'السؤال',
+            text: card.front,
+            tint: AppColors.primary,
+            color: muted,
+          ),
+          style: TextStyle(
+            fontFamily: 'ReadexPro',
+            fontSize: 26,
+            height: 1.5,
+            fontWeight: FontWeight.w700,
+            color: ink,
+          ),
+          mediaHeight: 220,
+        ),
+        if (card.hint != null && hintVisible) ...<Widget>[
+          const SizedBox(height: 16),
+          _hint(card.hint!),
+        ],
+      ],
+    );
+  }
+
+  Widget _answer(BuildContext context, Color muted) {
+    // No inner container, no second background, no border: the answer sits on
+    // the surface the question did, so turning the card over changes the
+    // colour and nothing else. The nested green box was the "card inside a
+    // card" that made this screen look unfinished.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: <Widget>[
+        if (card.type == 'occlusion') ...<Widget>[
+          OcclusionView(
+            imageUrl: occlusionImageUrl(card.front),
+            boxes: occlusionBoxes(card.occlusion),
+            masked: false,
+            height: 230,
+          ),
+          const SizedBox(height: 14),
+        ],
+        CardMarkup(
+          text: card.back,
+          mediaFirst: true,
+          alignment: CrossAxisAlignment.center,
+          textAlign: TextAlign.center,
+          onTapImage: (String url) => showImageViewer(context, url),
+          textHeader: _SideLabel(
+            label: 'الإجابة',
+            text: card.back,
+            tint: AppColors.accent,
+            color: AppColors.accent,
+          ),
+          style: const TextStyle(
+            fontFamily: 'ReadexPro',
+            color: Colors.white,
+            fontSize: 29,
+            height: 1.45,
+            fontWeight: FontWeight.w800,
+          ),
+          mediaHeight: 220,
+        ),
+        if (card.tags.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 7,
+            runSpacing: 7,
             children: <Widget>[
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+              for (final String tag in card.tags)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    tag,
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: revealed
-                      ? AppColors.primaryDeep
-                      : AppColors.accentSoft,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  deck.title,
+            ],
+          ),
+        ],
+        if (card.hint != null && hintVisible) ...<Widget>[
+          const SizedBox(height: 14),
+          _hint(card.hint!),
+        ],
+        if (card.note != null) ...<Widget>[
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  'ملاحظة',
                   style: TextStyle(
-                    color: revealed ? AppColors.accent : AppColors.primary,
+                    color: AppColors.accent,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              ),
-              const Spacer(),
-              Text(
-                'بطاقة $position',
-                style: TextStyle(color: muted, fontSize: 11),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                onPressed: onToggleFavorite,
-                tooltip: favorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة',
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: EdgeInsets.zero,
-                icon: Icon(
-                  favorite ? CupertinoIcons.star_fill : CupertinoIcons.star,
-                  size: 20,
-                  color: favorite ? AppColors.accent : muted,
+                const SizedBox(height: 3),
+                Text(
+                  card.note!,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.86),
+                    fontSize: 12.5,
+                    height: 1.6,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 14),
-          if (!revealed) ...<Widget>[
-            // Picture first, then the label row, then the words. The speaker
-            // sits in that row, right beside the text it reads.
-            if (card.type == 'occlusion')
-              OcclusionView(
-                imageUrl: occlusionImageUrl(card.front),
-                boxes: occlusionBoxes(card.occlusion),
-                masked: true,
-                height: 210,
-              )
-            else
-              CardMarkup(
-                text: card.front,
-                revealCloze: false,
-                mediaFirst: true,
-                textHeader: _SideLabel(
-                  label: 'السؤال',
-                  text: card.front,
-                  tint: AppColors.primary,
-                  color: muted,
-                ),
-                style: TextStyle(
-                  fontFamily: 'ReadexPro',
-                  fontSize: 24,
-                  height: 1.55,
-                  fontWeight: FontWeight.w700,
-                  color: ink,
-                ),
-                mediaHeight: 220,
-              ),
-            if (card.hint != null && hintVisible) ...<Widget>[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(11),
-                decoration: BoxDecoration(
-                  color: AppColors.warning,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    const Icon(
-                      CupertinoIcons.lightbulb,
-                      size: 16,
-                      color: AppColors.warningInk,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        card.hint!,
-                        style: const TextStyle(
-                          color: AppColors.warningInk,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ] else ...<Widget>[
-            // The answer side shows the answer and nothing else: repeating the
-            // question here made the reader scan two blocks to find the one
-            // they turned the card over for.
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.45),
-                  width: 1.2,
-                ),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  if (card.type == 'occlusion') ...<Widget>[
-                    OcclusionView(
-                      imageUrl: occlusionImageUrl(card.front),
-                      boxes: occlusionBoxes(card.occlusion),
-                      masked: false,
-                      height: 210,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  CardMarkup(
-                    text: card.back,
-                    mediaFirst: true,
-                    textHeader: _SideLabel(
-                      label: 'الإجابة',
-                      text: card.back,
-                      tint: AppColors.accent,
-                      color: AppColors.accent,
-                    ),
-                    style: const TextStyle(
-                      fontFamily: 'ReadexPro',
-                      color: AppColors.accent,
-                      fontSize: 26,
-                      height: 1.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    mediaHeight: 220,
-                  ),
-                ],
+        ],
+      ],
+    );
+  }
+
+  Widget _hint(String hint) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.warning,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Icon(
+            CupertinoIcons.lightbulb,
+            size: 14,
+            color: AppColors.warningInk,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              hint,
+              style: const TextStyle(
+                color: AppColors.warningInk,
+                fontSize: 12,
+                height: 1.6,
               ),
             ),
-            if (card.tags.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 7,
-                runSpacing: 7,
-                children: <Widget>[
-                  for (final String tag in card.tags)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentSoft,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        tag,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-            if (card.note != null) ...<Widget>[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryDeep,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    const Text(
-                      'ملاحظتي',
-                      style: TextStyle(
-                        color: AppColors.accent,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      card.note!,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.86),
-                        fontSize: 12.5,
-                        height: 1.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
+          ),
         ],
       ),
     );

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/confetti_burst.dart';
 import '../../data/content_providers.dart';
@@ -48,7 +49,11 @@ class TestModeScreen extends ConsumerWidget {
     if (usable.length < 2) {
       return _NotEnough(deckTitle: deck?.title ?? '');
     }
-    return _TestSession(deckTitle: deck?.title ?? 'اختبار', cards: usable);
+    return _TestSession(
+      deckId: deckId,
+      deckTitle: deck?.title ?? 'اختبار',
+      cards: usable,
+    );
   }
 }
 
@@ -88,23 +93,32 @@ List<_Question> _buildQuestions(List<ReviewCard> cards) {
   return questions;
 }
 
-class _TestSession extends StatefulWidget {
-  const _TestSession({required this.deckTitle, required this.cards});
+class _TestSession extends ConsumerStatefulWidget {
+  const _TestSession({
+    required this.deckId,
+    required this.deckTitle,
+    required this.cards,
+  });
 
+  final String deckId;
   final String deckTitle;
   final List<ReviewCard> cards;
 
   @override
-  State<_TestSession> createState() => _TestSessionState();
+  ConsumerState<_TestSession> createState() => _TestSessionState();
 }
 
-class _TestSessionState extends State<_TestSession> {
+class _TestSessionState extends ConsumerState<_TestSession> {
   late List<_Question> _questions = _buildQuestions(widget.cards);
   Timer? _advance;
   int _index = 0;
   int _correct = 0;
   int? _picked;
   bool _finished = false;
+
+  /// When the current question appeared, so the answer carries a real latency
+  /// into FSRS instead of a guess.
+  DateTime _shownAt = DateTime.now();
 
   @override
   void dispose() {
@@ -131,6 +145,29 @@ class _TestSessionState extends State<_TestSession> {
     } else {
       HapticFeedback.heavyImpact();
     }
+    // A test answer is genuine evidence about memory, so it moves the card's
+    // FSRS schedule: right is Good, wrong is Again. It is written off the
+    // frame so the next question is never delayed by the database.
+    unawaited(
+      ref
+          .read(contentRepositoryProvider)
+          .recordReview(
+            cardId: question.card.id,
+            rating: right ? 3 : 1,
+            elapsedMs: DateTime.now().difference(_shownAt).inMilliseconds,
+            allowEarly: true,
+          )
+          .catchError((Object error) {
+            if (!mounted) {
+              return;
+            }
+            showAppMessage(
+              context,
+              'تعذّر حفظ نتيجة السؤال في جدول المراجعة.',
+              kind: AppMessageKind.error,
+            );
+          }),
+    );
     _advance = Timer(const Duration(milliseconds: 980), _next);
   }
 
@@ -145,6 +182,7 @@ class _TestSessionState extends State<_TestSession> {
     setState(() {
       _index++;
       _picked = null;
+      _shownAt = DateTime.now();
     });
   }
 
@@ -156,6 +194,7 @@ class _TestSessionState extends State<_TestSession> {
       _correct = 0;
       _picked = null;
       _finished = false;
+      _shownAt = DateTime.now();
     });
   }
 
