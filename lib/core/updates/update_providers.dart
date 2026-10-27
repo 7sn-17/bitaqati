@@ -5,16 +5,17 @@ import 'update_service.dart';
 
 /// The updater, wired to the app's preferences so a check can be cached.
 final Provider<UpdateService> updateServiceProvider = Provider<UpdateService>(
-  (Ref ref) => UpdateService(prefs: ref.watch(sharedPreferencesProvider)),
+  (Ref ref) => UpdateService(ref.watch(sharedPreferencesProvider)),
 );
 
 /// The newest release, or null when the check could not be made.
 ///
 /// Kept in a provider so the launch prompt and the Settings row share one
 /// answer instead of asking GitHub twice.
-final FutureProvider<UpdateInfo?> updateInfoProvider = FutureProvider<UpdateInfo?>(
-  (Ref ref) => ref.watch(updateServiceProvider).check(),
-);
+final FutureProvider<UpdateInfo?> updateInfoProvider =
+    FutureProvider<UpdateInfo?>(
+      (Ref ref) => ref.watch(updateServiceProvider).check(),
+    );
 
 /// The installed version, read from the Android manifest rather than from a
 /// constant, so the number in the UI can never drift from the APK.

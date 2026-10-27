@@ -75,13 +75,11 @@ class UpdateInfo {
 /// `v<version>` and the APK is always attached as `bitaqati.apk`. That makes
 /// both the comparison and the download URL predictable.
 class UpdateService {
-  UpdateService({
-    required SharedPreferences prefs,
-    http.Client? client,
-    DateTime Function()? clock,
-  }) : _prefs = prefs,
-       _client = client ?? http.Client(),
-       _clock = clock ?? DateTime.now;
+  /// [prefs] is positional because it is the one required dependency; the
+  /// rest exist so a test can inject a fake client and a fixed clock.
+  UpdateService(this._prefs, {http.Client? client, DateTime Function()? clock})
+    : _client = client ?? http.Client(),
+      _clock = clock ?? DateTime.now;
 
   final SharedPreferences _prefs;
   final http.Client _client;
