@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bitaqati.app",
+      "sha256_cert_fingerprints": [
+        "19:E4:6F:09:DE:25:39:0E:E2:96:A0:91:9A:8B:2B:DA:BF:6F:CA:94:82:FC:B0:94:F5:2D:BA:81:BE:D2:C3:FA"
+      ]
+    }
+  }
+]

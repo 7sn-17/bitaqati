@@ -15,24 +15,28 @@ New links are always HTTPS.
 
 ## What has to exist outside this repository
 
-1. **Android App Links** — `https://bitaqati.app/.well-known/assetlinks.json`
-   must list `com.bitaqati.app` with the SHA-256 of the release certificate.
-   Get it with:
+1. **Android App Links** — copy `docs/assetlinks.json` to
+   `https://bitaqati.app/.well-known/assetlinks.json` and serve it as
+   `application/json`. It already carries the release fingerprint:
 
-   ```bash
-   keytool -list -v -keystore android/app/bitaqati.p12 \
-     -alias <alias> -storepass <password> | grep SHA256
+   ```text
+   SHA-256  19:E4:6F:09:DE:25:39:0E:E2:96:A0:91:9A:8B:2B:DA:BF:6F:CA:94:82:FC:B0:94:F5:2D:BA:81:BE:D2:C3:FA
+   SHA-1    3E:49:76:21:2F:89:7E:C9:A0:0C:3F:1E:80:43:58:C7:32:EB:F0:C0
    ```
 
-   ```json
-   [{
-     "relation": ["delegate_permission/common.handle_all_urls"],
-     "target": {
-       "namespace": "android_app",
-       "package_name": "com.bitaqati.app",
-       "sha256_cert_fingerprints": ["<SHA256>"]
-     }
-   }]
+   Both come from the certificate inside the release keystore (verified
+   against the published APK and `apksigner`). To re-derive them without the
+   keystore password, read the certificate out of a signed APK:
+
+   ```bash
+   keytool -printcert -jarfile app-arm64-v8a-release.apk
+   ```
+
+   If the keystore is ever replaced, update this file **and** the SHA-1 in
+   Google Cloud Console, then re-verify with:
+
+   ```bash
+   adb shell pm verify-app-links --re-verify com.bitaqati.app
    ```
 
 2. **Web preview** — the `deck-share` edge function renders the Open Graph page
