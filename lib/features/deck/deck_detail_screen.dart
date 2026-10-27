@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_providers.dart';
-import '../../core/config/app_config.dart';
 import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -977,7 +976,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     if (code == null || code.isEmpty) {
       return;
     }
-    final String link = AppConfig.deckShareLink(deck.id);
     showModalBottomSheet<void>(
       context: screenContext,
       backgroundColor: Colors.transparent,
@@ -997,7 +995,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               Text('رمز المشاركة', style: context.texts.titleMedium),
               const SizedBox(height: 4),
               Text(
-                'أرسله لمن تريد، أو أرسل الرابط مباشرة.',
+                'أرسل هذا الرمز لمن تريد مشاركة المجموعة معه.',
                 style: context.texts.bodySmall,
               ),
               const SizedBox(height: 14),
@@ -1021,24 +1019,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _copy(context, code, 'تم نسخ الرمز.'),
-                      icon: const Icon(CupertinoIcons.doc_on_doc, size: 15),
-                      label: const Text('نسخ الرمز'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _copy(context, link, 'تم نسخ الرابط.'),
-                      icon: const Icon(CupertinoIcons.link, size: 15),
-                      label: const Text('نسخ الرابط'),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _copy(context, code, 'تم نسخ الرمز.'),
+                  icon: const Icon(CupertinoIcons.doc_on_doc, size: 15),
+                  label: const Text('نسخ الرمز'),
+                ),
               ),
             ],
           ),
@@ -3022,7 +3009,7 @@ class _PrivacyOption extends StatelessWidget {
       case DeckPrivacy.private:
         icon = CupertinoIcons.lock;
       case DeckPrivacy.unlisted:
-        icon = CupertinoIcons.link;
+        icon = CupertinoIcons.number;
       case DeckPrivacy.public:
         icon = CupertinoIcons.globe;
     }

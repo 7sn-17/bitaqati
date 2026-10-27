@@ -24,15 +24,6 @@ abstract final class AppConfig {
   /// SharedPreferences key for a link that arrived before sign-in completed.
   static const String pendingDeckKey = 'pending_deck_id';
 
-  /// Universal share link. Opens the app when it is installed (Android App
-  /// Links / iOS Universal Links) and the web preview otherwise.
-  static String deckShareLink(String deckId) =>
-      'https://$shareHost/deck/$deckId';
-
-  /// Legacy custom-scheme link, still recognised when opened.
-  static String legacyDeckShareLink(String deckId) =>
-      '$shareScheme://deck/$deckId';
-
   /// Extracts a deck id from a share link, or null for unrelated links.
   ///
   /// Accepts `https://bitaqati.app/deck/<id>` and the old

@@ -15,24 +15,22 @@ class SharingFailure implements Exception {
   String toString() => message;
 }
 
-/// What the user needs to hand a deck to someone else.
+/// What the user needs to hand a deck to someone else: the deck id and the
+/// six-character code. Decks are shared by code only, so there is no link here
+/// to copy, paste or accidentally send to the wrong person.
 class SharingResult {
-  const SharingResult({
-    required this.deckId,
-    required this.shareCode,
-    required this.link,
-  });
+  const SharingResult({required this.deckId, required this.shareCode});
 
   final String deckId;
   final String shareCode;
-  final String link;
 }
 
 /// Publishes a local deck snapshot to Supabase.
 ///
 /// Decks are flat, so publishing is one deck row plus its cards. The local
-/// UUID is kept, so the same link works before and after someone installs it,
-/// and re-publishing updates in place instead of creating duplicates.
+/// UUID is kept, so the share code resolves to the same deck before and after
+/// someone installs it, and re-publishing updates in place instead of creating
+/// duplicates.
 class SharingService {
   SharingService(this._repository);
 
@@ -55,14 +53,16 @@ class SharingService {
         );
       }
 
-      await client.from('decks').upsert(
-        _deckPayload(
-          bundle.row,
-          ownerId: user.id,
-          privacy: privacy,
-          shareCode: bundle.deck.shareCode,
-        ),
-      );
+      await client
+          .from('decks')
+          .upsert(
+            _deckPayload(
+              bundle.row,
+              ownerId: user.id,
+              privacy: privacy,
+              shareCode: bundle.deck.shareCode,
+            ),
+          );
 
       // The server owns uniqueness: it keeps our code unless another account
       // already claimed it, in which case it minted a fresh one. Read back
@@ -76,40 +76,32 @@ class SharingService {
           ? (stored.first['share_code'] as String? ?? '')
           : (bundle.deck.shareCode ?? '');
       if (code.isEmpty) {
-        throw const SharingFailure(
-          'تعذّر توليد رمز المشاركة. حاول مرة أخرى.',
-        );
+        throw const SharingFailure('تعذّر توليد رمز المشاركة. حاول مرة أخرى.');
       }
       // The server owns uniqueness, so it may have replaced a colliding code.
       await _repository.setDeckShareCode(deckId, code);
 
-      await client.from('cards').upsert(
-        <Map<String, Object?>>[
-          for (final DeckBundleCard card in bundle.cards)
-            <String, Object?>{
-              'id': card.id,
-              'deck_id': card.deckId,
-              'type': card.type,
-              'front': card.front,
-              'back': card.back,
-              'notes': card.notes,
-              'hint': card.hint,
-              'tags': card.tags,
-              'media': card.media,
-              'occlusion': card.occlusion,
-              'source': card.source,
-              'ai_generated': card.aiGenerated,
-              'position': card.position,
-            },
-        ],
-      );
+      await client.from('cards').upsert(<Map<String, Object?>>[
+        for (final DeckBundleCard card in bundle.cards)
+          <String, Object?>{
+            'id': card.id,
+            'deck_id': card.deckId,
+            'type': card.type,
+            'front': card.front,
+            'back': card.back,
+            'notes': card.notes,
+            'hint': card.hint,
+            'tags': card.tags,
+            'media': card.media,
+            'occlusion': card.occlusion,
+            'source': card.source,
+            'ai_generated': card.aiGenerated,
+            'position': card.position,
+          },
+      ]);
 
       await _repository.setDeckPrivacy(deckId, privacy);
-      return SharingResult(
-        deckId: deckId,
-        shareCode: code,
-        link: AppConfig.deckShareLink(deckId),
-      );
+      return SharingResult(deckId: deckId, shareCode: code);
     } on SharingFailure {
       rethrow;
     } on PostgrestException {

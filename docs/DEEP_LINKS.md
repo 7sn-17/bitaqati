@@ -36,24 +36,32 @@ so a leaked code cannot expose an unpublished deck.
 
 ### Copying a code
 
-The deck screen's overflow menu has **نسخ رمز المشاركة** and the privacy card
-shows the code with its own copy button. The code is stored locally, so it is
+The deck screen's top bar has a code button that opens a sheet with one
+**نسخ الرمز** action, and the privacy card repeats the code next to the current
+visibility. The code is stored locally, so it is
 available before the deck is ever published — the server only confirms it
 during the first publish, and may replace it if another account already
 claimed the same string.
 
-## Link format
+A deck is shared **only** by that code. The app never builds, shows or copies a
+share URL: there is no link button anywhere in the interface, and
+`SharingResult` carries no link field.
+
+## Inbound links
+
+The app still **accepts** the old URL forms, so links shared before the switch
+keep working.
 
 ```text
 https://bitaqati.app/deck/<deck-id>
+bitaqati://deck/<deck-id>
 ```
 
 The id is the deck UUID, identical locally and in Supabase, so a link keeps
 working before and after the recipient installs the deck.
 
-The legacy `bitaqati://deck/<deck-id>` scheme is still accepted by
-`AppConfig.deckIdFromShareLink`, so links shared by older builds keep working.
-New links are always HTTPS.
+Both forms are parsed by `AppConfig.deckIdFromShareLink`. Nothing in the app
+produces these URLs any more; the parser is a compatibility path only.
 
 ## What has to exist outside this repository
 

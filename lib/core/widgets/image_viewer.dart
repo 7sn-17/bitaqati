@@ -3,8 +3,6 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
-
 /// Opens a card attachment full screen on a black backdrop, with pinch zoom.
 ///
 /// A review card crops pictures to keep the card a card, which is the right

@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/auth_providers.dart';
@@ -23,6 +24,15 @@ import '../../data/auth_service.dart';
 import '../../data/profile_providers.dart';
 import '../../data/profile_repository.dart';
 import '../updates/update_dialog.dart';
+
+/// What the share sheet sends. One paragraph about the app, then the direct
+/// APK link, so the receiver can install without hunting through the releases
+/// page on a phone.
+const String _shareAppText =
+    'جرب تطبيق بطاقاتي! تطبيق عربي احترافي يساعدك على الحفظ والمراجعة '
+    'باستخدام التكرار المتباعد والذكاء الاصطناعي.\n\n'
+    'حمّل التطبيق الآن من هنا:\n'
+    'https://github.com/7sn-17/bitaqati/releases/latest/download/bitaqati.apk';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -255,6 +265,12 @@ class SettingsScreen extends ConsumerWidget {
             _Group(
               children: <Widget>[
                 _Row(
+                  icon: CupertinoIcons.share,
+                  title: 'شارك التطبيق',
+                  subtitle: 'أرسل رابط التنزيل لمن تحب',
+                  onTap: () => _shareApp(context),
+                ),
+                _Row(
                   icon: CupertinoIcons.person_crop_circle,
                   title: 'المطور',
                   subtitle: 'حسن المحمد · تواصل مباشر',
@@ -407,6 +423,32 @@ class SettingsScreen extends ConsumerWidget {
       return;
     }
     await showUpdateDialog(context, info);
+  }
+
+  /// Hands the download link to the native share sheet.
+  ///
+  /// The message is fixed text plus the APK URL, so it reads the same whether
+  /// it lands in WhatsApp, Telegram or an email draft.
+  Future<void> _shareApp(BuildContext context) async {
+    final RenderBox? box = context.findRenderObject() as RenderBox?;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: _shareAppText,
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } catch (_) {
+      if (context.mounted) {
+        showAppMessage(
+          context,
+          'تعذّر فتح نافذة المشاركة على هذا الجهاز.',
+          kind: AppMessageKind.error,
+        );
+      }
+    }
   }
 
   Future<void> _askForPermission(BuildContext context, WidgetRef ref) async {
