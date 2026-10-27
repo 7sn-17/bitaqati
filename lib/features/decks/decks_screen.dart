@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/deck_card.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/tag_filter_bar.dart';
 import '../../data/content_providers.dart';
 import '../../domain/models.dart';
@@ -44,9 +45,10 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 118),
-        children: <Widget>[
+      child: CustomScrollView(
+        slivers: <Widget>[
+          SliverList.list(
+            children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
             child: Row(
@@ -113,42 +115,39 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
             },
           ),
           const SizedBox(height: 18),
+            ],
+          ),
           if (decks.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-              child: Column(
-                children: <Widget>[
-                  Icon(
-                    CupertinoIcons.search,
-                    size: 42,
-                    color: context.texts.bodySmall?.color,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    allDecks.isEmpty
-                        ? 'لا توجد مجموعات بعد'
-                        : 'لا توجد نتائج مطابقة',
-                    style: context.texts.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    allDecks.isEmpty
-                        ? 'أنشئ أول مجموعة من زر + في الأسفل.'
-                        : 'جرّب وسماً آخر أو كلمة بحث مختلفة.',
-                    style: context.texts.bodySmall,
-                  ),
-                ],
+            SliverToBoxAdapter(
+              child: EmptyState(
+                icon: allDecks.isEmpty
+                    ? CupertinoIcons.rectangle_stack
+                    : CupertinoIcons.search,
+                title: allDecks.isEmpty
+                    ? 'لا توجد مجموعات بعد'
+                    : 'لا توجد نتائج مطابقة',
+                message: allDecks.isEmpty
+                    ? 'أنشئ أول مجموعة من زر + في الأسفل.'
+                    : 'جرّب وسماً آخر أو كلمة بحث مختلفة.',
               ),
             )
           else
-            for (final DeckNode deck in decks)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
-                child: DeckCard(
-                  deck: deck,
-                  onTap: () => context.push('/deck/${deck.id}'),
-                ),
-              ),
+            // Built lazily: a deck list that grows to a few hundred entries
+            // should cost the same to open as one with ten.
+            SliverList.builder(
+              itemCount: decks.length,
+              itemBuilder: (BuildContext context, int index) {
+                final DeckNode deck = decks[index];
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
+                  child: DeckCard(
+                    deck: deck,
+                    onTap: () => context.push('/deck/${deck.id}'),
+                  ),
+                );
+              },
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 118)),
         ],
       ),
     );
