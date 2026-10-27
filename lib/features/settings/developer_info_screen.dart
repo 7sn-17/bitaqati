@@ -209,7 +209,7 @@ class _ContactCard extends StatelessWidget {
     this.gradient,
   });
 
-  final IconData icon;
+  final FaIconData icon;
   final String label;
   final String value;
 
@@ -389,7 +389,7 @@ class _BrandBadge extends StatelessWidget {
     this.gradient,
   });
 
-  final IconData icon;
+  final FaIconData icon;
   final Color tint;
   final bool dark;
   final List<Color>? gradient;
