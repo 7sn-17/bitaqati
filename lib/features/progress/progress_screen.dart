@@ -20,8 +20,6 @@ class ProgressScreen extends ConsumerStatefulWidget {
 }
 
 class _ProgressScreenState extends ConsumerState<ProgressScreen> {
-  int _range = 1;
-
   @override
   Widget build(BuildContext context) {
     final AsyncValue<List<ReviewActivityDay>> activityAsync = ref.watch(
@@ -35,18 +33,17 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
     final DueTotals due = ref.watch(dueTotalsProvider);
     final DeckNode? todayDeck = ref.watch(todayReviewDeckProvider);
     final List<DeckNode> forest = ref.watch(deckForestProvider);
-    final List<ReviewActivityDay> visible = _inRange(activity);
-    final int reviews = visible.fold<int>(
+    final int reviews = activity.fold<int>(
       0,
       (int sum, ReviewActivityDay day) => sum + day.reviews,
     );
-    final int correct = visible.fold<int>(
+    final int correct = activity.fold<int>(
       0,
       (int sum, ReviewActivityDay day) => sum + day.correct,
     );
     final int retention = reviews == 0 ? 0 : (correct / reviews * 100).round();
     final int longest = _longestStreak(activity);
-    final int activeDays = visible.where((day) => day.reviews > 0).length;
+    final int activeDays = activity.where((day) => day.reviews > 0).length;
     final String streakValue = currentStreak == 2
         ? 'يومان'
         : '$currentStreak';
@@ -103,14 +100,6 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
               onBrowse: () => context.go('/decks'),
             )
           else ...<Widget>[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _RangeSelector(
-                selected: _range,
-                onChanged: (int value) => setState(() => _range = value),
-              ),
-            ),
-            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -200,19 +189,6 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
         ],
       ),
     );
-  }
-
-  List<ReviewActivityDay> _inRange(List<ReviewActivityDay> activity) {
-    if (_range == 2) {
-      return activity;
-    }
-    final DateTime now = DateTime.now();
-    final DateTime today = DateTime(now.year, now.month, now.day);
-    final int days = _range == 0 ? 7 : 30;
-    final DateTime cutoff = today.subtract(Duration(days: days - 1));
-    return activity
-        .where((ReviewActivityDay day) => !day.day.isBefore(cutoff))
-        .toList(growable: false);
   }
 
   int _longestStreak(List<ReviewActivityDay> activity) {
@@ -330,58 +306,6 @@ class _EmptyProgress extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _RangeSelector extends StatelessWidget {
-  const _RangeSelector({required this.selected, required this.onChanged});
-
-  final int selected;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    const List<String> labels = <String>['أسبوع', 'شهر', 'الكل'];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: <Widget>[
-          for (int index = 0; index < labels.length; index++)
-            Expanded(
-              child: GestureDetector(
-                onTap: () => onChanged(index),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: selected == index
-                        ? context.colors.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    labels[index],
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: selected == index
-                          ? FontWeight.w600
-                          : FontWeight.w400,
-                      color: selected == index
-                          ? (context.isDark ? AppColors.primary : Colors.white)
-                          : context.texts.bodySmall?.color,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }

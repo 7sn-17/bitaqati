@@ -7,27 +7,51 @@ abstract final class AppConfig {
   static const String appNameEn = 'Bitaqati';
   static const String appVersion = '0.1.0';
 
-  /// Custom URL scheme registered by the Android manifest.
+  /// Custom URL scheme kept for links that were already shared.
   ///
-  /// Links look like `bitaqati://deck/<deck-id>`. The id is the same UUID the
-  /// deck has locally and in Supabase, so the recipient can open a preview
-  /// and install an exact snapshot.
+  /// New links use HTTPS so they can travel through WhatsApp, Telegram and any
+  /// browser; the custom scheme only stays as a compatibility path.
   static const String shareScheme = 'bitaqati';
+
+  /// Public web host that serves the deck preview page and the
+  /// `assetlinks.json` file used for Android App Links verification.
+  static const String shareHost = 'bitaqati.app';
 
   /// SharedPreferences key for a link that arrived before sign-in completed.
   static const String pendingDeckKey = 'pending_deck_id';
 
-  static String deckShareLink(String deckId) => '$shareScheme://deck/$deckId';
+  /// Universal share link. Opens the app when it is installed (Android App
+  /// Links / iOS Universal Links) and the web preview otherwise.
+  static String deckShareLink(String deckId) =>
+      'https://' + shareHost + '/deck/' + deckId;
+
+  /// Legacy custom-scheme link, still recognised when opened.
+  static String legacyDeckShareLink(String deckId) =>
+      shareScheme + '://deck/' + deckId;
 
   /// Extracts a deck id from a share link, or null for unrelated links.
+  ///
+  /// Accepts `https://bitaqati.app/deck/<id>` and the old
+  /// `bitaqati://deck/<id>` form.
   static String? deckIdFromShareLink(Uri uri) {
-    if (uri.scheme != shareScheme || uri.host != 'deck') {
+    if (uri.scheme == shareScheme && uri.host == 'deck') {
+      if (uri.pathSegments.isEmpty) {
+        return null;
+      }
+      final String id = uri.pathSegments.first.trim();
+      return id.isEmpty ? null : id;
+    }
+    final bool web =
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        (uri.host == shareHost || uri.host == 'www.' + shareHost);
+    if (!web) {
       return null;
     }
-    if (uri.pathSegments.isEmpty) {
+    final List<String> segments = uri.pathSegments;
+    if (segments.length < 2 || segments.first != 'deck') {
       return null;
     }
-    final String id = uri.pathSegments.first.trim();
+    final String id = segments[1].trim();
     return id.isEmpty ? null : id;
   }
 

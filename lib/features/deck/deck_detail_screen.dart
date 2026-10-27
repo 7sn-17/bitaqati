@@ -10,6 +10,7 @@ import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
+import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/deck_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/surface_card.dart';
@@ -20,7 +21,6 @@ import '../../data/sharing_providers.dart';
 import '../../data/sharing_service.dart';
 import '../../domain/enums.dart';
 import '../../domain/models.dart';
-import '../create/card_editor_sheet.dart';
 import '../create/deck_editor_sheet.dart';
 import '../create/editor_common.dart';
 import '../library/install_library_deck.dart';
@@ -803,7 +803,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     showDeckEditorSheet(context, parentId: deck.id, parentTitle: deck.title);
   }
 
-  void _addCard(BuildContext context, DeckNode deck) {
+  Future<void> _addCard(BuildContext context, DeckNode deck) async {
     if (!ensureCanCreate(context, ref)) {
       return;
     }
@@ -815,7 +815,12 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       );
       return;
     }
-    showCardEditorSheet(context, deckId: deck.id);
+    final String? message = await context.push<String>(
+      '/create-card?deckId=' + deck.id,
+    );
+    if (message != null && context.mounted) {
+      showAppMessage(context, message);
+    }
   }
 
   Future<void> _editCard(BuildContext context, ReviewCard card) async {
@@ -827,9 +832,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     )) {
       return;
     }
-    final ReviewCard? updated = await showCardEditSheet(context, card);
-    if (updated != null && context.mounted) {
-      showAppMessage(context, 'تم تحديث البطاقة.');
+    final String? message = await context.push<String>(
+      '/edit-card/' + card.id + '?deckId=' + card.deckId,
+    );
+    if (message != null && context.mounted) {
+      showAppMessage(context, message);
     }
   }
 
@@ -1355,13 +1362,14 @@ String _cardPreviewText(String raw, {String fallback = ''}) {
   if (value.isEmpty) {
     return fallback;
   }
-  if (RegExp(r'^!\[[^\]]*\]\([^)]+\)$').hasMatch(value)) {
+  if (isImageOnly(value)) {
     return 'صورة تغطية';
   }
   if (RegExp(r'^\[(?:صوت|sound)[^\]]*\]\([^)]+\)$').hasMatch(value)) {
     return 'مرفق صوتي';
   }
-  return value;
+  final String plain = plainMarkup(value);
+  return plain.isEmpty ? fallback : plain;
 }
 
 class _SelectableCardRow extends StatelessWidget {
@@ -1386,184 +1394,157 @@ class _SelectableCardRow extends StatelessWidget {
     final _CardStatusInfo status = _statusFor(card);
     final String front = _cardPreviewText(card.front, fallback: 'بدون نص');
     final String back = _cardPreviewText(card.back);
-    final Color surface = context.isDark
-        ? AppColors.darkSurfaceHigh
-        : Colors.white;
+    final bool hasBack = back.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(22),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
-            decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.accentSoft.withValues(
-                      alpha: context.isDark ? 0.2 : 1,
-                    )
-                  : surface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: selected
-                    ? AppColors.accent
-                    : context.colors.outlineVariant.withValues(
-                        alpha: context.isDark ? 0.45 : 0.7,
-                      ),
-                width: selected ? 1.4 : 1,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: selected ? context.softAccent : context.cardSurface,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected
+                      ? context.brandInk.withValues(alpha: 0.55)
+                      : context.hairline,
+                  width: selected ? 1.4 : 1,
+                ),
               ),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: Colors.black.withValues(
-                    alpha: context.isDark ? 0.2 : 0.045,
-                  ),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      width: 27,
-                      height: 27,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.accent
-                            : AppColors.accentSoft.withValues(
-                                alpha: context.isDark ? 0.2 : 1,
-                              ),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: selecting
-                          ? Icon(
-                              selected
-                                  ? CupertinoIcons.checkmark_alt
-                                  : CupertinoIcons.circle,
-                              size: 15,
-                              color: selected
-                                  ? AppColors.primary
-                                  : context.texts.bodySmall?.color,
-                            )
-                          : Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 8),
-                    _StatusBadge(info: status),
-                    if (card.type != 'basic') ...<Widget>[
-                      const SizedBox(width: 5),
-                      _TypeBadge(type: card.type),
-                    ],
-                    const Spacer(),
-                    if (card.tags.isNotEmpty)
-                      Icon(
-                        CupertinoIcons.tag,
-                        size: 13,
-                        color: context.texts.bodySmall?.color,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 9),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Text(
-                    front,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.texts.titleMedium?.copyWith(
-                      height: 1.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (back.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  // State stripe: the fastest way to read a long list.
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 9,
+                    width: 4,
+                    color: status.color.withValues(
+                      alpha: context.isDark ? 0.85 : 0.9,
                     ),
-                    decoration: BoxDecoration(
-                      color: context.isDark
-                          ? AppColors.darkCanvas
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Icon(
-                            CupertinoIcons.reply,
-                            size: 13,
-                            color: context.texts.bodySmall?.color,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Row(
+                            children: <Widget>[
+                              _SelectionMark(
+                                index: index,
+                                selected: selected,
+                                selecting: selecting,
+                              ),
+                              const SizedBox(width: 8),
+                              _StatusBadge(info: status),
+                              if (card.type != 'basic') ...<Widget>[
+                                const SizedBox(width: 5),
+                                _TypeBadge(type: card.type),
+                              ],
+                              const Spacer(),
+                              if (card.favorite)
+                                Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                    end: 4,
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.star_fill,
+                                    size: 13,
+                                    color: context.brandInk,
+                                  ),
+                                ),
+                              if (card.tags.isNotEmpty)
+                                Icon(
+                                  CupertinoIcons.tag,
+                                  size: 13,
+                                  color: context.texts.bodySmall?.color,
+                                ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 7),
-                        Expanded(
-                          child: Text(
-                            back,
-                            maxLines: 2,
+                          const SizedBox(height: 10),
+                          Text(
+                            front,
+                            maxLines: 3,
                             overflow: TextOverflow.ellipsis,
-                            style: context.texts.bodySmall?.copyWith(
+                            style: context.texts.titleMedium?.copyWith(
+                              fontSize: 15,
                               height: 1.55,
+                              fontWeight: FontWeight.w600,
+                              color: context.ink,
                             ),
                           ),
-                        ),
-                      ],
+                          if (hasBack) ...<Widget>[
+                            const SizedBox(height: 10),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                              decoration: BoxDecoration(
+                                color: context.raisedSurface,
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 1),
+                                    child: Icon(
+                                      CupertinoIcons.arrow_turn_down_left,
+                                      size: 12,
+                                      color: context.texts.bodySmall?.color,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 7),
+                                  Expanded(
+                                    child: Text(
+                                      back,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: context.texts.bodySmall?.copyWith(
+                                        height: 1.6,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (card.tags.isNotEmpty) ...<Widget>[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 5,
+                              runSpacing: 5,
+                              children: <Widget>[
+                                for (final String tag in card.tags.take(4))
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: context.softAccent,
+                                      borderRadius: BorderRadius.circular(7),
+                                    ),
+                                    child: Text(
+                                      tag,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: context.brandInk,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
-                if (card.tags.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 9),
-                  Wrap(
-                    spacing: 5,
-                    runSpacing: 5,
-                    children: <Widget>[
-                      for (final String tag in card.tags.take(4))
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentSoft.withValues(
-                              alpha: context.isDark ? 0.18 : 1,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: context.isDark
-                                  ? AppColors.accent
-                                  : AppColors.primary,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),
@@ -1625,6 +1606,49 @@ class _CardStatusInfo {
   final String label;
   final Color color;
   final IconData icon;
+}
+
+/// Index chip that turns into a checkbox while a selection is active.
+class _SelectionMark extends StatelessWidget {
+  const _SelectionMark({
+    required this.index,
+    required this.selected,
+    required this.selecting,
+  });
+
+  final int index;
+  final bool selected;
+  final bool selecting;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      width: 24,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? context.brandInk : context.raisedSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: selecting
+          ? Icon(
+              selected ? CupertinoIcons.checkmark_alt : CupertinoIcons.circle,
+              size: 14,
+              color: selected
+                  ? (context.isDark ? AppColors.primary : Colors.white)
+                  : context.texts.bodySmall?.color,
+            )
+          : Text(
+              '${index + 1}',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: context.texts.bodySmall?.color,
+              ),
+            ),
+    );
+  }
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -2016,9 +2040,15 @@ class _DeckStatisticsTab extends ConsumerWidget {
               body: 'أضف بطاقات وابدأ المراجعة لتظهر الأرقام الحقيقية هنا.',
               actionLabel: deck.canHoldCards ? 'إضافة بطاقة' : null,
               onAction: deck.canHoldCards
-                  ? () {
-                      if (ensureCanCreate(context, ref)) {
-                        showCardEditorSheet(context, deckId: deck.id);
+                  ? () async {
+                      if (!ensureCanCreate(context, ref)) {
+                        return;
+                      }
+                      final String? message = await context.push<String>(
+                        '/create-card?deckId=' + deck.id,
+                      );
+                      if (message != null && context.mounted) {
+                        showAppMessage(context, message);
                       }
                     }
                   : null,

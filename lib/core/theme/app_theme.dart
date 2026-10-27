@@ -8,43 +8,64 @@ abstract final class AppTheme {
   static ThemeData dark() => _build(Brightness.dark);
 
   static ThemeData _build(Brightness brightness) {
-    final isDark = brightness == Brightness.dark;
-    final scheme =
+    final bool isDark = brightness == Brightness.dark;
+    final Color ink = isDark ? AppColors.darkInk : AppColors.ink;
+    final Color muted = isDark ? AppColors.darkMuted : AppColors.muted;
+    final Color page = isDark ? AppColors.darkCanvas : AppColors.canvas;
+    final Color card = isDark ? AppColors.darkSurface : Colors.white;
+    final Color raised = isDark ? AppColors.darkSurfaceHigh : AppColors.surface;
+    final Color hairline = isDark ? AppColors.darkLine : AppColors.line;
+
+    final ColorScheme scheme =
         ColorScheme.fromSeed(
           seedColor: AppColors.primary,
           brightness: brightness,
         ).copyWith(
-          primary: isDark ? AppColors.accent : AppColors.primary,
+          primary: isDark ? AppColors.darkAccent : AppColors.primary,
           onPrimary: isDark ? AppColors.primary : Colors.white,
-          secondary: isDark ? AppColors.accent : AppColors.primaryDeep,
+          primaryContainer: isDark ? AppColors.darkSurfaceHigh : AppColors.accentSoft,
+          onPrimaryContainer: isDark ? AppColors.darkAccent : AppColors.primary,
+          secondary: isDark ? AppColors.darkAccent : AppColors.primaryDeep,
           onSecondary: isDark ? AppColors.primary : Colors.white,
-          surface: isDark ? AppColors.darkCanvas : AppColors.canvas,
-          onSurface: isDark ? AppColors.darkInk : AppColors.ink,
-          surfaceContainerHighest: isDark
-              ? AppColors.darkSurface
-              : AppColors.surface,
-          surfaceContainerHigh: isDark
-              ? AppColors.darkSurfaceHigh
-              : AppColors.surface,
-          outline: isDark ? AppColors.darkLine : AppColors.line,
-          outlineVariant: isDark ? AppColors.darkLine : AppColors.line,
-          error: AppColors.danger,
+          secondaryContainer: raised,
+          onSecondaryContainer: ink,
+          tertiary: isDark ? AppColors.accent : AppColors.blue,
+          onTertiary: isDark ? AppColors.primary : Colors.white,
+          surface: page,
+          onSurface: ink,
+          onSurfaceVariant: muted,
+          surfaceContainerLowest: page,
+          surfaceContainerLow: card,
+          surfaceContainer: card,
+          surfaceContainerHigh: raised,
+          surfaceContainerHighest: raised,
+          outline: hairline,
+          outlineVariant: hairline,
+          error: isDark ? AppColors.darkDanger : AppColors.danger,
+          onError: isDark ? AppColors.darkCanvas : Colors.white,
         );
 
-    final textTheme = _textTheme(
-      isDark ? AppColors.darkInk : AppColors.ink,
-      isDark ? AppColors.darkMuted : AppColors.muted,
-    );
+    final TextTheme textTheme = _textTheme(ink, muted);
 
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      scaffoldBackgroundColor: scheme.surface,
+      scaffoldBackgroundColor: page,
+      canvasColor: page,
+      cardColor: card,
+      dividerColor: hairline,
       fontFamily: 'IBMPlexSansArabic',
       textTheme: textTheme,
       splashFactory: NoSplash.splashFactory,
       visualDensity: VisualDensity.standard,
+      iconTheme: IconThemeData(color: ink),
+      cardTheme: CardThemeData(
+        color: card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
@@ -52,12 +73,15 @@ abstract final class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: textTheme.titleLarge,
-        iconTheme: IconThemeData(color: scheme.onSurface),
+        iconTheme: IconThemeData(color: ink),
+        actionsIconTheme: IconThemeData(color: ink),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: isDark ? AppColors.accent : AppColors.primary,
+          backgroundColor: isDark ? AppColors.darkAccent : AppColors.primary,
           foregroundColor: isDark ? AppColors.primary : Colors.white,
+          disabledBackgroundColor: raised,
+          disabledForegroundColor: muted,
           minimumSize: const Size(52, 52),
           textStyle: const TextStyle(
             fontFamily: 'ReadexPro',
@@ -70,9 +94,13 @@ abstract final class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: scheme.primary,
+          foregroundColor: isDark ? AppColors.darkAccent : AppColors.primary,
+          disabledForegroundColor: muted,
           minimumSize: const Size(52, 50),
-          side: BorderSide(color: scheme.primary, width: 1.2),
+          side: BorderSide(
+            color: isDark ? AppColors.darkLine : AppColors.primary,
+            width: 1.2,
+          ),
           textStyle: const TextStyle(
             fontFamily: 'ReadexPro',
             fontWeight: FontWeight.w600,
@@ -83,20 +111,20 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: scheme.primary,
+          foregroundColor: isDark ? AppColors.darkAccent : AppColors.primary,
+          disabledForegroundColor: muted,
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? AppColors.darkSurface : AppColors.surface,
+        fillColor: raised,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 14,
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(
-          color: isDark ? AppColors.darkMuted : AppColors.muted,
-        ),
+        hintStyle: textTheme.bodyMedium?.copyWith(color: muted),
+        labelStyle: textTheme.bodyMedium?.copyWith(color: muted),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(999),
           borderSide: BorderSide.none,
@@ -107,30 +135,73 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(999),
-          borderSide: BorderSide(color: scheme.primary, width: 1.2),
+          borderSide: BorderSide(color: scheme.primary, width: 1.4),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: isDark ? AppColors.darkSurfaceHigh : Colors.white,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: textTheme.headlineSmall,
+        contentTextStyle: textTheme.bodyMedium,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(26),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: isDark ? AppColors.darkSurfaceHigh : AppColors.ink,
+        contentTextStyle: TextStyle(
+          color: isDark ? AppColors.darkInk : Colors.white,
+          fontFamily: 'IBMPlexSansArabic',
+          fontSize: 13,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
       dividerTheme: DividerThemeData(
-        color: scheme.outlineVariant,
+        color: hairline,
         thickness: 0.7,
         space: 1,
       ),
+      listTileTheme: ListTileThemeData(
+        iconColor: isDark ? AppColors.darkMuted : AppColors.muted,
+        textColor: ink,
+        titleTextStyle: textTheme.titleMedium,
+        subtitleTextStyle: textTheme.bodySmall,
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: scheme.primary,
+        linearTrackColor: raised,
+        circularTrackColor: raised,
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: scheme.primary,
+        selectionColor: scheme.primary.withValues(alpha: 0.28),
+        selectionHandleColor: scheme.primary,
+      ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
+          (Set<WidgetState> states) => states.contains(WidgetState.selected)
               ? (isDark ? AppColors.primary : Colors.white)
               : (isDark ? AppColors.darkMuted : Colors.white),
         ),
         trackColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? (isDark ? AppColors.accent : AppColors.primary)
+          (Set<WidgetState> states) => states.contains(WidgetState.selected)
+              ? (isDark ? AppColors.darkAccent : AppColors.primary)
               : (isDark ? AppColors.darkLine : AppColors.line),
         ),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
           TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
-          TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
@@ -245,9 +316,38 @@ abstract final class AppTheme {
   }
 }
 
+/// Theme-aware colours. Widgets should read from here instead of reaching for
+/// the raw palette, which is what made dark mode unreadable.
 extension AppThemeContext on BuildContext {
   ColorScheme get colors => Theme.of(this).colorScheme;
   TextTheme get texts => Theme.of(this).textTheme;
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
   bool get isArabic => Localizations.localeOf(this).languageCode == 'ar';
+
+  /// Primary text colour for the current theme.
+  Color get ink => isDark ? AppColors.darkInk : AppColors.ink;
+
+  /// Secondary text colour for the current theme.
+  Color get muted => isDark ? AppColors.darkMuted : AppColors.muted;
+
+  /// Brand colour that stays legible: dark green on light, lime on dark.
+  Color get brandInk => isDark ? AppColors.darkAccent : AppColors.primary;
+
+  /// Solid card background for the current theme.
+  Color get cardSurface => isDark ? AppColors.darkSurface : Colors.white;
+
+  /// Inputs, chips and selected tabs inside a card.
+  Color get raisedSurface =>
+      isDark ? AppColors.darkSurfaceHigh : AppColors.surface;
+
+  /// Soft brand wash used behind icons and highlights.
+  Color get softAccent => isDark
+      ? AppColors.accent.withValues(alpha: 0.16)
+      : AppColors.accentSoft;
+
+  /// Danger colour that stays legible on both themes.
+  Color get dangerInk => isDark ? AppColors.darkDanger : AppColors.danger;
+
+  /// Hairline colour for borders.
+  Color get hairline => isDark ? AppColors.darkLine : AppColors.line;
 }

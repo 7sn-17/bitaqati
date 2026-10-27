@@ -1,12 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
-import 'card_editor_sheet.dart';
 import 'deck_editor_sheet.dart';
 
 Future<void> showCreateSheet(BuildContext context) {
@@ -115,7 +115,16 @@ class _CreateSheet extends ConsumerWidget {
       );
       return;
     }
-    showCardEditorSheet(parentContext);
+    _pushCardEditor(parentContext);
+  }
+
+  /// Opens the full-screen editor and reports the result on the screen that
+  /// opened the sheet, which is still mounted.
+  Future<void> _pushCardEditor(BuildContext context) async {
+    final String? message = await context.push<String>('/create-card');
+    if (message != null && context.mounted) {
+      showAppMessage(context, message);
+    }
   }
 }
 

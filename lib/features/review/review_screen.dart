@@ -8,9 +8,9 @@ import 'package:go_router/go_router.dart';
 import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_message.dart';
+import '../../core/widgets/card_markup.dart';
 import '../../data/content_providers.dart';
 import '../../domain/models.dart';
-import '../create/card_editor_sheet.dart';
 
 /// Loads the deck and the cards that are due now, then runs the session.
 class ReviewScreen extends ConsumerWidget {
@@ -192,17 +192,31 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
     )) {
       return;
     }
-    final ReviewCard? updated = await showCardEditSheet(context, card);
-    if (updated == null || !mounted) {
+    final String? message = await context.push<String>(
+      '/edit-card/' + card.id + '?deckId=' + card.deckId,
+    );
+    if (message == null || !mounted) {
       return;
     }
+    // The editor writes to the database, so re-read the card from the stream
+    // instead of trusting a stale copy.
+    ReviewCard? updated;
+    for (final ReviewCard candidate
+        in ref.read(deckCardsProvider(card.deckId)).valueOrNull ??
+            const <ReviewCard>[]) {
+      if (candidate.id == card.id) {
+        updated = candidate;
+      }
+    }
     setState(() {
-      _cards[_index] = updated;
+      if (updated != null) {
+        _cards[_index] = updated;
+      }
       _revealed = false;
       _hintVisible = false;
     });
     _shownAt = DateTime.now();
-    showAppMessage(context, 'تم تحديث البطاقة.');
+    showAppMessage(context, message);
   }
 
   Future<void> _snooze(ReviewCard card) async {
@@ -531,61 +545,6 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   }
 }
 
-class _CardContent extends StatelessWidget {
-  const _CardContent({required this.text, required this.style});
-
-  final String text;
-  final TextStyle style;
-
-  @override
-  Widget build(BuildContext context) {
-    final RegExpMatch? image = RegExp(
-      r'^!\[[^\]]*\]\(([^)]+)\)$',
-    ).firstMatch(text.trim());
-    if (image == null) {
-      return Text(text, style: style);
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Image.network(
-        image.group(1)!,
-        width: double.infinity,
-        height: 190,
-        fit: BoxFit.cover,
-        loadingBuilder: (
-          BuildContext context,
-          Widget child,
-          ImageChunkEvent? progress,
-        ) {
-          if (progress == null) {
-            return child;
-          }
-          return Container(
-            height: 190,
-            alignment: Alignment.center,
-            color: AppColors.accentSoft,
-            child: const CircularProgressIndicator(strokeWidth: 2),
-          );
-        },
-        errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
-          return Container(
-            height: 120,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.accentSoft,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              'تعذّر تحميل الصورة',
-              style: style.copyWith(fontSize: 12),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
 class _CardBody extends StatelessWidget {
   const _CardBody({
     required this.card,
@@ -607,10 +566,10 @@ class _CardBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color ink = revealed ? Colors.white : AppColors.ink;
+    final Color ink = revealed ? Colors.white : context.ink;
     final Color muted = revealed
         ? Colors.white.withValues(alpha: 0.62)
-        : AppColors.muted;
+        : context.muted;
 
     return SingleChildScrollView(
       child: Column(
@@ -700,16 +659,26 @@ class _CardBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 5),
-            _CardContent(
-              text: card.front,
-              style: TextStyle(
-                fontFamily: 'ReadexPro',
-                fontSize: 24,
-                height: 1.55,
-                fontWeight: FontWeight.w700,
-                color: ink,
+            if (card.type == 'occlusion')
+              OcclusionView(
+                imageUrl: occlusionImageUrl(card.front),
+                boxes: occlusionBoxes(card.occlusion),
+                masked: true,
+                height: 210,
+              )
+            else
+              CardMarkup(
+                text: card.front,
+                revealCloze: false,
+                style: TextStyle(
+                  fontFamily: 'ReadexPro',
+                  fontSize: 24,
+                  height: 1.55,
+                  fontWeight: FontWeight.w700,
+                  color: ink,
+                ),
+                mediaHeight: 190,
               ),
-            ),
             if (card.hint != null && hintVisible) ...<Widget>[
               const SizedBox(height: 14),
               Container(
@@ -740,13 +709,14 @@ class _CardBody extends StatelessWidget {
               ),
             ],
           ] else ...<Widget>[
-            _CardContent(
+            CardMarkup(
               text: card.front,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.62),
                 fontSize: 13,
                 height: 1.6,
               ),
+              mediaHeight: 140,
             ),
             const SizedBox(height: 12),
             Container(height: 0.7, color: AppColors.primaryDeep),
@@ -782,7 +752,16 @@ class _CardBody extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  _CardContent(
+                  if (card.type == 'occlusion') ...<Widget>[
+                    OcclusionView(
+                      imageUrl: occlusionImageUrl(card.front),
+                      boxes: occlusionBoxes(card.occlusion),
+                      masked: false,
+                      height: 210,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  CardMarkup(
                     text: card.back,
                     style: const TextStyle(
                       fontFamily: 'ReadexPro',
@@ -791,6 +770,7 @@ class _CardBody extends StatelessWidget {
                       height: 1.5,
                       fontWeight: FontWeight.w700,
                     ),
+                    mediaHeight: 190,
                   ),
                 ],
               ),
@@ -996,7 +976,7 @@ class _Summary extends ConsumerWidget {
         ? 'يومان'
         : '$streak ${_dayWord(streak)}';
     return Scaffold(
-      backgroundColor: AppColors.canvas,
+      backgroundColor: context.colors.surface,
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 30, 20, 20),
@@ -1017,12 +997,12 @@ class _Summary extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
+            Text(
               'أنهيت مراجعة اليوم',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'ReadexPro',
-                color: AppColors.ink,
+                color: context.ink,
                 fontSize: 29,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.6,
@@ -1032,7 +1012,7 @@ class _Summary extends ConsumerWidget {
             Text(
               '$completed من $total بطاقة في ${_formatDuration(duration)}',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+              style: TextStyle(color: context.muted, fontSize: 13),
             ),
             const SizedBox(height: 22),
             Row(
@@ -1158,8 +1138,8 @@ class _Summary extends ConsumerWidget {
                 hardCount > 0
                     ? 'راجع البطاقات الصعبة الآن ($hardCount)'
                     : 'إعادة الجلسة',
-                style: const TextStyle(
-                  color: AppColors.primary,
+                style: TextStyle(
+                  color: context.brandInk,
                   decoration: TextDecoration.underline,
                   fontSize: 13,
                 ),
@@ -1169,7 +1149,7 @@ class _Summary extends ConsumerWidget {
             Text(
               deck.title,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              style: TextStyle(color: context.muted, fontSize: 11),
             ),
           ],
         ),
@@ -1189,23 +1169,23 @@ class _SummaryStat extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 13),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: context.raisedSurface,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: <Widget>[
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'ReadexPro',
               fontSize: 23,
               fontWeight: FontWeight.w700,
-              color: AppColors.ink,
+              color: context.ink,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(color: AppColors.muted, fontSize: 9.5),
+            style: TextStyle(color: context.muted, fontSize: 9.5),
           ),
         ],
       ),
@@ -1260,17 +1240,17 @@ class _SoftAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: context.raisedSurface,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
           children: <Widget>[
-            Icon(icon, size: 14, color: AppColors.primary),
+            Icon(icon, size: 14, color: context.brandInk),
             const SizedBox(width: 4),
             Text(
               label,
-              style: const TextStyle(
-                color: AppColors.primary,
+              style: TextStyle(
+                color: context.brandInk,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w600,
               ),

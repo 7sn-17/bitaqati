@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/login_screen.dart';
+import '../../features/create/card_editor_page.dart';
 import '../../features/deck/deck_detail_screen.dart';
 import '../../features/decks/decks_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -121,6 +122,21 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             DeckDetailScreen(deckId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/create-card',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => CardEditorPage(
+          deckId: state.uri.queryParameters['deckId'],
+        ),
+      ),
+      GoRoute(
+        path: '/edit-card/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => CardEditorPage(
+          cardId: state.pathParameters['id'],
+          deckId: state.uri.queryParameters['deckId'],
+        ),
       ),
       GoRoute(
         path: '/review/:id',

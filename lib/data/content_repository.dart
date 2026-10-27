@@ -640,6 +640,7 @@ ORDER BY d.depth, d.position, d.created_at
     String note = '',
     List<String> tags = const <String>[],
     String type = 'basic',
+    Map<String, Object?>? occlusion,
   }) {
     final String cleanFront = front.trim();
     final String cleanBack = back.trim();
@@ -680,6 +681,7 @@ ORDER BY d.depth, d.position, d.created_at
               hint: Value(hint.trim()),
               notes: Value(note.trim()),
               tags: Value(_cleanTags(tags)),
+              occlusion: Value<Map<String, Object?>?>(occlusion),
               position: Value(next.read<int>('next')),
             ),
           );
@@ -700,6 +702,7 @@ ORDER BY d.depth, d.position, d.created_at
     String note = '',
     List<String> tags = const <String>[],
     String type = 'basic',
+    Map<String, Object?>? occlusion,
   }) {
     final String cleanFront = front.trim();
     final String cleanBack = back.trim();
@@ -722,6 +725,7 @@ ORDER BY d.depth, d.position, d.created_at
           hint: Value(hint.trim()),
           notes: Value(note.trim()),
           tags: Value(_cleanTags(tags)),
+          occlusion: Value<Map<String, Object?>?>(occlusion),
           updatedAt: Value(_clock()),
         ),
       );
@@ -998,6 +1002,7 @@ ORDER BY d.depth, d.position, d.created_at
           state?.status == CardStatus.suspended ||
           state?.status == CardStatus.buried,
       favorite: card.favorite,
+      occlusion: card.occlusion,
     );
   }
 

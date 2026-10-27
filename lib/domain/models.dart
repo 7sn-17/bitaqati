@@ -106,6 +106,7 @@ class ReviewCard {
     this.scheduledDays = 0,
     this.suspended = false,
     this.favorite = false,
+    this.occlusion,
   });
 
   final String id;
@@ -122,6 +123,10 @@ class ReviewCard {
   final int scheduledDays;
   final bool suspended;
   final bool favorite;
+
+  /// Image-occlusion geometry: `{'boxes': [...]}` in normalised coordinates.
+  /// Null for every other card type.
+  final Map<String, Object?>? occlusion;
 
   bool get isLeech => lapses >= 4;
 
