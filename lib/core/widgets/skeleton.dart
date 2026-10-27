@@ -80,7 +80,7 @@ class DeckTileSkeleton extends StatelessWidget {
               children: <Widget>[
                 const SkeletonBox(width: 150, height: 13),
                 const SizedBox(height: 8),
-                SkeletonBox(width: 90, height: 10, radius: 6),
+                const SkeletonBox(width: 90, height: 10, radius: 6),
               ],
             ),
           ),

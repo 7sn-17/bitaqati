@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/sync_providers.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_theme.dart';
 
 /// A slim pill that appears while the device has no connection.
 ///

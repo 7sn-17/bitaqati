@@ -70,7 +70,7 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
     ref.invalidate(reminderAccessProvider);
     ref.invalidate(exactAlarmProvider);
     unawaited(ref.read(reminderCoordinatorProvider).refresh());
-    unawaited(ref.read(syncControllerProvider).syncNow());
+    unawaited(ref.read(syncControllerProvider.notifier).syncNow());
   }
 
   /// Opens the review screen for [deckId], or parks the request until the user
