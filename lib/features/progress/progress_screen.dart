@@ -161,7 +161,7 @@ class _LevelCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: TweenAnimationBuilder<double>(
-        tween: const Tween<double>(begin: 0, end: 1),
+        tween: Tween<double>(begin: 0, end: 1),
         duration: const Duration(milliseconds: 1100),
         curve: Curves.easeOutCubic,
         builder: (BuildContext context, double t, Widget? child) {
@@ -687,7 +687,7 @@ class _AchievementsSection extends StatelessWidget {
         const SizedBox(height: 22),
         SectionHeader(
           title: 'الإنجازات',
-          subtitle: '${unlocked} من ${badges.length} شارة مفتوحة',
+          subtitle: '$unlocked من ${badges.length} شارة مفتوحة',
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1074,7 +1074,7 @@ class _ForecastCard extends StatelessWidget {
                             child: Text(
                               total == 0
                                   ? 'لا شيء مستحق خلال سبعة أيام.'
-                                  : '${total} بطاقة خلال سبعة أيام',
+                                  : '$total بطاقة خلال سبعة أيام',
                               style: context.texts.bodySmall?.copyWith(
                                 fontSize: 10.5,
                               ),
@@ -1305,7 +1305,7 @@ class _HeatCell extends StatelessWidget {
     // this learner actually reviews instead of a fixed scale nobody reaches.
     final int step = count == 0 ? 0 : math.max(1, (count / highest * 4).ceil());
     return Tooltip(
-      message: '${date.day}/${date.month} · ${count} مراجعة',
+      message: '${date.day}/${date.month} · $count مراجعة',
       child: Container(
         width: 13,
         height: 13,
@@ -1336,15 +1336,14 @@ Color _heatColor(BuildContext context, int step, int steps) {
 /// The shared card shell for every chart section: white in light mode, a
 /// raised surface in dark mode, with a hairline that survives both.
 class _Panel extends StatelessWidget {
-  const _Panel({required this.child, this.padding = const EdgeInsets.all(16)});
+  const _Panel({required this.child});
 
   final Widget child;
-  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: context.cardSurface,
         borderRadius: BorderRadius.circular(24),
