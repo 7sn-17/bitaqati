@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
 import 'local/app_database.dart';
+import 'local/tables.dart';
 
 /// A profile problem whose message is safe to show to the user.
 class ProfileFailure implements Exception {

@@ -2485,9 +2485,7 @@ class _AttributionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final String author = (deck.originalAuthorName ?? '').trim();
     final Color tint = context.isDark ? AppColors.darkAccent : AppColors.blue;
-    final String title = author.isEmpty
-        ? 'مجموعة مقتبسة'
-        : 'مقتبسة من ' + author;
+    final String title = author.isEmpty ? 'مجموعة مقتبسة' : 'مقتبسة من $author';
     return SurfaceCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

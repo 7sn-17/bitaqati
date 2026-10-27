@@ -189,7 +189,7 @@ class _RemixBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool dark = context.isDark;
     final String trimmed = author.trim();
-    final String label = trimmed.isEmpty ? 'مقتبسة' : 'مقتبسة من ' + trimmed;
+    final String label = trimmed.isEmpty ? 'مقتبسة' : 'مقتبسة من $trimmed';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
