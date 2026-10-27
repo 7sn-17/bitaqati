@@ -44,6 +44,16 @@ New links are always HTTPS.
 
    Set `PLAY_STORE_URL` if the package name ever changes.
 
+   > **Gateway caveat.** Supabase serves every function response as
+   > `text/plain` with `content-security-policy: default-src 'none'; sandbox`
+   > to stop projects using `*.supabase.co` for phishing, so the HTML body is
+   > correct but browsers will not render it. Put a tiny proxy in front —
+   > a Cloudflare Worker or Pages route on `bitaqati.app/deck/*` that forwards
+   > to `https://<ref>.supabase.co/functions/v1/deck-share/deck/<id>` and
+   > rewrites the content type — or host a static page that links to the app
+   > and the store. Crawlers only need the Open Graph tags, which are present
+   > either way.
+
 3. **iOS Universal Links** (when an iOS build exists) — `apple-app-site-association`
    at the same host, plus the Associated Domains capability.
 
