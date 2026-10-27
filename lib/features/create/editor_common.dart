@@ -121,10 +121,7 @@ class EditorSheetFrame extends StatelessWidget {
                   Row(
                     children: <Widget>[
                       Expanded(
-                        child: Text(
-                          title,
-                          style: context.texts.headlineSmall,
-                        ),
+                        child: Text(title, style: context.texts.headlineSmall),
                       ),
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),

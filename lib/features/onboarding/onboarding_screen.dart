@@ -20,20 +20,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   static const List<_OnboardingPage> _pages = <_OnboardingPage>[
     _OnboardingPage(
       title: 'راجع أقل، تذكّر أكثر',
-      body:
-          'بطاقاتي يستخدم التكرار المتباعد ليعرض لك البطاقة المناسبة في الوقت المناسب، لا أكثر ولا أقل.',
+      body: 'بطاقاتي يستخدم التكرار المتباعد ليعرض لك البطاقة المناسبة في الوقت المناسب، لا أكثر ولا أقل.',
       asset: 'assets/onboarding/review_less.svg',
     ),
     _OnboardingPage(
       title: 'حوّل أي ملف إلى بطاقات',
-      body:
-          'الصق نصاً أو أضف صورة أو ملفاً، وسنحوّله إلى بطاقات مراجعة جاهزة يمكنك تعديلها قبل الحفظ.',
+      body: 'الصق نصاً أو أضف صورة أو ملفاً، وسنحوّله إلى بطاقات مراجعة جاهزة يمكنك تعديلها قبل الحفظ.',
       asset: 'assets/onboarding/file_to_cards.svg',
     ),
     _OnboardingPage(
       title: 'مكتبة من الطلاب',
-      body:
-          'اكتشف مجموعات جاهزة في الفيزياء والكيمياء والبيولوجيا وتاريخ الطب والانكليزية 1.',
+      body: 'اكتشف مجموعات جاهزة في الفيزياء والكيمياء والبيولوجيا وتاريخ الطب والانكليزية 1.',
       asset: 'assets/onboarding/student_library.svg',
     ),
   ];

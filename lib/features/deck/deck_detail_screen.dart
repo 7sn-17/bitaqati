@@ -265,9 +265,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Text(
-                  isSubDeck
-                      ? 'أضف أول بطاقة من الزر أدناه لتبدأ المراجعة.'
-                      : 'أنشئ مجموعة فرعية، ثم أضف البطاقات داخلها لتبدأ المراجعة.',
+                  isSubDeck ? 'أضف أول بطاقة من الزر أدناه لتبدأ المراجعة.' : 'أنشئ مجموعة فرعية، ثم أضف البطاقات داخلها لتبدأ المراجعة.',
                   textAlign: TextAlign.center,
                   style: context.texts.bodySmall,
                 ),
@@ -277,8 +275,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               const _TabPlaceholder(
                 icon: CupertinoIcons.book,
                 title: 'مجموعة من المكتبة العامة',
-                body:
-                    'هذه معاينة فقط: لا يمكن دراستها أو تعديلها قبل ربط المكتبة العامة بالسحابة.',
+                body: 'هذه معاينة فقط: لا يمكن دراستها أو تعديلها قبل ربط المكتبة العامة بالسحابة.',
               )
             else ...<Widget>[
               Padding(
@@ -298,15 +295,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 const _TabPlaceholder(
                   icon: CupertinoIcons.chart_bar,
                   title: 'إحصائيات المجموعة',
-                  body:
-                      'ستظهر هنا نسبة الحفظ وتوزيع البطاقات بعد تفعيل محرّك المراجعة.',
+                  body: 'ستظهر هنا نسبة الحفظ وتوزيع البطاقات بعد تفعيل محرّك المراجعة.',
                 )
               else
                 const _TabPlaceholder(
                   icon: CupertinoIcons.gear,
                   title: 'إعدادات المجموعة',
-                  body:
-                      'يمكنك تعديل الخصوصية، عدد البطاقات اليومية، ونسبة التذكر.',
+                  body: 'يمكنك تعديل الخصوصية، عدد البطاقات اليومية، ونسبة التذكر.',
                 ),
             ],
           ],
@@ -354,7 +349,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         _EmptyState(
           icon: CupertinoIcons.folder_badge_plus,
           title: 'لا مجموعات فرعية بعد',
-          body: 'المجموعة الرئيسية تنظّم فقط. أنشئ مجموعة فرعية '
+          body:
+              'المجموعة الرئيسية تنظّم فقط. أنشئ مجموعة فرعية '
               'لتضع فيها البطاقات.',
           actionLabel: 'إنشاء مجموعة فرعية',
           onAction: () => _addSubDeck(context, deck),
@@ -391,7 +387,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         _EmptyState(
           icon: CupertinoIcons.rectangle_stack,
           title: 'لا بطاقات بعد',
-          body: 'هذه المجموعة الفرعية جاهزة لبطاقاتك. أضف أول بطاقة '
+          body:
+              'هذه المجموعة الفرعية جاهزة لبطاقاتك. أضف أول بطاقة '
               'لتظهر في المراجعة.',
           actionLabel: 'إضافة بطاقة',
           onAction: () => _addCard(context, deck),
@@ -442,11 +439,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       );
       return;
     }
-    showDeckEditorSheet(
-      context,
-      parentId: deck.id,
-      parentTitle: deck.title,
-    );
+    showDeckEditorSheet(context, parentId: deck.id, parentTitle: deck.title);
   }
 
   void _addCard(BuildContext context, DeckNode deck) {
@@ -717,11 +710,7 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> labels = <String>[
-      firstLabel,
-      'إحصائيات',
-      'الإعدادات',
-    ];
+    final List<String> labels = <String>[firstLabel, 'إحصائيات', 'الإعدادات'];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(

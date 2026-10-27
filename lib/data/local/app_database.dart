@@ -31,6 +31,7 @@ class AppDatabase extends _$AppDatabase {
           // rebuilt table satisfies the new constraint; their cards stay
           // attached and remain editable.
           await customStatement('UPDATE decks SET depth = 1 WHERE depth > 1');
+          // ignore: experimental_member_use
           await migrator.alterTable(TableMigration(decks));
         }
       },

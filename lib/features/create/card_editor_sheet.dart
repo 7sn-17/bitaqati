@@ -11,10 +11,7 @@ import 'editor_common.dart';
 
 /// Opens the "new card" sheet. Pass [deckId] to add to a specific deck,
 /// otherwise the sheet lets the user pick one.
-Future<void> showCardEditorSheet(
-  BuildContext context, {
-  String? deckId,
-}) async {
+Future<void> showCardEditorSheet(BuildContext context, {String? deckId}) async {
   final int? added = await showModalBottomSheet<int>(
     context: context,
     isScrollControlled: true,

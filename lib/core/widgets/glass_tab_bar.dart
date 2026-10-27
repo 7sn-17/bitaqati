@@ -91,9 +91,7 @@ class GlassTabBar extends StatelessWidget {
                   borderRadius: radius,
                   boxShadow: <BoxShadow>[
                     BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.4 : 0.1,
-                      ),
+                      color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
                       blurRadius: 26,
                       offset: const Offset(0, 10),
                     ),

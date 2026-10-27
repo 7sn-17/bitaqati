@@ -184,9 +184,8 @@ ORDER BY d.depth, d.position, d.created_at
       if (parentId != null) {
         final String parentKey = parentId;
         final DeckRow? parent =
-            await (_db.select(_db.decks)..where(
-                  (d) => d.id.equals(parentKey) & d.deletedAt.isNull(),
-                ))
+            await (_db.select(_db.decks)
+                  ..where((d) => d.id.equals(parentKey) & d.deletedAt.isNull()))
                 .getSingleOrNull();
         if (parent == null) {
           throw StateError('Parent deck $parentKey does not exist');
@@ -239,14 +238,12 @@ ORDER BY d.depth, d.position, d.created_at
 
   /// Cards that sit directly in [deckId], oldest first.
   Stream<List<ReviewCard>> watchCards(String deckId) {
-    final query = _db
-        .select(_db.cards)
-        .join([
-          leftOuterJoin(
-            _db.cardStates,
-            _db.cardStates.cardId.equalsExp(_db.cards.id),
-          ),
-        ]);
+    final query = _db.select(_db.cards).join([
+      leftOuterJoin(
+        _db.cardStates,
+        _db.cardStates.cardId.equalsExp(_db.cards.id),
+      ),
+    ]);
     query
       ..where(_db.cards.deckId.equals(deckId) & _db.cards.deletedAt.isNull())
       ..orderBy([
@@ -271,9 +268,8 @@ ORDER BY d.depth, d.position, d.created_at
     }
     return _db.transaction(() async {
       final DeckRow? deck =
-          await (_db.select(_db.decks)..where(
-                (d) => d.id.equals(deckId) & d.deletedAt.isNull(),
-              ))
+          await (_db.select(_db.decks)
+                ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
               .getSingleOrNull();
       if (deck == null) {
         throw StateError('Deck $deckId does not exist');
@@ -330,9 +326,8 @@ ORDER BY d.depth, d.position, d.created_at
     }
     return _db.transaction(() async {
       final CardRow? existing =
-          await (_db.select(_db.cards)..where(
-                (c) => c.id.equals(cardId) & c.deletedAt.isNull(),
-              ))
+          await (_db.select(_db.cards)
+                ..where((c) => c.id.equals(cardId) & c.deletedAt.isNull()))
               .getSingleOrNull();
       if (existing == null) {
         throw StateError('Card $cardId does not exist');
@@ -367,14 +362,12 @@ ORDER BY d.depth, d.position, d.created_at
       return const <ReviewCard>[];
     }
 
-    final query = _db
-        .select(_db.cards)
-        .join([
-          leftOuterJoin(
-            _db.cardStates,
-            _db.cardStates.cardId.equalsExp(_db.cards.id),
-          ),
-        ]);
+    final query = _db.select(_db.cards).join([
+      leftOuterJoin(
+        _db.cardStates,
+        _db.cardStates.cardId.equalsExp(_db.cards.id),
+      ),
+    ]);
     query
       ..where(_db.cards.deckId.isIn(ids) & _db.cards.deletedAt.isNull())
       ..orderBy([
@@ -418,14 +411,12 @@ ORDER BY d.depth, d.position, d.created_at
   /// returns the three newest cards, used as suggestions.
   Future<List<ReviewCard>> searchCards(String query, {int limit = 20}) async {
     final String needle = query.trim();
-    final matches = _db
-        .select(_db.cards)
-        .join([
-          leftOuterJoin(
-            _db.cardStates,
-            _db.cardStates.cardId.equalsExp(_db.cards.id),
-          ),
-        ]);
+    final matches = _db.select(_db.cards).join([
+      leftOuterJoin(
+        _db.cardStates,
+        _db.cardStates.cardId.equalsExp(_db.cards.id),
+      ),
+    ]);
     final Expression<bool> alive = _db.cards.deletedAt.isNull();
     if (needle.isEmpty) {
       matches.where(alive);
@@ -449,10 +440,7 @@ ORDER BY d.depth, d.position, d.created_at
     final List<ReviewCard> cards = <ReviewCard>[];
     for (final TypedResult row in rows) {
       cards.add(
-        _toCard(
-          row.readTable(_db.cards),
-          row.readTableOrNull(_db.cardStates),
-        ),
+        _toCard(row.readTable(_db.cards), row.readTableOrNull(_db.cardStates)),
       );
     }
     return cards;
@@ -508,11 +496,9 @@ ORDER BY d.depth, d.position, d.created_at
     }
     return _db.transaction(() async {
       final DateTime now = _clock();
-      final CardStateRow? previous =
-          await (_db.select(_db.cardStates)..where(
-                (s) => s.cardId.equals(cardId),
-              ))
-              .getSingleOrNull();
+      final CardStateRow? previous = await (_db.select(
+        _db.cardStates,
+      )..where((s) => s.cardId.equals(cardId))).getSingleOrNull();
 
       final Duration interval = _intervalFor(rating);
       final CardStatus next = rating == 1
@@ -566,11 +552,9 @@ ORDER BY d.depth, d.position, d.created_at
   }) {
     return _db.transaction(() async {
       final DateTime now = _clock();
-      final CardStateRow? previous =
-          await (_db.select(_db.cardStates)..where(
-                (s) => s.cardId.equals(cardId),
-              ))
-              .getSingleOrNull();
+      final CardStateRow? previous = await (_db.select(
+        _db.cardStates,
+      )..where((s) => s.cardId.equals(cardId))).getSingleOrNull();
       await _db
           .into(_db.cardStates)
           .insertOnConflictUpdate(

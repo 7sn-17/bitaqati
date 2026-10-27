@@ -27,9 +27,7 @@ class ReviewScreen extends ConsumerWidget {
     if ((found == null && !listReady) || queue == null) {
       return const Scaffold(
         backgroundColor: AppColors.primary,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.accent),
-        ),
+        body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
       );
     }
     final DeckNode deck =
@@ -355,9 +353,8 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                           revealed: _revealed,
                           position: _index + 1,
                           hintVisible: _hintVisible,
-                          onToggleHint: () => setState(
-                            () => _hintVisible = !_hintVisible,
-                          ),
+                          onToggleHint: () =>
+                              setState(() => _hintVisible = !_hintVisible),
                           onEdit: () => _editCard(card),
                           onSnooze: () => _snooze(card),
                         ),
