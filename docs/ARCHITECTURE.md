@@ -397,6 +397,66 @@ dozing phone within the hour.
 - **Accessibility.** Icon-only controls carry `Semantics` labels, and the
   offline banner is a live region.
 
+## Releases and the in-app updater
+
+The app ships itself. Nothing here is a store listing: a release is a GitHub
+Release, and the app reads that release to decide whether to offer an update.
+
+**Pipeline.** `.github/workflows/build_android.yml` builds three split APKs,
+renames the arm64 one to `bitaqati.apk`, and publishes all of them with
+`softprops/action-gh-release`. The tag comes from `pubspec.yaml`
+(`version: 1.0.0+1` → `v1.0.0`), not from the run number, because the updater
+compares that tag with the installed version. `make_latest: true` keeps
+`/releases/latest` pointing at the newest build, which is what makes the fixed
+download URL work:
+
+```
+https://github.com/7sn-17/bitaqati/releases/latest/download/bitaqati.apk
+```
+
+The job needs `permissions: contents: write`; without it the release step fails
+and the download URL 404s.
+
+**Check.** `UpdateService` reads the installed version with
+`PackageInfo.fromPlatform()` — never a constant, so the number in Settings
+cannot drift from the APK — then `GET`s
+`https://api.github.com/repos/7sn-17/bitaqati/releases/latest`. The answer is
+cached for three hours, because GitHub allows 60 unauthenticated requests an
+hour and an app that is opened often would burn them for nothing. A check that
+fails returns `null`, which the UI treats as "nothing to show", never as "you
+are up to date" — that is the one wrong answer that could strand someone on an
+old build.
+
+**Compare.** `UpdateService.compareVersions` walks numeric segments first and
+then the pre-release tag, so `1.0.0` beats `1.0.0-beta.2` and `v1.2.0` equals
+`1.2.0`. `+build` suffixes are stripped before comparing.
+
+**Show.** `AppShell` waits two seconds after the first frame, reads
+`updateInfoProvider`, and shows `UpdateDialog` when there is something newer and
+the user has not already dismissed that exact version. Settings carries the same
+information as an "تحديث متوفر" row that only exists while an update is
+pending, and the version row doubles as a manual re-check. "تحديث الآن" hands
+the URL to the system browser: Android will not let an app install a package it
+downloaded itself without a second permission, and a browser already shows
+progress and resumes.
+
+## Deck customisation
+
+`kDeckColors` holds 42 tones in two families — 28 deep jewel and earth tones
+that carry white text, and 14 pale tints that carry dark ink. `kDeckIcons`
+holds 79 icons grouped by subject (science, maths, language, history,
+technology, arts, business).
+
+Nothing decides the foreground by hand. `onDeckColor(color)` returns the ink
+for something painted *on* a deck colour (a tile, a header, the editor preview),
+and `deckInk(color, dark: …)` returns the colour to use *as* a foreground on a
+surface, darkening pale tones in the light theme where a pastel on near-white
+would be invisible. Both are luminance tests, so a new tone dropped into the
+list is legible without touching any widget.
+
+The editor shows both sets in a three-row scrollable window rather than a wrap,
+so 42 swatches and 79 icons do not push the save button off the sheet.
+
 ## Cloud schema
 
 Migrations live in `supabase/migrations/` and are applied in filename order:

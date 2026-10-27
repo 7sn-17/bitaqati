@@ -65,6 +65,9 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
 
     final DeckNode deck = found;
     final bool isPreview = local == null;
+    // The header card is painted in the deck colour. Half the palette is pale
+    // enough that a fixed white foreground would disappear on it.
+    final Color headerInk = onDeckColor(deck.color);
 
     final List<ReviewCard> cards =
         ref.watch(deckCardsProvider(deck.id)).valueOrNull ??
@@ -130,10 +133,10 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
+                        color: headerInk.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(15),
                       ),
-                      child: Icon(deck.icon, color: Colors.white, size: 25),
+                      child: Icon(deck.icon, color: headerInk, size: 25),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -144,8 +147,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                             deck.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: headerInk,
                               fontSize: 17.5,
                               fontWeight: FontWeight.w700,
                               height: 1.3,
@@ -159,7 +162,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                                 : '${deck.cardCount} بطاقة · '
                                       'نسبة الحفظ ${deck.retention.round()}%',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: headerInk.withValues(alpha: 0.7),
                               fontSize: 11.5,
                             ),
                           ),
@@ -169,16 +172,16 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     if (deck.rating != null)
                       Row(
                         children: <Widget>[
-                          const Icon(
+                          Icon(
                             CupertinoIcons.star_fill,
-                            color: Colors.white,
+                            color: headerInk,
                             size: 14,
                           ),
                           const SizedBox(width: 3),
                           Text(
                             deck.rating!.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: headerInk,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -521,7 +524,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 ListTile(
                   leading: Icon(
                     kDeckIcons[node.iconKey] ?? CupertinoIcons.folder,
-                    color: node.color,
+                    color: deckInk(node.color, dark: context.isDark),
                   ),
                   title: Text(node.title),
                   subtitle: Text('${node.cardCount} بطاقة'),
@@ -536,10 +539,12 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     try {
-      await ref.read(contentRepositoryProvider).moveCards(
-        cardIds: _selected.toList(growable: false),
-        deckId: target,
-      );
+      await ref
+          .read(contentRepositoryProvider)
+          .moveCards(
+            cardIds: _selected.toList(growable: false),
+            deckId: target,
+          );
       if (!mounted || !context.mounted) {
         return;
       }
@@ -573,9 +578,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'وسم، وسم آخر',
-          ),
+          decoration: const InputDecoration(hintText: 'وسم، وسم آخر'),
         ),
         actions: <Widget>[
           TextButton(
@@ -595,10 +598,12 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     try {
-      await ref.read(contentRepositoryProvider).addTagsToCards(
-        cardIds: _selected.toList(growable: false),
-        tags: tags,
-      );
+      await ref
+          .read(contentRepositoryProvider)
+          .addTagsToCards(
+            cardIds: _selected.toList(growable: false),
+            tags: tags,
+          );
       if (!mounted || !context.mounted) {
         return;
       }
@@ -625,10 +630,12 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     try {
-      await ref.read(contentRepositoryProvider).setCardsSuspended(
-        cardIds: _selected.toList(growable: false),
-        suspended: true,
-      );
+      await ref
+          .read(contentRepositoryProvider)
+          .setCardsSuspended(
+            cardIds: _selected.toList(growable: false),
+            suspended: true,
+          );
       if (!mounted || !context.mounted) {
         return;
       }
@@ -681,9 +688,9 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     try {
-      await ref.read(contentRepositoryProvider).deleteCards(
-        _selected.toList(growable: false),
-      );
+      await ref
+          .read(contentRepositoryProvider)
+          .deleteCards(_selected.toList(growable: false));
       if (!mounted || !context.mounted) {
         return;
       }
@@ -833,8 +840,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     if (!ensureSignedIn(
       context,
       ref,
-      message:
-          'تعديل المجموعات يحتاج حساباً. سجّل الدخول من الإعدادات بحساب Google.',
+      message: 'تعديل المجموعات يحتاج حساباً. سجّل الدخول من الإعدادات بحساب Google.',
     )) {
       return;
     }
@@ -983,8 +989,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   }
 
   List<Widget> _settingsSection(BuildContext context, DeckNode deck) {
-    final bool signedIn =
-        ref.watch(currentUserProvider).valueOrNull != null;
+    final bool signedIn = ref.watch(currentUserProvider).valueOrNull != null;
     return <Widget>[
       const SizedBox(height: 8),
       const SectionHeader(
@@ -1006,7 +1011,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 ),
                 child: Icon(
                   kDeckIcons[deck.iconKey] ?? CupertinoIcons.rectangle_stack,
-                  color: deck.color,
+                  color: deckInk(deck.color, dark: context.isDark),
                   size: 23,
                 ),
               ),
@@ -1059,10 +1064,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  'تقييم المجموعة الأصلية',
-                  style: context.texts.titleSmall,
-                ),
+                Text('تقييم المجموعة الأصلية', style: context.texts.titleSmall),
                 const SizedBox(height: 4),
                 Text(
                   'ساعد الآخرين على اختيار مجموعات جيدة.',
@@ -1131,7 +1133,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         )
         .toList(growable: false);
   }
-
 }
 
 class _MiniStat extends StatelessWidget {
@@ -1630,10 +1631,7 @@ class _TypeBadge extends StatelessWidget {
         color: context.colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: Text(
-        label,
-        style: context.texts.bodySmall?.copyWith(fontSize: 9),
-      ),
+      child: Text(label, style: context.texts.bodySmall?.copyWith(fontSize: 9)),
     );
   }
 }
@@ -1682,21 +1680,14 @@ class _BulkActionBar extends StatelessWidget {
                 tooltip: 'إلغاء التحديد',
               ),
               Expanded(
-                child: Text(
-                  '$count محددة',
-                  style: context.texts.labelLarge,
-                ),
+                child: Text('$count محددة', style: context.texts.labelLarge),
               ),
               _BulkAction(
                 icon: CupertinoIcons.folder,
                 label: 'نقل',
                 onTap: onMove,
               ),
-              _BulkAction(
-                icon: CupertinoIcons.tag,
-                label: 'وسم',
-                onTap: onTag,
-              ),
+              _BulkAction(icon: CupertinoIcons.tag, label: 'وسم', onTap: onTag),
               _BulkAction(
                 icon: CupertinoIcons.pause,
                 label: 'تعليق',
@@ -1875,7 +1866,8 @@ class _DeckRatingBarState extends ConsumerState<_DeckRatingBar> {
 
   @override
   Widget build(BuildContext context) {
-    final int mine = ref.watch(myDeckRatingProvider(widget.deck.id)).valueOrNull ?? 0;
+    final int mine =
+        ref.watch(myDeckRatingProvider(widget.deck.id)).valueOrNull ?? 0;
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
@@ -1944,10 +1936,7 @@ class _DeckStatisticsTab extends ConsumerWidget {
               const SizedBox(height: 8),
               Text('تعذّر تحميل الإحصائيات', style: context.texts.titleMedium),
               const SizedBox(height: 4),
-              Text(
-                'حاول إعادة فتح المجموعة.',
-                style: context.texts.bodySmall,
-              ),
+              Text('حاول إعادة فتح المجموعة.', style: context.texts.bodySmall),
             ],
           ),
         ),
@@ -2002,7 +1991,9 @@ class _DeckStatisticsTab extends ConsumerWidget {
                           CircularProgressIndicator(
                             value: value.retention / 100,
                             strokeWidth: 7,
-                            backgroundColor: Colors.white.withValues(alpha: 0.18),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.18,
+                            ),
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               AppColors.accent,
                             ),
@@ -2183,7 +2174,10 @@ class _PrivacyCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text('الخصوصية والمشاركة', style: context.texts.titleMedium),
+                    Text(
+                      'الخصوصية والمشاركة',
+                      style: context.texts.titleMedium,
+                    ),
                     const SizedBox(height: 1),
                     Text(
                       'انشر المجموعة واحصل على رمز مشاركة من 6 خانات.',

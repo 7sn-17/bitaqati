@@ -79,7 +79,7 @@ class DeckCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(17),
                 ),
                 alignment: Alignment.center,
-                child: Icon(deck.icon, color: Colors.white, size: 26),
+                child: Icon(deck.icon, color: onDeckColor(tileColor), size: 26),
               ),
               const SizedBox(width: 12),
               Expanded(

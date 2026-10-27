@@ -56,15 +56,28 @@ InputDecoration editorDecoration(
 }
 
 class EditorLabel extends StatelessWidget {
-  const EditorLabel(this.text, {super.key});
+  const EditorLabel(this.text, {this.hint, super.key});
 
   final String text;
 
+  /// Optional note beside the label, used by the pickers to say that the list
+  /// scrolls. The colour and icon sets are far longer than the visible window.
+  final String? hint;
+
   @override
   Widget build(BuildContext context) {
+    final String? note = hint;
     return Padding(
       padding: const EdgeInsets.only(bottom: 7, top: 14),
-      child: Text(text, style: context.texts.labelLarge),
+      child: Row(
+        children: <Widget>[
+          Text(text, style: context.texts.labelLarge),
+          if (note != null) ...<Widget>[
+            const SizedBox(width: 8),
+            Flexible(child: Text(note, style: context.texts.bodySmall)),
+          ],
+        ],
+      ),
     );
   }
 }

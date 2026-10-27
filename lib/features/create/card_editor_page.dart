@@ -67,8 +67,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
   /// One controller per box, kept in step with [_boxes] so the answer fields
   /// survive a rebuild when a box is added, moved or deleted.
-  final List<TextEditingController> _boxControllers =
-      <TextEditingController>[];
+  final List<TextEditingController> _boxControllers = <TextEditingController>[];
 
   bool get _editing => widget.cardId != null;
 
@@ -207,8 +206,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     );
   }
 
-  MarkupTextController get _activeField =>
-      _backFocus.hasFocus ? _back : _front;
+  MarkupTextController get _activeField => _backFocus.hasFocus ? _back : _front;
 
   String get _typeName {
     switch (_kind) {
@@ -237,7 +235,9 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
     if (before.endsWith(open) && after.startsWith(close)) {
       final String next =
-          before.substring(0, before.length - open.length) + selected + after.substring(close.length);
+          before.substring(0, before.length - open.length) +
+          selected +
+          after.substring(close.length);
       controller.value = TextEditingValue(
         text: next,
         selection: TextSelection(
@@ -694,7 +694,10 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                   children: <Widget>[
                     for (final DeckNode deck in decks)
                       ListTile(
-                        leading: Icon(deck.icon, color: deck.color),
+                        leading: Icon(
+                          deck.icon,
+                          color: deckInk(deck.color, dark: context.isDark),
+                        ),
                         title: Text(deck.title),
                         subtitle: Text('${deck.cardCount} بطاقة'),
                         onTap: () => Navigator.of(sheet).pop(deck.id),
@@ -756,10 +759,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                 multiline: true,
               ),
             ),
-            _MediaStrip(
-              text: _front.text,
-              onRemove: _removeMedia,
-            ),
+            _MediaStrip(text: _front.text, onRemove: _removeMedia),
             if (cloze) ...<Widget>[
               const SizedBox(height: 10),
               _ClozeHelper(
@@ -804,10 +804,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                 multiline: true,
               ),
             ),
-            _MediaStrip(
-              text: _back.text,
-              onRemove: _removeMedia,
-            ),
+            _MediaStrip(text: _back.text, onRemove: _removeMedia),
           ],
         ),
       ),
@@ -830,10 +827,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                 decoration: BoxDecoration(
                   color: context.raisedSurface,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: context.hairline,
-                    width: 1,
-                  ),
+                  border: Border.all(color: context.hairline, width: 1),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -849,10 +843,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                       style: context.texts.titleSmall,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      'PNG أو JPG',
-                      style: context.texts.bodySmall,
-                    ),
+                    Text('PNG أو JPG', style: context.texts.bodySmall),
                   ],
                 ),
               ),
@@ -905,8 +896,9 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                             hint: 'إجابة التغطية ${index + 1}',
                           ),
                           onChanged: (String value) {
-                            final List<OcclusionBox> next =
-                                <OcclusionBox>[..._boxes];
+                            final List<OcclusionBox> next = <OcclusionBox>[
+                              ..._boxes,
+                            ];
                             next[index] = next[index].copyWith(answer: value);
                             _boxes = next;
                           },
@@ -972,11 +964,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(
-                CupertinoIcons.eye_fill,
-                size: 14,
-                color: context.brandInk,
-              ),
+              Icon(CupertinoIcons.eye_fill, size: 14, color: context.brandInk),
               const SizedBox(width: 6),
               Text(
                 'معاينة مباشرة',
@@ -986,10 +974,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                 ),
               ),
               const Spacer(),
-              Text(
-                'كما ستظهر في المراجعة',
-                style: context.texts.labelSmall,
-              ),
+              Text('كما ستظهر في المراجعة', style: context.texts.labelSmall),
             ],
           ),
           const SizedBox(height: 12),
@@ -1238,10 +1223,7 @@ class _MediaChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            item.image ? 'صورة' : 'صوت',
-            style: context.texts.labelSmall,
-          ),
+          Text(item.image ? 'صورة' : 'صوت', style: context.texts.labelSmall),
           IconButton(
             onPressed: onRemove,
             icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
@@ -1270,7 +1252,11 @@ class _DeckBanner extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(deck.icon, size: 18, color: deck.color),
+          Icon(
+            deck.icon,
+            size: 18,
+            color: deckInk(deck.color, dark: context.isDark),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1538,11 +1524,7 @@ class _Toolbar extends StatelessWidget {
             tooltip: 'صورة',
             onTap: onImage,
           ),
-          _ToolButton(
-            icon: CupertinoIcons.mic,
-            tooltip: 'صوت',
-            onTap: onAudio,
-          ),
+          _ToolButton(icon: CupertinoIcons.mic, tooltip: 'صوت', onTap: onAudio),
         ],
       ),
     );
@@ -1622,9 +1604,7 @@ class _ClozeHelper extends StatelessWidget {
           Row(
             children: <Widget>[
               Text(
-                count == 0
-                    ? 'لا يوجد فراغ بعد'
-                    : 'عدد الفراغات: $count',
+                count == 0 ? 'لا يوجد فراغ بعد' : 'عدد الفراغات: $count',
                 style: context.texts.labelSmall?.copyWith(
                   color: context.brandInk,
                   fontWeight: FontWeight.w600,

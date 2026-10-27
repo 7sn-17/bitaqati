@@ -143,10 +143,7 @@ class _CreateSheet extends ConsumerWidget {
   /// Importing needs a destination. One deck goes straight there; several ask
   /// which one, because putting a hundred cards in the wrong deck is worse than
   /// one extra tap.
-  Future<void> _pickDeckForImport(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
+  Future<void> _pickDeckForImport(BuildContext context, WidgetRef ref) async {
     final List<DeckNode> decks = ref.read(allDecksProvider);
     if (decks.isEmpty) {
       showAppMessage(
@@ -189,7 +186,7 @@ class _CreateSheet extends ConsumerWidget {
                         ListTile(
                           leading: Icon(
                             kDeckIcons[node.iconKey] ?? CupertinoIcons.folder,
-                            color: node.color,
+                            color: deckInk(node.color, dark: context.isDark),
                           ),
                           title: Text(node.title),
                           subtitle: Text('${node.cardCount} بطاقة'),

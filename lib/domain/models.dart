@@ -8,41 +8,103 @@ import 'enums.dart';
 /// The keys are stable: never rename one without a data migration, because
 /// existing decks reference them by name.
 const Map<String, IconData> kDeckIcons = <String, IconData>{
+  // General
   'layers': Icons.layers_rounded,
   'bolt': Icons.bolt_rounded,
-  'science': Icons.science_rounded,
-  'biotech': Icons.biotech_rounded,
-  'history': Icons.history_edu_rounded,
-  'translate': Icons.translate_rounded,
-  'book': Icons.menu_book_rounded,
-  'calculate': Icons.calculate_rounded,
-  'code': Icons.code_rounded,
-  'medical': Icons.medical_services_rounded,
-  'palette': Icons.palette_rounded,
-  'globe': Icons.public_rounded,
-  'psychology': Icons.psychology_rounded,
-  'functions': Icons.functions_rounded,
-  'numbers': Icons.exposure_rounded,
-  'gavel': Icons.gavel_rounded,
-  'business': Icons.business_center_rounded,
-  'music': Icons.music_note_rounded,
-  'computer': Icons.computer_rounded,
-  'architecture': Icons.straighten_rounded,
   'lightbulb': Icons.lightbulb_rounded,
   'quiz': Icons.live_help_rounded,
-  'travel': Icons.flight_takeoff_rounded,
-  'law': Icons.account_balance_rounded,
+  'bookmark': Icons.bookmark_rounded,
+  'star': Icons.star_rounded,
+  'target': Icons.track_changes_rounded,
+  'puzzle': Icons.extension_rounded,
+  'rocket': Icons.rocket_launch_rounded,
+  'diamond': Icons.diamond_rounded,
+  'hourglass': Icons.hourglass_bottom_rounded,
+  'key': Icons.key_rounded,
+  // Science and medicine
+  'science': Icons.science_rounded,
+  'biotech': Icons.biotech_rounded,
+  'chemistry': Icons.bubble_chart_rounded,
+  'virus': Icons.coronavirus_rounded,
+  'medical': Icons.medical_services_rounded,
   'health': Icons.favorite_rounded,
-  'agriculture': Icons.eco_rounded,
+  'psychology': Icons.psychology_rounded,
+  'mind': Icons.psychology_alt_rounded,
   'astronomy': Icons.wb_sunny_rounded,
+  'agriculture': Icons.eco_rounded,
+  'water': Icons.water_drop_rounded,
+  // Maths
+  'calculate': Icons.calculate_rounded,
+  'functions': Icons.functions_rounded,
+  'numbers': Icons.exposure_rounded,
+  'statistics': Icons.bar_chart_rounded,
+  'geometry': Icons.change_history_rounded,
+  'percent': Icons.percent_rounded,
+  'infinity': Icons.all_inclusive_rounded,
+  'measure': Icons.square_foot_rounded,
+  // Language
+  'translate': Icons.translate_rounded,
+  'language': Icons.language_rounded,
+  'spellcheck': Icons.spellcheck_rounded,
+  'text': Icons.text_fields_rounded,
+  'voice': Icons.record_voice_over_rounded,
+  'listening': Icons.headphones_rounded,
+  'book': Icons.menu_book_rounded,
+  // History, law and society
+  'history': Icons.history_edu_rounded,
+  'museum': Icons.museum_rounded,
+  'castle': Icons.castle_rounded,
+  'map': Icons.map_rounded,
+  'flag': Icons.flag_rounded,
+  'gavel': Icons.gavel_rounded,
+  'law': Icons.account_balance_rounded,
+  'society': Icons.groups_rounded,
+  'theater': Icons.theater_comedy_rounded,
+  'worship': Icons.church_rounded,
+  // Technology
+  'code': Icons.code_rounded,
+  'computer': Icons.computer_rounded,
+  'memory': Icons.memory_rounded,
+  'terminal': Icons.terminal_rounded,
+  'cloud': Icons.cloud_rounded,
+  'security': Icons.security_rounded,
+  'network': Icons.wifi_rounded,
+  'mobile': Icons.smartphone_rounded,
+  'database': Icons.storage_rounded,
+  'bug': Icons.bug_report_rounded,
+  // Arts and media
+  'palette': Icons.palette_rounded,
+  'brush': Icons.brush_rounded,
+  'design': Icons.design_services_rounded,
+  'draw': Icons.draw_rounded,
+  'music': Icons.music_note_rounded,
+  'piano': Icons.piano_rounded,
+  'movie': Icons.movie_rounded,
+  'photo': Icons.photo_camera_rounded,
+  // Business and daily life
+  'business': Icons.business_center_rounded,
+  'money': Icons.payments_rounded,
+  'shopping': Icons.shopping_bag_rounded,
+  'school': Icons.school_rounded,
+  'restaurant': Icons.restaurant_rounded,
+  'fitness': Icons.fitness_center_rounded,
   'sports': Icons.sports_soccer_rounded,
+  'wellness': Icons.spa_rounded,
+  'pets': Icons.pets_rounded,
+  'car': Icons.directions_car_rounded,
+  'travel': Icons.flight_takeoff_rounded,
+  'globe': Icons.public_rounded,
+  'architecture': Icons.straighten_rounded,
 };
 
 /// Colours offered in the deck editor. The first one is the default.
 ///
-/// Every entry is dark enough for the white icon and label used on the deck
-/// hero card, in both light and dark themes.
+/// Two families live here: deep tones that carry white text, and pale ones
+/// that carry dark text. Which one a deck needs is decided by
+/// [onDeckColor], never hardcoded, so a pale deck is just as readable as a
+/// dark one in both themes.
 const List<Color> kDeckColors = <Color>[
+  // Deep: brand, jewel and earth tones.
   Color(0xFF163300),
   Color(0xFF054D28),
   Color(0xFF0B4C72),
@@ -61,7 +123,56 @@ const List<Color> kDeckColors = <Color>[
   Color(0xFF0C4A6E),
   Color(0xFF334155),
   Color(0xFF1F2937),
+  Color(0xFF7E22CE),
+  Color(0xFF0E7490),
+  Color(0xFF4D7C0F),
+  Color(0xFF166534),
+  Color(0xFF9F1239),
+  Color(0xFF5B21B6),
+  Color(0xFFA21CAF),
+  Color(0xFF78350F),
+  Color(0xFF14532D),
+  Color(0xFF1E293B),
+  // Pale: soft, modern tints that take dark ink.
+  Color(0xFFFDE68A),
+  Color(0xFFFBCFE8),
+  Color(0xFFBFDBFE),
+  Color(0xFFBBF7D0),
+  Color(0xFFDDD6FE),
+  Color(0xFFFED7AA),
+  Color(0xFFA5F3FC),
+  Color(0xFFF5D0FE),
+  Color(0xFFFECDD3),
+  Color(0xFFE0E7FF),
+  Color(0xFFD9F99D),
+  Color(0xFF99F6E4),
+  Color(0xFFFECACA),
+  Color(0xFFE7E5E4),
 ];
+
+/// Ink that stays readable on top of [color].
+///
+/// The palette spans pale sand and near-black forest, so a fixed white
+/// foreground would disappear on half of it. The crossover sits at a
+/// luminance of 0.22: below that white wins on contrast, above it the near
+/// black ink does, which is also where dark text stops looking muddy.
+Color onDeckColor(Color color) {
+  return color.computeLuminance() > 0.22
+      ? const Color(0xFF0E0F0C)
+      : Colors.white;
+}
+
+/// A version of a deck colour that works as *text or an icon on a surface*.
+///
+/// Pale decks are darkened in the light theme, where a pastel foreground on a
+/// near-white background would be invisible. The dark theme keeps the colour
+/// as-is, because a pale tone on a dark surface is already high contrast.
+Color deckInk(Color color, {required bool dark}) {
+  if (dark || color.computeLuminance() <= 0.35) {
+    return color;
+  }
+  return Color.lerp(color, const Color(0xFF0E0F0C), 0.55)!;
+}
 
 const String kDefaultDeckColorHex = '#163300';
 
@@ -376,8 +487,7 @@ class DeckStatistics {
   double get retention =>
       reviewCount == 0 ? 0 : correctCount / reviewCount * 100;
 
-  double get maturity =>
-      totalCards == 0 ? 0 : matureCards / totalCards;
+  double get maturity => totalCards == 0 ? 0 : matureCards / totalCards;
 
   double get maturityPercent => maturity * 100;
 }
@@ -464,7 +574,11 @@ class DeckBundleCard {
 /// the library or a share link.
 @immutable
 class DeckBundle {
-  const DeckBundle({required this.deck, required this.row, required this.cards});
+  const DeckBundle({
+    required this.deck,
+    required this.row,
+    required this.cards,
+  });
 
   final DeckNode deck;
   final DeckBundleNode row;
