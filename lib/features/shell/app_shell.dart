@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/guest_guard.dart';
+import '../../core/notifications/reminder_providers.dart';
 import '../../core/widgets/glass_tab_bar.dart';
+import '../../core/widgets/offline_banner.dart';
 import '../../data/content_providers.dart';
 import '../../data/sync_providers.dart';
 import '../create/create_sheet.dart';
@@ -26,10 +28,24 @@ class AppShell extends ConsumerWidget {
     // than a watch, so a sync starting never rebuilds the tab bar.
     ref.listen<SyncState>(syncControllerProvider, (SyncState? _, SyncState __) {});
 
+    // Reminders follow the workload, not a timer: whenever the amount of due
+    // work changes the schedule is rebuilt a couple of seconds later, which
+    // collapses a whole review session into a single reschedule.
+    ref.listen<int>(totalDueProvider, (int? _, int __) {
+      ref.read(reminderCoordinatorProvider).schedule();
+    });
+
     return Scaffold(
       body: Stack(
         children: <Widget>[
           Positioned.fill(child: navigationShell),
+          if (!keyboardOpen)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: GlassTabBar.reservedHeight + 6,
+              child: const OfflineBanner(),
+            ),
           if (!keyboardOpen)
             Positioned(
               left: 0,

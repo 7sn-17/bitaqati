@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/scheduling/fsrs_engine.dart';
 import '../domain/card_draft.dart';
 import '../domain/enums.dart';
 import '../domain/models.dart';
@@ -14,13 +15,23 @@ import 'local/tables.dart';
 /// Every write also queues a row in `sync_queue` so the future Supabase sync
 /// knows what to push. Screens never touch the database directly.
 class ContentRepository {
-  ContentRepository(this._db, {Uuid? uuid, DateTime Function()? clock})
-    : _uuid = uuid ?? const Uuid(),
-      _clock = clock ?? DateTime.now;
+  ContentRepository(
+    this._db, {
+    Uuid? uuid,
+    DateTime Function()? clock,
+    FsrsEngine engine = const FsrsEngine(),
+  }) : _uuid = uuid ?? const Uuid(),
+       _clock = clock ?? DateTime.now,
+       fsrs = engine;
 
   final AppDatabase _db;
   final Uuid _uuid;
   final DateTime Function() _clock;
+
+  /// The scheduler every review goes through. Exposed so the review screen can
+  /// preview the interval each rating would produce without a database round
+  /// trip.
+  final FsrsEngine fsrs;
 
   /// Alphabet for share codes. No vowels, so codes cannot spell a word, and
   /// no characters that are easy to confuse when typed (0/O, 1/I/L).
@@ -753,12 +764,19 @@ ORDER BY d.position, d.created_at
 
   /// Suspends or restores cards. Restored cards keep their review history and
   /// become due immediately so they can rejoin the queue.
+  ///
+  /// The FSRS numbers survive both directions untouched: suspending is not
+  /// evidence about memory, so stability, difficulty and the step index are
+  /// copied across verbatim. The phase is restored from those numbers rather
+  /// than from `reps`, because a card can have one answer and still be on its
+  /// first learning step — promoting that to `review` would let FSRS schedule
+  /// a week-long interval off a single shaky memory.
   Future<void> setCardsSuspended({
     required List<String> cardIds,
     required bool suspended,
   }) {
     return _db.transaction(() async {
-      final DateTime now = _clock();
+      final DateTime now = _clock().toUtc();
       for (final String cardId in cardIds) {
         final CardStateRow? previous =
             await (_db.select(_db.cardStates)
@@ -772,11 +790,15 @@ ORDER BY d.position, d.created_at
                   cardId: Value<String>(cardId),
                   status: Value<CardStatus>(CardStatus.suspended),
                   due: Value<DateTime>(previous?.due ?? now),
+                  stability: Value<double>(previous?.stability ?? 0),
+                  difficulty: Value<double>(previous?.difficulty ?? 0),
                   elapsedDays: Value<int>(previous?.elapsedDays ?? 0),
                   scheduledDays: Value<int>(previous?.scheduledDays ?? 0),
+                  learningSteps: Value<int>(previous?.learningSteps ?? 0),
                   reps: Value<int>(previous?.reps ?? 0),
                   lapses: Value<int>(previous?.lapses ?? 0),
                   lastReview: Value<DateTime?>(previous?.lastReview),
+                  fsrsVersion: Value<int>(previous?.fsrsVersion ?? 0),
                   updatedAt: Value<DateTime>(now),
                 ),
               );
@@ -788,15 +810,17 @@ ORDER BY d.position, d.created_at
               .insertOnConflictUpdate(
                 CardStatesCompanion(
                   cardId: Value<String>(cardId),
-                  status: Value<CardStatus>(
-                    previous.reps > 0 ? CardStatus.review : CardStatus.newCard,
-                  ),
+                  status: Value<CardStatus>(_restoredStatus(previous)),
                   due: Value<DateTime>(now),
+                  stability: Value<double>(previous.stability),
+                  difficulty: Value<double>(previous.difficulty),
                   elapsedDays: Value<int>(previous.elapsedDays),
                   scheduledDays: Value<int>(previous.scheduledDays),
+                  learningSteps: Value<int>(previous.learningSteps),
                   reps: Value<int>(previous.reps),
                   lapses: Value<int>(previous.lapses),
                   lastReview: Value<DateTime?>(previous.lastReview),
+                  fsrsVersion: Value<int>(previous.fsrsVersion),
                   updatedAt: Value<DateTime>(now),
                 ),
               );
@@ -806,6 +830,18 @@ ORDER BY d.position, d.created_at
         await _enqueue('card_states', cardId, SyncOperation.upsert);
       }
     });
+  }
+
+  /// Which phase a suspended card was in before it was set aside.
+  ///
+  /// A card FSRS has never scheduled goes back to `new`. One that graduated
+  /// has a scheduled interval of at least a day; anything shorter is still on
+  /// a learning or relearning step.
+  static CardStatus _restoredStatus(CardStateRow state) {
+    if (state.stability <= 0 || state.difficulty <= 0) {
+      return CardStatus.newCard;
+    }
+    return state.scheduledDays > 0 ? CardStatus.review : CardStatus.learning;
   }
 
   /// Soft-deletes cards. Review history remains for statistics and undo.
@@ -832,10 +868,15 @@ ORDER BY d.position, d.created_at
 
   /// Cards to study now in [deckId]: learning first, then reviews, then new
   /// cards, each capped by the user's daily limits.
+  /// Set [includeFuture] to build a "review everything" session: cards that
+  /// are scheduled for later are pulled in too, most overdue first. A normal
+  /// session leaves it false so a card answered ahead of schedule never
+  /// distorts its own memory state.
   Future<List<ReviewCard>> studyQueue(
     String deckId, {
     int newLimit = 10,
     int reviewLimit = 200,
+    bool includeFuture = false,
   }) async {
     final query = _db.select(_db.cards).join([
       leftOuterJoin(
@@ -863,11 +904,11 @@ ORDER BY d.position, d.created_at
         case CardPhase.newCard:
           fresh.add(item);
         case CardPhase.learning:
-          if (state != null && !state.due.isAfter(now)) {
+          if (state != null && (includeFuture || !state.due.isAfter(now))) {
             learning.add(item);
           }
         case CardPhase.review:
-          if (state != null && !state.due.isAfter(now)) {
+          if (state != null && (includeFuture || !state.due.isAfter(now))) {
             review.add(item);
           }
         case CardPhase.paused:
@@ -939,6 +980,40 @@ ORDER BY d.position, d.created_at
           state?.status == CardStatus.buried,
       favorite: card.favorite,
       occlusion: card.occlusion,
+      memory: _memoryOf(state),
+    );
+  }
+
+  /// The FSRS state behind a `card_states` row, or null when the row cannot be
+  /// trusted as memory state.
+  ///
+  /// A row written by the old fixed-interval scheduler has stability and
+  /// difficulty at 0, which FSRS can never produce, so it is reported as "no
+  /// memory" and the card is re-seeded as a new one on its next answer.
+  FsrsMemory? _memoryOf(CardStateRow? state) {
+    if (state == null || state.stability <= 0 || state.difficulty <= 0) {
+      return null;
+    }
+    final FsrsPhase phase;
+    switch (state.status) {
+      case CardStatus.learning:
+        phase = FsrsPhase.learning;
+      case CardStatus.review:
+        phase = FsrsPhase.review;
+      case CardStatus.relearning:
+        phase = FsrsPhase.relearning;
+      case CardStatus.newCard:
+      case CardStatus.suspended:
+      case CardStatus.buried:
+        return null;
+    }
+    return FsrsMemory(
+      phase: phase,
+      step: state.learningSteps,
+      stability: state.stability,
+      difficulty: state.difficulty,
+      due: state.due,
+      lastReview: state.lastReview,
     );
   }
 
@@ -964,46 +1039,71 @@ ORDER BY d.position, d.created_at
   // Reviews
   // ---------------------------------------------------------------------------
 
-  /// Saves one answer: an append-only log row plus the card's new state.
+  /// Saves one answer: an append-only log row plus the card's new FSRS state.
   ///
-  /// [rating] is 1 again, 2 hard, 3 good, 4 easy. Until the FSRS engine
-  /// lands, the next due date uses the fixed intervals the rating buttons
-  /// already show (1 minute, 2 days, 5 days, 11 days).
+  /// [rating] is 1 again, 2 hard, 3 good, 4 easy.
+  ///
+  /// The card's memory state is read back as an instant, handed to the FSRS-6
+  /// scheduler and written back in UTC, because that is the only timezone the
+  /// maths is defined in and a device that changes timezone must not move a
+  /// card's schedule.
+  ///
+  /// A card that still carries the old fixed-interval state is re-seeded as a
+  /// new card: the old intervals say nothing about how well the user actually
+  /// remembers it, so treating them as stability would poison every later
+  /// interval.
+  ///
+  /// [allowEarly] is for "review everything" sessions. A normal session only
+  /// shows due cards, so an answer that arrives while a card is still
+  /// scheduled in the future is a duplicate tap and is ignored rather than
+  /// distorting the memory state.
   Future<void> recordReview({
     required String cardId,
     required int rating,
     int? elapsedMs,
+    bool allowEarly = false,
   }) {
     if (rating < 1 || rating > 4) {
       throw ArgumentError.value(rating, 'rating', 'must be between 1 and 4');
     }
     return _db.transaction(() async {
-      final DateTime now = _clock();
+      final DateTime nowUtc = _clock().toUtc();
       final CardStateRow? previous = await (_db.select(
         _db.cardStates,
       )..where((s) => s.cardId.equals(cardId))).getSingleOrNull();
 
-      final Duration interval = _intervalFor(rating);
-      final CardStatus next = rating == 1
-          ? CardStatus.learning
-          : CardStatus.review;
-      final bool lapsed = rating == 1 && previous?.status == CardStatus.review;
-      final DateTime? last = previous?.lastReview;
-      final int elapsedDays = last == null ? 0 : now.difference(last).inDays;
+      if (!allowEarly &&
+          previous != null &&
+          previous.status == CardStatus.review &&
+          previous.due.isAfter(nowUtc)) {
+        return;
+      }
+
+      final FsrsOutcome outcome = fsrs.review(
+        cardId: cardId,
+        memory: _memoryOf(previous),
+        rating: rating,
+        now: nowUtc,
+        elapsedMs: elapsedMs,
+      );
 
       await _db
           .into(_db.cardStates)
           .insertOnConflictUpdate(
             CardStatesCompanion(
               cardId: Value(cardId),
-              status: Value(next),
-              due: Value(now.add(interval)),
-              elapsedDays: Value(elapsedDays),
-              scheduledDays: Value(interval.inDays),
+              status: Value(_statusOf(outcome.phase)),
+              due: Value(outcome.due),
+              stability: Value(outcome.stability),
+              difficulty: Value(outcome.difficulty),
+              elapsedDays: Value(outcome.elapsedDays),
+              scheduledDays: Value(outcome.scheduledDays),
+              learningSteps: Value(outcome.step),
               reps: Value((previous?.reps ?? 0) + 1),
-              lapses: Value((previous?.lapses ?? 0) + (lapsed ? 1 : 0)),
-              lastReview: Value(now),
-              updatedAt: Value(now),
+              lapses: Value((previous?.lapses ?? 0) + (outcome.lapsed ? 1 : 0)),
+              lastReview: Value(nowUtc),
+              fsrsVersion: Value(FsrsEngine.version),
+              updatedAt: Value(nowUtc),
             ),
           );
 
@@ -1015,9 +1115,13 @@ ORDER BY d.position, d.created_at
               id: logId,
               cardId: cardId,
               rating: rating,
-              reviewedAt: Value(now),
+              reviewedAt: Value(nowUtc),
               elapsedMs: Value(elapsedMs),
-              scheduledDays: Value(interval.inDays),
+              scheduledDays: Value(outcome.scheduledDays),
+              stability: Value(outcome.stability),
+              difficulty: Value(outcome.difficulty),
+              prevState: Value(outcome.previous),
+              nextState: Value(outcome.next),
             ),
           );
       await _enqueue('card_states', cardId, SyncOperation.upsert);
@@ -1027,14 +1131,15 @@ ORDER BY d.position, d.created_at
 
   /// Pushes a card's next review into the future without rating it.
   ///
-  /// Used by the "postpone" action in the review screen. The card leaves the
-  /// current queue and returns as a learning card after [duration].
+  /// Used by the "postpone" action in the review screen. Only the due date
+  /// moves: stability, difficulty and the step index are left exactly as FSRS
+  /// wrote them, because a postpone is not evidence about memory.
   Future<void> snoozeCard({
     required String cardId,
     Duration duration = const Duration(minutes: 10),
   }) {
     return _db.transaction(() async {
-      final DateTime now = _clock();
+      final DateTime nowUtc = _clock().toUtc();
       final CardStateRow? previous = await (_db.select(
         _db.cardStates,
       )..where((s) => s.cardId.equals(cardId))).getSingleOrNull();
@@ -1043,30 +1148,46 @@ ORDER BY d.position, d.created_at
           .insertOnConflictUpdate(
             CardStatesCompanion(
               cardId: Value(cardId),
-              status: Value(CardStatus.learning),
-              due: Value(now.add(duration)),
+              status: Value(previous?.status ?? CardStatus.learning),
+              due: Value(nowUtc.add(duration)),
+              stability: Value(previous?.stability ?? 0),
+              difficulty: Value(previous?.difficulty ?? 0),
               elapsedDays: Value(previous?.elapsedDays ?? 0),
-              scheduledDays: Value(0),
+              scheduledDays: Value(previous?.scheduledDays ?? 0),
+              learningSteps: Value(previous?.learningSteps ?? 0),
               reps: Value(previous?.reps ?? 0),
               lapses: Value(previous?.lapses ?? 0),
-              lastReview: Value(previous?.lastReview ?? now),
-              updatedAt: Value(now),
+              lastReview: Value(previous?.lastReview),
+              fsrsVersion: Value(previous?.fsrsVersion ?? 0),
+              updatedAt: Value(nowUtc),
             ),
           );
       await _enqueue('card_states', cardId, SyncOperation.upsert);
     });
   }
 
-  Duration _intervalFor(int rating) {
-    switch (rating) {
-      case 1:
-        return const Duration(minutes: 1);
-      case 2:
-        return const Duration(days: 2);
-      case 3:
-        return const Duration(days: 5);
-      default:
-        return const Duration(days: 11);
+  /// The next due date each rating would produce, for the button labels.
+  ///
+  /// Pure computation: no database access, so it is safe to call from build.
+  Map<int, Duration> previewIntervals(ReviewCard card, {DateTime? now}) {
+    return fsrs.preview(memory: card.memory, now: now ?? _clock());
+  }
+
+  /// Probability the user still remembers [card] right now, 0 to 1.
+  ///
+  /// Null for a card FSRS has never scheduled.
+  double? retrievabilityOf(ReviewCard card, {DateTime? now}) {
+    return fsrs.retrievabilityOf(memory: card.memory, now: now ?? _clock());
+  }
+
+  static CardStatus _statusOf(FsrsPhase phase) {
+    switch (phase) {
+      case FsrsPhase.learning:
+        return CardStatus.learning;
+      case FsrsPhase.review:
+        return CardStatus.review;
+      case FsrsPhase.relearning:
+        return CardStatus.relearning;
     }
   }
 

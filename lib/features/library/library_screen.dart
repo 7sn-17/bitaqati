@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/deck_card.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../data/content_providers.dart';
 import '../../data/library_providers.dart';
 import '../../data/library_repository.dart';
@@ -348,10 +349,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               const SizedBox(height: 8),
             ],
             if (catalog.isLoading && all.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 54),
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const _LibrarySkeleton()
             else if (catalog.hasError && all.isEmpty)
               _LibraryState(
                 icon: CupertinoIcons.wifi_exclamationmark,
@@ -607,6 +605,29 @@ class _AddButton extends StatelessWidget {
                 ),
               )
             : const Text('أضف'),
+      ),
+    );
+  }
+}
+
+/// Placeholder for the first frame of the library.
+///
+/// Four tiles shaped like the real ones keep the layout still while the
+/// network answers, instead of a spinner that collapses the whole page and
+/// then jumps back to full height.
+class _LibrarySkeleton extends StatelessWidget {
+  const _LibrarySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SkeletonShimmer(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: Column(
+          children: <Widget>[
+            for (int index = 0; index < 4; index++) const DeckTileSkeleton(),
+          ],
+        ),
       ),
     );
   }

@@ -1,11 +1,14 @@
 import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/legal_footer.dart';
 import '../legal/privacy_policy_screen.dart';
@@ -66,12 +69,71 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _finish() async {
+    await _askForReminders();
     await ref.read(sharedPreferencesProvider).setBool('onboarding_done', true);
     ref.read(onboardingCompletedProvider.notifier).state = true;
     if (!mounted) {
       return;
     }
     context.go('/login');
+  }
+
+  /// Asks for notification permission while the reason is still fresh.
+  ///
+  /// The system dialog is shown only after our own explanation, because a cold
+  /// request is the fastest way to a permanent no — and on Android a permanent
+  /// no can only be undone in the system settings, where most people never go.
+  /// Declining here flips the in-app switch off instead of leaving it looking
+  /// enabled while nothing can be delivered.
+  Future<void> _askForReminders() async {
+    if (!mounted) {
+      return;
+    }
+    final bool? wants = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        icon: const Icon(
+          CupertinoIcons.bell,
+          color: AppColors.accent,
+          size: 30,
+        ),
+        title: const Text('تذكير لطيف كل يوم؟'),
+        content: const Text(
+          'سنرسل تنبيهات قصيرة في أوقات محددة عندما تكون لديك بطاقات '
+          'مستحقة، حتى لا تنسى مراجعتك. لا رسائل تسويقية، ويمكنك إيقافها '
+          'في أي وقت من الإعدادات.',
+          textAlign: TextAlign.center,
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: const Text('ليس الآن'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialog).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: AppColors.primary,
+            ),
+            child: const Text('تفعيل التذكير'),
+          ),
+        ],
+      ),
+    );
+    if (wants != true) {
+      ref.read(notificationsEnabledProvider.notifier).state = false;
+      await ref.read(sharedPreferencesProvider).setBool('notifications', false);
+      return;
+    }
+    final ReminderAccess access = await ReminderService.instance.request();
+    if (!mounted) {
+      return;
+    }
+    if (access != ReminderAccess.granted) {
+      ref.read(notificationsEnabledProvider.notifier).state = false;
+      await ref.read(sharedPreferencesProvider).setBool('notifications', false);
+    }
   }
 
   @override

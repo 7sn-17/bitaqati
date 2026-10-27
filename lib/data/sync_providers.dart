@@ -12,6 +12,20 @@ final Provider<SyncService> syncServiceProvider = Provider<SyncService>(
   (Ref ref) => SyncService(ref.watch(appDatabaseProvider)),
 );
 
+/// Whether the device currently has a network route, as a stream.
+///
+/// Kept here because the sync controller is the only other thing that cares,
+/// and two subscriptions to the same platform channel would be wasteful.
+final StreamProvider<bool> networkStatusProvider = StreamProvider<bool>((Ref ref) {
+  return Connectivity().onConnectivityChanged
+      .map(
+        (List<ConnectivityResult> results) => results.any(
+          (ConnectivityResult result) => result != ConnectivityResult.none,
+        ),
+      )
+      .distinct();
+});
+
 /// Where the last sync left off, for the settings screen and any status chip.
 class SyncState {
   const SyncState({this.running = false, this.report});
@@ -20,18 +34,26 @@ class SyncState {
   final SyncReport? report;
 }
 
-/// Runs a sync on sign-in and whenever a screen asks for one.
+/// Runs a sync on sign-in, on reconnect, and when the app returns to the
+/// foreground.
 ///
-/// Keeping this in a notifier means the pull only happens once per session,
-/// and a second tap on "sync now" cannot start a parallel pass.
+/// Keeping this in a notifier means a pull cannot overlap itself, and the
+/// short cooldown below stops a burst of foreground events from turning into a
+/// burst of round trips. There is deliberately no timer: nothing polls while
+/// the app is idle.
 final NotifierProvider<SyncController, SyncState> syncControllerProvider =
     NotifierProvider<SyncController, SyncState>(SyncController.new);
 
 class SyncController extends Notifier<SyncState> {
   bool _alive = true;
   bool _wasOffline = false;
+  DateTime? _lastPass;
   StreamSubscription<List<ConnectivityResult>>? _network;
-  Timer? _beat;
+
+  /// Two foreground events in a row — returning from the image picker, for
+  /// example — should not each cost a round trip. Anything within this window
+  /// is treated as the same wake-up.
+  static const Duration _cooldown = Duration(seconds: 20);
 
   @override
   SyncState build() {
@@ -58,19 +80,11 @@ class SyncController extends Notifier<SyncState> {
     );
     ref.onDispose(() => _network?.cancel());
 
-    // A quiet heartbeat so a study session's writes do not have to wait for
-    // the next launch: every five minutes, and only when the queue is not
-    // empty, so an idle app never touches the network.
-    _beat = Timer.periodic(const Duration(minutes: 5), (Timer _) async {
-      if (!_alive || state.running) {
-        return;
-      }
-      final int pending = await ref.read(syncServiceProvider).pendingCount();
-      if (pending > 0 && _alive) {
-        unawaited(Future<void>.microtask(syncNow));
-      }
-    });
-    ref.onDispose(() => _beat?.cancel());
+    // No timer. A study session's writes are pushed on the three moments that
+    // actually matter: when the radio comes back, when the app returns to the
+    // foreground, and when the user asks. An idle app therefore never wakes the
+    // radio, which is both kinder to the battery and cheaper than polling a
+    // queue that is usually empty.
     ref.listen<AsyncValue<User?>>(
       currentUserProvider,
       (AsyncValue<User?>? previous, AsyncValue<User?> next) {
@@ -78,7 +92,9 @@ class SyncController extends Notifier<SyncState> {
         if (user != null && previous?.valueOrNull?.id != user.id) {
           // Deferred: the listener can fire while build() is still running,
           // and a notifier may not touch its own state during that window.
-          unawaited(Future<void>.microtask(syncNow));
+          // Forced, because a sign-in must pull immediately even if the app
+          // just resumed.
+          unawaited(Future<void>.microtask(() => syncNow(force: true)));
         }
       },
       fireImmediately: true,
@@ -86,10 +102,15 @@ class SyncController extends Notifier<SyncState> {
     return const SyncState();
   }
 
-  Future<void> syncNow() async {
+  Future<void> syncNow({bool force = false}) async {
     if (!_alive || state.running) {
       return;
     }
+    final DateTime? last = _lastPass;
+    if (!force && last != null && DateTime.now().difference(last) < _cooldown) {
+      return;
+    }
+    _lastPass = DateTime.now();
     state = const SyncState(running: true);
     final SyncReport report = await ref.read(syncServiceProvider).run();
     if (!_alive) {

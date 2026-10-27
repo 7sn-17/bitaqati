@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/scheduling/fsrs_engine.dart';
 import 'enums.dart';
 
 /// Icons a deck can use. The key is what gets stored in `decks.icon`.
@@ -98,6 +99,7 @@ class ReviewCard {
     this.suspended = false,
     this.favorite = false,
     this.occlusion,
+    this.memory,
   });
 
   final String id;
@@ -118,6 +120,11 @@ class ReviewCard {
   /// Image-occlusion geometry: `{'boxes': [...]}` in normalised coordinates.
   /// Null for every other card type.
   final Map<String, Object?>? occlusion;
+
+  /// The FSRS memory state behind [phase], or null when the card has never
+  /// been scheduled. Carried on the card so the rating buttons can preview
+  /// their real intervals without touching the database.
+  final FsrsMemory? memory;
 
   bool get isLeech => lapses >= 4;
 

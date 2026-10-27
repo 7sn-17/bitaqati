@@ -12,6 +12,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/user_display.dart';
 import '../../core/widgets/deck_card.dart';
+import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/tag_filter_bar.dart';
 import '../../data/content_providers.dart';
@@ -495,33 +496,18 @@ class _NoDecks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Container(
-        padding: const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color: context.colors.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(22),
         ),
-        child: Column(
-          children: <Widget>[
-            Icon(
-              CupertinoIcons.rectangle_stack,
-              size: 36,
-              color: context.texts.bodySmall?.color,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'لا توجد مجموعات هنا بعد',
-              textAlign: TextAlign.center,
-              style: context.texts.titleMedium,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'أنشئ مجموعة جديدة من زر + في الأسفل.',
-              textAlign: TextAlign.center,
-              style: context.texts.bodySmall,
-            ),
-          ],
+        child: const EmptyState(
+          icon: CupertinoIcons.rectangle_stack,
+          title: 'لا توجد مجموعات هنا بعد',
+          message:
+              'أنشئ مجموعتك الأولى من زر + في الأسفل، أو ثبّت مجموعة '
+              'جاهزة من المكتبة.',
         ),
       ),
     );

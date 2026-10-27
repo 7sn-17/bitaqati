@@ -67,7 +67,10 @@ Every local write happens first and returns immediately. The repository also
 appends a row to `sync_queue` in the same transaction, so a change can never
 be stored without a matching intent to push it.
 
-`SyncService` runs on app start and whenever the signed-in user changes:
+`SyncService` runs on app start, when the signed-in user changes, when the
+radio comes back after being offline, when the app returns to the foreground,
+and when the user asks for it. There is no timer: an idle app never wakes the
+radio to poll a queue that is almost always empty.
 
 1. **Push.** Drain `sync_queue` in insertion order, grouped by entity and
    ordered `decks → cards → card_states → review_logs` so a parent always
@@ -79,7 +82,7 @@ be stored without a matching intent to push it.
 A queue row that fails five times is dropped rather than blocking the queue
 forever; its `last_error` is kept for diagnosis.
 
-## Local schema (Drift v5)
+## Local schema (Drift v6)
 
 ```text
 profiles(user_id PK, display_name, updated_at)
@@ -92,7 +95,7 @@ cards(id PK, deck_id FK→decks CASCADE, type, front, back, notes, hint, tags,
       created_at, updated_at, deleted_at)
 card_states(card_id PK FK→cards CASCADE, status, due, stability, difficulty,
             elapsed_days, scheduled_days, learning_steps, reps, lapses,
-            last_review, updated_at)
+            last_review, fsrs_version, updated_at)
 review_logs(id PK, card_id FK→cards CASCADE, rating, reviewed_at, elapsed_ms,
             scheduled_days, stability, difficulty, prev_state, next_state)
 sync_queue(id PK, entity, entity_id, operation, payload, created_at,
@@ -110,6 +113,7 @@ every child relationship is `ON DELETE CASCADE`.
 | 3 | `cards.favorite` |
 | 4 | Flattened `decks`: dropped `parent_id`, `root_id`, `path`, `depth`; added `share_code` |
 | 5 | Added `profiles`; added `decks.original_deck_id` and `decks.original_author_name` |
+| 6 | Added `card_states.fsrs_version` (local-only) |
 
 Version 4 rebuilds the table with `TableMigration`, which copies every column
 that still exists, so existing decks and their cards survive the flattening.
@@ -233,25 +237,165 @@ and nothing that can drift. Three details keep that promise:
 - `DisplayNameController` invalidates the cached library catalog after a rename,
   so the user sees the new name without restarting the app.
 
-## FSRS review engine
+## FSRS-6 review engine
 
-```dart
-abstract interface class Scheduler {
-  CardState review({
-    required CardState current,
-    required Rating rating,
-    required DateTime now,
-  });
-}
+Scheduling is delegated to the [`fsrs`](https://pub.dev/packages/fsrs) package
+(2.x, which is FSRS-6) through `lib/core/scheduling/fsrs_engine.dart`. The
+package is never imported outside that file, so the algorithm can be swapped or
+pinned without touching the repository or the UI.
+
+### What the app stores
+
+`card_states` already had the right columns; FSRS-6 needs exactly three things
+to be reproducible:
+
+| Column | Meaning |
+|---|---|
+| `stability` | Days until recall decays to the target retention |
+| `difficulty` | 1 (easy) … 10 (hard) |
+| `learning_steps` | The FSRS step index, synced as `learning_steps` |
+
+`due`, `last_review` and `updated_at` are **instants**. Drift stores
+`DateTime` columns as Unix epoch seconds, so a value written with
+`DateTime.now().toUtc()` reads back as the same instant in whatever timezone
+the device is in. The scheduler itself only accepts UTC (`reviewCard` throws
+otherwise), so `FsrsEngine` converts on the way in and writes UTC on the way
+out. A user who flies from Riyadh to London keeps the same schedule.
+
+### One answer, start to finish
+
+```text
+rating (1..4)
+  → read card_states row
+  → FsrsMemory? (null when the row has no real FSRS numbers)
+  → Scheduler.reviewCard(card, rating, reviewDateTime: nowUtc)
+  → CardStatesCompanion (status, due, stability, difficulty, step, …)
+  → review_logs row with prev_state / next_state snapshots
+  → one sync_queue row per write
 ```
 
-- Ratings: `1 again`, `2 hard`, `3 good`, `4 easy`.
-- Desired retention default: 90%.
-- New cards are introduced up to a daily limit (default 10, adjustable in
-  Settings from 0 to 200 in steps of 5).
-- Reviews per session default to 200, adjustable from 20 to 1000.
-- Review logs are immutable; state is derived and can be rebuilt.
-- A leech is a card with 4+ lapses; it is surfaced for rewriting.
+Everything happens in a single Drift transaction, so an answer either updates
+the card and its log or does neither.
+
+### Edge cases that are handled explicitly
+
+- **Legacy cards.** Rows written by the old fixed-interval scheduler have
+  `stability = 0` and `difficulty = 0`, which FSRS can never produce (stability
+  has a floor of 0.001). `ContentRepository._memoryOf` reports those as *no
+  memory*, so the card is re-seeded as `Card.newCard()` on its next answer. Its
+  review history and lapse count are kept, but the made-up intervals are not
+  trusted as memory: treating "5 days because the button said so" as stability
+  would poison every later interval.
+- **Clock moved backwards.** `last_review` is clamped to `now` before the maths
+  runs, so a user who sets the date back cannot feed the scheduler a negative
+  elapsed time (which would land in the short-term branch and corrupt
+  stability).
+- **Long-overdue cards.** The package computes retrievability from the real
+  elapsed days, so a card that is three weeks late comes back with a much
+  lower stability update than one answered on time. The pre-answer
+  retrievability is written into `review_logs.prev_state` for inspection.
+- **Answering ahead of schedule.** A mature card whose `due` is still in the
+  future is ignored by `recordReview` unless `allowEarly` is set, which only
+  the "راجع الكل الآن" path does. That turns a double tap into a no-op instead
+  of a corrupted interval.
+- **Suspending.** `setCardsSuspended` copies stability, difficulty and the step
+  index across unchanged, and on restore derives the phase from the numbers
+  (`scheduled_days > 0` means graduated) rather than from `reps`, because a
+  card can have one answer and still be on its first learning step.
+- **Timezones.** Nothing is stored as a wall-clock string; only instants and
+  the scheduler's own numbers.
+- **Fuzzing.** On, so a batch of cards learned the same day does not all come
+  back on the same day. The interval previews under the rating buttons are
+  computed with fuzzing off so they do not flicker between rebuilds.
+
+### What the user sees
+
+The four rating buttons show the interval FSRS would actually produce for that
+card (`ContentRepository.previewIntervals`, pure computation, no database
+access). They used to show hardcoded "1 minute / 2 days / 5 days / 11 days",
+which became a lie the moment real scheduling arrived.
+
+Daily limits are unchanged and still applied in `studyQueue`: new cards first
+capped at `dailyNewLimit`, then learning, then reviews capped at
+`dailyReviewLimit`.
+
+## Reminders
+
+`lib/core/notifications/reminder_service.dart` wraps
+`flutter_local_notifications` and `timezone`. Nothing else in the app touches
+the plugin.
+
+### Schedule
+
+| Rule | Value |
+|---|---|
+| Slots | 08:00, 11:00, 14:00, 17:00, 20:00, 22:00 local |
+| Slots used | 2 for under 10 due cards, 4 for 10–29, all 6 for 30+ |
+| Nothing due | every pending reminder is cancelled |
+| Repeat | `DateTimeComponents.time`, so the set repeats daily |
+| Ids | `4100 + slot index` |
+
+The slot count is deliberate: one overdue card does not deserve six nudges,
+while a hundred do.
+
+### Permission
+
+The system dialog is only shown *after* an explanation of our own, at the end
+of onboarding. A cold request is the fastest route to a permanent denial, and
+on Android a permanent denial can only be undone in the system settings.
+Declining the explanation flips the in-app switch off, so the app never claims
+to be reminding someone it cannot reach. Settings shows the real state, with a
+row that opens the system settings when notifications are blocked.
+
+`SCHEDULE_EXACT_ALARM` is requested from Settings, not during onboarding:
+it opens a second system screen, and it is optional. When it is missing the
+scheduler silently falls back to `inexactAllowWhileIdle`, which still wakes a
+dozing phone within the hour.
+
+### Staying correct
+
+- **Timezone.** `tz.initializeTimeZones()` plus
+  `FlutterTimezone.getLocalTimezone()` run at startup, so a repeat lands on the
+  right wall-clock hour rather than in UTC.
+- **Reboot.** `ScheduledNotificationBootReceiver` is declared in the manifest
+  with `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`, so the set is re-armed
+  without the app being opened.
+- **Tap.** The payload is the deck id. A tap while running calls
+  `ReminderService.onOpenDeck`, which pushes `/review/:id`; a tap that launched
+  the app is delivered through `getNotificationAppLaunchDetails` and drained
+  after the first frame. If the user has not finished onboarding, the deck id is
+  parked in `SharedPreferences` and opened afterwards.
+- **Keeping in step.** `ReminderCoordinator` listens to the total due count,
+  debounces two seconds, and only reschedules when the *number of slots* or the
+  deck changed. A whole review session therefore collapses into one
+  reschedule, and the last answer of the day cancels everything.
+
+## Offline, failures and empty states
+
+- **Offline.** `networkStatusProvider` maps `connectivity_plus` to a boolean.
+  `OfflineBanner` floats a pill above the tab bar while the device is offline
+  and fades out when it returns; it never shifts the layout, so no screen has to
+  know it exists. Studying is unaffected, and the sync queue drains on
+  reconnect.
+- **Loading.** Lists that can be slow use shimmer skeletons shaped like the
+  real rows (`lib/core/widgets/skeleton.dart`) instead of a centred spinner,
+  so the page keeps its height and does not jump when data arrives.
+- **Empty.** `EmptyState` is the single empty view: an icon badge, a sentence
+  that explains *why* it is empty, and one action. No screen renders a bare
+  "nothing here".
+- **Errors.** Supabase calls are wrapped in the repository, which converts
+  failures into a typed `LibraryFailure` / `ProfileFailure` carrying Arabic
+  copy. The UI maps those to a SnackBar or an inline error; a raw exception
+  string is never shown.
+- **Async gaps.** Every `setState` that follows an `await` is behind a
+  `mounted` check, including the media picker, which runs in another activity
+  while the editor can be popped.
+- **Disposal.** Every `AnimationController`, `Timer`, `StreamSubscription` and
+  `TextEditingController` is released in `dispose` or `ref.onDispose`.
+- **Images.** Every `CachedNetworkImage` sets `memCacheWidth` and
+  `maxWidthDiskCache` to the size it actually paints.
+- **Accessibility.** Icon-only controls carry `Semantics` labels, and the
+  offline banner is a live region.
 
 ## Cloud schema
 
@@ -267,8 +411,17 @@ Migrations live in `supabase/migrations/` and are applied in filename order:
 | `20261027000300_card_media_storage.sql` | Storage bucket for card media |
 | `20261027000400_deck_share_codes.sql` | `share_code`, generator, uniqueness trigger, `resolve_share_code` |
 | `20261027000500_profile_and_attribution.sql` | Attribution columns, profile insert policy, flat `public_decks` |
+| `20261027000600_live_author_names.sql` | Author name joined live instead of copied |
+| `20261027000700_flatten_decks.sql` | Dropped every nesting column and the tree indexes |
+| `20261027000800_public_decks_hardening.sql` | `security_invoker` on the view, column grants, pinned `search_path` |
+| `20261027000900_new_user_metadata.sql` | `handle_new_user` reads Google's name and picture |
 
 Every user table has RLS. The client only ever ships the publishable key.
+
+`card_states` already carries every column FSRS-6 needs (`stability`,
+`difficulty`, `learning_steps`, `elapsed_days`, `scheduled_days`), so the
+scheduler needs no cloud migration: the numbers travel in the existing
+`card_states` upsert. `fsrs_version` is local-only and deliberately not synced.
 
 ## Security checklist
 

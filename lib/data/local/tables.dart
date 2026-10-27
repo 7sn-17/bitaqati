@@ -188,7 +188,19 @@ class Cards extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
-/// FSRS memory state of one card for the local user (one row per card).
+/// FSRS-6 memory state of one card for the local user (one row per card).
+///
+/// Every timestamp here is an instant: Drift stores [DateTime] columns as Unix
+/// epoch seconds, so a value written as UTC reads back as the same instant in
+/// whatever timezone the device happens to be in. The scheduler still writes
+/// [due] and [lastReview] from `DateTime.now().toUtc()` because FSRS maths is
+/// defined in UTC and a device that changes timezone must not shift a card's
+/// memory state.
+///
+/// [stability] and [difficulty] are the two numbers FSRS needs to remember.
+/// A row written by the old fixed-interval scheduler has both at 0, which is
+/// impossible for a real FSRS card (stability has a floor of 0.001), so 0 is
+/// the marker [FsrsEngine] uses to re-seed a legacy card on its next review.
 @DataClassName('CardStateRow')
 @TableIndex(name: 'card_states_due_idx', columns: {#status, #due})
 class CardStates extends Table {
@@ -198,23 +210,43 @@ class CardStates extends Table {
   TextColumn get status =>
       textEnum<CardStatus>().withDefault(const Constant('newCard'))();
 
+  /// Next review instant, always written in UTC.
   DateTimeColumn get due => dateTime().withDefault(currentDateAndTime)();
 
+  /// Days until the memory of this card decays to 90 % recall. 0 means the
+  /// card has never been scheduled by FSRS.
   RealColumn get stability => real().withDefault(const Constant(0.0))();
 
+  /// How hard this card is for this user, 1 (easy) to 10 (hard). 0 means the
+  /// card has never been scheduled by FSRS.
   RealColumn get difficulty => real().withDefault(const Constant(0.0))();
 
+  /// Whole days between the previous review and this one, as FSRS saw them.
   IntColumn get elapsedDays => integer().withDefault(const Constant(0))();
 
+  /// Whole days FSRS asked for when it scheduled this card. 0 for the short
+  /// learning steps, which are measured in minutes.
   IntColumn get scheduledDays => integer().withDefault(const Constant(0))();
 
+  /// Index into the scheduler's learning or relearning steps, i.e. FSRS's
+  /// `Card.step`. Synced as `learning_steps` for backwards compatibility with
+  /// the cloud column of the same name. 0 while the card sits on step one.
   IntColumn get learningSteps => integer().withDefault(const Constant(0))();
 
   IntColumn get reps => integer().withDefault(const Constant(0))();
 
   IntColumn get lapses => integer().withDefault(const Constant(0))();
 
+  /// Instant of the last answer, always written in UTC.
   DateTimeColumn get lastReview => dateTime().nullable()();
+
+  /// Which scheduler produced [stability] and [difficulty]. 0 means the row
+  /// predates FSRS and must be re-seeded on its next review.
+  ///
+  /// Kept local-only: the cloud copy of the row carries the same numbers, and
+  /// [FsrsEngine] treats `stability > 0` as FSRS state too, so a state pulled
+  /// onto a fresh device is never mistaken for a legacy one.
+  IntColumn get fsrsVersion => integer().withDefault(const Constant(0))();
 
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 

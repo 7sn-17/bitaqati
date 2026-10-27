@@ -25,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'bitaqati'));
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -52,6 +52,12 @@ class AppDatabase extends _$AppDatabase {
           await migrator.createTable(profiles);
           await migrator.addColumn(decks, decks.originalDeckId);
           await migrator.addColumn(decks, decks.originalAuthorName);
+        }
+        if (from < 6) {
+          // FSRS-6 bookkeeping. Rows that already exist keep the default 0,
+          // which is exactly the marker the scheduler looks for when it
+          // re-seeds a card that was scheduled by the old fixed intervals.
+          await migrator.addColumn(cardStates, cardStates.fsrsVersion);
         }
       },
       beforeOpen: (OpeningDetails details) async {

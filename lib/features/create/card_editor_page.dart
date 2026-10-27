@@ -288,6 +288,11 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       final PickedMedia? media = image
           ? await _media.pickImage()
           : await _media.pickAudio();
+      // The picker runs in another activity; the editor may have been popped
+      // while it was open, and every branch below calls setState.
+      if (!mounted) {
+        return;
+      }
       if (media == null) {
         return;
       }

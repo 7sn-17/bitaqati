@@ -35,16 +35,25 @@ final StreamProviderFamily<List<ReviewCard>, String> deckCardsProvider =
           ref.watch(contentRepositoryProvider).watchCards(deckId),
     );
 
+/// Which queue a review session wants.
+///
+/// [all] builds a "review everything" session that also pulls in cards
+/// scheduled for later, which is what the empty state offers once the day's
+/// work is done. A record is used as the family key because records compare by
+/// value, so Riverpod caches the two queues separately.
+typedef StudyQuery = ({String deckId, bool all});
+
 /// The cards a review session should show. Loaded once per session.
-final AutoDisposeFutureProviderFamily<List<ReviewCard>, String>
+final AutoDisposeFutureProviderFamily<List<ReviewCard>, StudyQuery>
 studyQueueProvider = FutureProvider.autoDispose
-    .family<List<ReviewCard>, String>(
-      (Ref ref, String deckId) => ref
+    .family<List<ReviewCard>, StudyQuery>(
+      (Ref ref, StudyQuery query) => ref
           .watch(contentRepositoryProvider)
           .studyQueue(
-            deckId,
+            query.deckId,
             newLimit: ref.watch(dailyNewLimitProvider),
             reviewLimit: ref.watch(dailyReviewLimitProvider),
+            includeFuture: query.all,
           ),
     );
 

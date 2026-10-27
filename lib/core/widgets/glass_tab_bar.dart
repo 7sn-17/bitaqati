@@ -25,6 +25,11 @@ class GlassTabBar extends StatelessWidget {
   static const double _barHeight = 64;
   static const double _createSize = 58;
 
+  /// How much room the floating bar takes from the bottom of the screen,
+  /// including its own padding. Anything that floats above it — the offline
+  /// banner — offsets itself by this.
+  static const double reservedHeight = _barHeight + 24;
+
   static const List<_TabSpec> _tabs = <_TabSpec>[
     _TabSpec(
       label: 'الرئيسية',

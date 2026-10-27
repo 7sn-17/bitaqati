@@ -1,5 +1,7 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
+import '../../core/notifications/reminder_providers.dart';
+import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -35,6 +39,9 @@ class SettingsScreen extends ConsumerWidget {
         themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && context.isDark);
     final bool notificationsEnabled = ref.watch(notificationsEnabledProvider);
+    final ReminderAccess access =
+        ref.watch(reminderAccessProvider).valueOrNull ?? ReminderAccess.denied;
+    final bool exactAlarms = ref.watch(exactAlarmProvider).valueOrNull ?? false;
     final int newLimit = ref.watch(dailyNewLimitProvider);
     final int reviewLimit = ref.watch(dailyReviewLimitProvider);
 
@@ -146,19 +153,60 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
+              ],
+            ),
+            const _SectionLabel('التذكير'),
+            _Group(
+              children: <Widget>[
                 _Row(
                   icon: CupertinoIcons.bell,
                   title: 'التذكير اليومي',
-                  subtitle: 'تنبيه واحد في اليوم لمراجعة بطاقاتك',
+                  subtitle: _reminderSubtitle(
+                    enabled: notificationsEnabled,
+                    access: access,
+                  ),
                   trailing: Switch.adaptive(
                     value: notificationsEnabled,
                     onChanged: (bool value) {
                       ref
                           .read(notificationsEnabledProvider.notifier)
                           .state = value;
+                      unawaited(
+                        ref.read(reminderCoordinatorProvider).refresh(),
+                      );
+                      if (value && access != ReminderAccess.granted) {
+                        unawaited(_askForPermission(context, ref));
+                      }
                     },
                   ),
                 ),
+                if (notificationsEnabled && access != ReminderAccess.granted)
+                  _Row(
+                    icon: CupertinoIcons.exclamationmark_circle,
+                    title: 'الإشعارات موقوفة من النظام',
+                    subtitle:
+                        'افتح إعدادات النظام وفعّل الإشعارات لهذا التطبيق ليصلك التذكير.',
+                    onTap: () async {
+                      await ReminderService.instance.openSystemSettings();
+                      ref.invalidate(reminderAccessProvider);
+                    },
+                  ),
+                if (notificationsEnabled &&
+                    access == ReminderAccess.granted &&
+                    !exactAlarms)
+                  _Row(
+                    icon: CupertinoIcons.clock,
+                    title: 'تذكير في الوقت المحدد',
+                    subtitle:
+                        'قد يتأخر التنبيه حتى ساعة بسبب توفير الطاقة. اسمح بالمنبهات الدقيقة.',
+                    onTap: () async {
+                      await ReminderService.instance.requestExactAlarms();
+                      ref.invalidate(exactAlarmProvider);
+                      unawaited(
+                        ref.read(reminderCoordinatorProvider).refresh(),
+                      );
+                    },
+                  ),
               ],
             ),
             _SectionLabel(
@@ -298,6 +346,46 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// One line that tells the truth about whether a reminder will arrive.
+  ///
+  /// A switch that reads "on" while the system silently drops every
+  /// notification is the worst possible state: the user believes they are
+  /// covered and misses a week of reviews.
+  static String _reminderSubtitle({
+    required bool enabled,
+    required ReminderAccess access,
+  }) {
+    if (!enabled) {
+      return 'لن تصلك تنبيهات. يمكنك تفعيلها في أي وقت.';
+    }
+    switch (access) {
+      case ReminderAccess.granted:
+        return 'حتى ٦ تنبيهات بين ٨ صباحاً و١٠ مساءً، بحسب عدد البطاقات المستحقة.';
+      case ReminderAccess.denied:
+      case ReminderAccess.blocked:
+        return 'الإشعارات موقوفة من النظام — اسمح بها ليصلك التذكير.';
+      case ReminderAccess.unsupported:
+        return 'هذا الجهاز لا يدعم الإشعارات.';
+    }
+  }
+
+  Future<void> _askForPermission(BuildContext context, WidgetRef ref) async {
+    final ReminderAccess result = await ReminderService.instance.request();
+    ref.invalidate(reminderAccessProvider);
+    if (!context.mounted) {
+      return;
+    }
+    if (result == ReminderAccess.granted) {
+      unawaited(ref.read(reminderCoordinatorProvider).refresh());
+      return;
+    }
+    showAppMessage(
+      context,
+      'لم يُسمح بالإشعارات. يمكنك تفعيلها من إعدادات النظام في أي وقت.',
+      kind: AppMessageKind.info,
     );
   }
 

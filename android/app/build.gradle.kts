@@ -22,17 +22,22 @@ android {
     // name is part of the native Google Sign-In binding: a mismatch produces
     // ApiException 10 / a cancelled credential request.
     namespace = "com.bitaqati.app"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_local_notifications needs API 36 to compile and API 24 to run.
+    // Taking the larger of the two keeps the plugin resolvable on a Flutter
+    // SDK whose defaults are older, without pinning us below Flutter's own.
+    compileSdk = maxOf(flutter.compileSdkVersion, 36)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Required by flutter_local_notifications, which uses java.time.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
         applicationId = "com.bitaqati.app"
-        minSdk = flutter.minSdkVersion
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -69,6 +74,10 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 flutter {

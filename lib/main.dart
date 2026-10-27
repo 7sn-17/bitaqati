@@ -5,11 +5,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/config/app_config.dart';
+import 'core/notifications/reminder_service.dart';
 import 'core/providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  // Loads the timezone database and the notification plugin before the first
+  // frame so a tap that launched the app is not lost. Every failure inside is
+  // swallowed: a device that refuses notifications still gets a working app.
+  await ReminderService.instance.init();
 
   if (AppConfig.hasSupabase) {
     try {

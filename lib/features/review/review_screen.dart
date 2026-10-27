@@ -15,17 +15,28 @@ import '../../data/content_providers.dart';
 import '../../domain/models.dart';
 
 /// Loads the deck and the cards that are due now, then runs the session.
-class ReviewScreen extends ConsumerWidget {
+class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({required this.deckId, super.key});
 
   final String deckId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReviewScreen> createState() => _ReviewScreenState();
+}
+
+class _ReviewScreenState extends ConsumerState<ReviewScreen> {
+  /// Set once the user asks to see cards that are not due yet. The session
+  /// then also passes `allowEarly` to the scheduler, so answering a card ahead
+  /// of time is recorded instead of being discarded as a duplicate tap.
+  bool _all = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final String deckId = widget.deckId;
     final DeckNode? found = ref.watch(deckByIdProvider(deckId));
     final bool listReady = ref.watch(deckListProvider).hasValue;
     final List<ReviewCard>? queue = ref
-        .watch(studyQueueProvider(deckId))
+        .watch(studyQueueProvider((deckId: deckId, all: _all)))
         .valueOrNull;
     if ((found == null && !listReady) || queue == null) {
       return const Scaffold(
@@ -35,18 +46,36 @@ class ReviewScreen extends ConsumerWidget {
     }
     final DeckNode deck =
         found ?? DeckNode(id: deckId, title: '', color: AppColors.primary);
+    final bool canStudyAll =
+        !_all && queue.isEmpty && found != null && deck.cardCount > 0;
     return _ReviewSession(
       deck: deck,
       cards: found == null ? const <ReviewCard>[] : queue,
+      allowEarly: _all,
+      onStudyAll: canStudyAll
+          ? () {
+              setState(() => _all = true);
+            }
+          : null,
     );
   }
 }
 
 class _ReviewSession extends ConsumerStatefulWidget {
-  const _ReviewSession({required this.deck, required this.cards});
+  const _ReviewSession({
+    required this.deck,
+    required this.cards,
+    this.allowEarly = false,
+    this.onStudyAll,
+  });
 
   final DeckNode deck;
   final List<ReviewCard> cards;
+  final bool allowEarly;
+
+  /// Offered when nothing is due but the deck has cards: the user can choose
+  /// to study ahead of the schedule.
+  final VoidCallback? onStudyAll;
 
   @override
   ConsumerState<_ReviewSession> createState() => _ReviewSessionState();
@@ -73,6 +102,39 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
         if (card.favorite) card.id,
     };
     _resetRemaining();
+  }
+
+  /// Adopts a queue that arrived after the screen was built.
+  ///
+  /// The "راجع الكل الآن" button swaps the queue from empty to "everything in
+  /// this deck"; without this the session would keep the empty list it was
+  /// created with and the button would appear to do nothing. A queue that
+  /// changes mid-session is ignored, because the session owns its own copy.
+  @override
+  void didUpdateWidget(covariant _ReviewSession oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_cards.isNotEmpty || widget.cards.isEmpty) {
+      return;
+    }
+    _cards = List<ReviewCard>.of(widget.cards);
+    _favorites
+      ..clear()
+      ..addAll(<String>{
+        for (final ReviewCard card in _cards)
+          if (card.favorite) card.id,
+      });
+    _resetRemaining();
+    _index = 0;
+    _completed = 0;
+    _revealed = false;
+    _hintVisible = false;
+    _finished = false;
+    _again = 0;
+    _hard = 0;
+    _good = 0;
+    _easy = 0;
+    _startedAt = DateTime.now();
+    _shownAt = DateTime.now();
   }
 
   void _resetRemaining() {
@@ -116,6 +178,9 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
         _hardCards.add(answered);
       }
       _decrementRemaining(answered.phase);
+      // The answer is written off the frame so the next card appears
+      // instantly. A failure has to surface somewhere, though, otherwise the
+      // user would keep answering cards that are silently not being saved.
       unawaited(
         ref
             .read(contentRepositoryProvider)
@@ -123,7 +188,18 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
               cardId: answered.id,
               rating: rating,
               elapsedMs: DateTime.now().difference(_shownAt).inMilliseconds,
-            ),
+              allowEarly: widget.allowEarly,
+            )
+            .catchError((Object error) {
+              if (!mounted) {
+                return;
+              }
+              showAppMessage(
+                context,
+                'تعذّر حفظ إجابتك. تحقق من المساحة المتاحة وحاول مرة أخرى.',
+                kind: AppMessageKind.error,
+              );
+            }),
       );
     }
     final bool done = _index >= _cards.length - 1;
@@ -314,7 +390,41 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  FilledButton(
+                  if (widget.onStudyAll != null) ...<Widget>[
+                    Semantics(
+                      button: true,
+                      label: 'راجع كل بطاقات المجموعة الآن',
+                      child: FilledButton.icon(
+                        onPressed: widget.onStudyAll,
+                        icon: const Icon(CupertinoIcons.forward_end, size: 17),
+                        label: const Text('راجع الكل الآن'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.accent,
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 13,
+                          ),
+                          textStyle: const TextStyle(
+                            fontFamily: 'ReadexPro',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ستُراجع بطاقات مجدولة لوقت لاحق، وسيُعاد ترتيبها حسب إجاباتك.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  TextButton(
                     onPressed: () {
                       if (context.canPop()) {
                         context.pop();
@@ -322,9 +432,8 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                         context.go('/home');
                       }
                     },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.primary,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white.withValues(alpha: 0.8),
                     ),
                     child: const Text('رجوع'),
                   ),
@@ -538,7 +647,12 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                   ),
                 )
               else
-                _RatingBar(onRate: _rate),
+                _RatingBar(
+                  onRate: _rate,
+                  intervals: ref
+                      .read(contentRepositoryProvider)
+                      .previewIntervals(card),
+                ),
             ],
           ),
         ),
@@ -867,20 +981,37 @@ class _CardBody extends StatelessWidget {
 }
 
 class _RatingBar extends StatelessWidget {
-  const _RatingBar({required this.onRate});
+  const _RatingBar({required this.onRate, required this.intervals});
 
   final ValueChanged<int> onRate;
 
+  /// What each rating would actually do to the card, straight from FSRS. The
+  /// labels used to be hardcoded, which quietly lied once real scheduling
+  /// arrived: a mature card can jump months on "easy".
+  final Map<int, Duration> intervals;
+
   @override
   Widget build(BuildContext context) {
-    const List<_RatingSpec> specs = <_RatingSpec>[
-      _RatingSpec(label: 'نسيتها', interval: 'دقيقة', color: AppColors.danger),
-      _RatingSpec(label: 'صعبة', interval: 'يومان', color: Colors.white),
-      _RatingSpec(label: 'جيدة', interval: '5 أيام', color: AppColors.accent),
+    final List<_RatingSpec> specs = <_RatingSpec>[
+      _RatingSpec(
+        label: 'نسيتها',
+        interval: _intervalLabel(intervals[1]),
+        color: AppColors.danger,
+      ),
+      _RatingSpec(
+        label: 'صعبة',
+        interval: _intervalLabel(intervals[2]),
+        color: Colors.white,
+      ),
+      _RatingSpec(
+        label: 'جيدة',
+        interval: _intervalLabel(intervals[3]),
+        color: AppColors.accent,
+      ),
       _RatingSpec(
         label: 'سهلة',
-        interval: '11 يوماً',
-        color: Color(0xFF054D28),
+        interval: _intervalLabel(intervals[4]),
+        color: const Color(0xFF054D28),
       ),
     ];
 
@@ -1350,6 +1481,65 @@ String _durationShort(Duration duration) {
     return '${duration.inMinutes}د';
   }
   return '${duration.inHours}س ${duration.inMinutes.remainder(60)}د';
+}
+
+/// How far away a due date is, in words, for the rating buttons.
+String _intervalLabel(Duration? gap) {
+  if (gap == null) {
+    return '—';
+  }
+  final int minutes = gap.inMinutes;
+  if (minutes < 60) {
+    final int value = minutes < 1 ? 1 : minutes;
+    if (value == 1) {
+      return 'دقيقة';
+    }
+    if (value == 2) {
+      return 'دقيقتان';
+    }
+    return '$value دقائق';
+  }
+  if (gap.inHours < 24) {
+    final int value = gap.inHours;
+    if (value == 1) {
+      return 'ساعة';
+    }
+    if (value == 2) {
+      return 'ساعتان';
+    }
+    return '$value ساعات';
+  }
+  final int days = gap.inDays;
+  if (days == 1) {
+    return 'يوم';
+  }
+  if (days == 2) {
+    return 'يومان';
+  }
+  if (days <= 10) {
+    return '$days أيام';
+  }
+  if (days < 30) {
+    return '$days يوماً';
+  }
+  final int months = (days / 30).round();
+  if (months == 1) {
+    return 'شهر';
+  }
+  if (months == 2) {
+    return 'شهران';
+  }
+  if (months <= 10) {
+    return '$months أشهر';
+  }
+  final int years = (days / 365).round();
+  if (years <= 1) {
+    return 'سنة';
+  }
+  if (years == 2) {
+    return 'سنتان';
+  }
+  return '$years سنوات';
 }
 
 String _dayWord(int days) {
