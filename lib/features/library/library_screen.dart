@@ -140,9 +140,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    selected == null
-                        ? 'الأكثر استخداماً'
-                        : selected,
+                    selected ?? 'الأكثر استخداماً',
                     style: context.texts.titleLarge,
                   ),
                 ),

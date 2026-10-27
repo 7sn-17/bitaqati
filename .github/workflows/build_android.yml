@@ -50,6 +50,9 @@ jobs:
       - name: Generate Drift code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
       - name: Check formatting
         continue-on-error: true
         run: dart format --output=none --set-exit-if-changed $(git ls-files 'lib/*.dart')
