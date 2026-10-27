@@ -328,15 +328,39 @@ Daily limits are unchanged and still applied in `studyQueue`: new cards first
 capped at `dailyNewLimit`, then learning, then reviews capped at
 `dailyReviewLimit`.
 
-### Test mode is a review
+### Every study mode is a review
 
-A multiple-choice answer is evidence about memory, so it is written through the
-same `recordReview` path as the review screen: a correct answer is rating 3
-(Good), a wrong answer is rating 1 (Again). It passes `allowEarly: true`
-because the learner deliberately tested themselves over the whole deck, and the
-answer carries the real latency of the question on screen. Nothing else about
-the session touches the database: the questions are built once and
-«أعد الاختبار» is a pure in-memory rebuild.
+The four modes differ in how they ask, not in what they write. All of them go
+through the same `recordReview` path as the review screen: a correct answer is
+rating 3 (Good), a wrong one is rating 1 (Again), and every call passes
+`allowEarly: true` because the learner deliberately chose to practise over the
+whole deck rather than waiting for the scheduler.
+
+| Mode | Written when | Rating |
+|---|---|---|
+| المراجعة | The learner picks a button | 1-4, as chosen |
+| الاختبار | Each question is answered | 3 correct, 1 wrong |
+| المطابقة | A pair clears, or a wrong pair is tried | 3 matched, 1 mismatched |
+| الكتابة | The answer is confirmed or overridden | 3 accepted, 1 rejected |
+
+In the match game the *first* tile of a failed pair is the one that gets
+marked: that is the card the learner committed to. In write mode nothing is
+written until the question is resolved, so the override button («كنت محقاً»)
+replaces the verdict instead of adding a second review to the same card.
+
+Nothing else about a session touches the database: the question list is built
+once and «أعد الاختبار» is a pure in-memory rebuild.
+
+### Write mode matching
+
+`lib/domain/answer_match.dart` folds Arabic orthography before it measures
+anything — hamza forms, ta marbuta, alef maqsura, tashkeel and tatweel all
+collapse to one spelling — then compares with a two-row Levenshtein distance.
+The tolerance scales with length: a four-letter answer must match exactly,
+because «DNA» and «RNA» differ by one character and by everything, while a long
+answer can absorb a couple of slips. A multi-word answer also passes when every
+word is present in any order. Anything the matcher still gets wrong is what the
+override button is for.
 
 ## The progress dashboard
 

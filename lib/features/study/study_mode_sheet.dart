@@ -6,8 +6,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
-/// The three ways a learner can spend a session on a deck.
-enum StudyMode { review, test, match }
+/// The four ways a learner can spend a session on a deck.
+enum StudyMode { review, test, match, write }
 
 /// Opens the study-mode chooser and resolves to the picked mode.
 ///
@@ -47,6 +47,7 @@ class _StudyModeSheet extends StatelessWidget {
 
   bool get _canReview => dueCount > 0;
   bool get _canPlay => cardCount >= 2;
+  bool get _canWrite => cardCount >= 1;
 
   String _reviewSubtitle() {
     if (_canReview) {
@@ -137,6 +138,20 @@ class _StudyModeSheet extends StatelessWidget {
                   badge: null,
                   delay: 220,
                   onTap: () => Navigator.of(context).pop(StudyMode.match),
+                ),
+                const SizedBox(height: 12),
+                _ModeCard(
+                  icon: CupertinoIcons.pencil,
+                  title: 'وضع الكتابة',
+                  subtitle: _canWrite
+                      ? 'اكتب الإجابة بنفسك لاختبار حفظك الحقيقي.'
+                      : 'تحتاج بطاقة واحدة على الأقل في هذه المجموعة.',
+                  tint: const Color(0xFF6B5B95),
+                  accent: const Color(0xFFD5C7EE),
+                  enabled: _canWrite,
+                  badge: null,
+                  delay: 300,
+                  onTap: () => Navigator.of(context).pop(StudyMode.write),
                 ),
                 const SizedBox(height: 14),
                 Center(

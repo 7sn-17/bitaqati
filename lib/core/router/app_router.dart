@@ -21,6 +21,7 @@ import '../../features/settings/settings_screen.dart';
 import '../../features/shell/app_shell.dart';
 import '../../features/study/match_game_screen.dart';
 import '../../features/study/test_mode_screen.dart';
+import '../../features/study/write_mode_screen.dart';
 import '../auth/auth_providers.dart';
 import '../providers.dart';
 
@@ -151,9 +152,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: '/create-card',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => CardEditorPage(
-          deckId: state.uri.queryParameters['deckId'],
-        ),
+        builder: (BuildContext context, GoRouterState state) =>
+            CardEditorPage(deckId: state.uri.queryParameters['deckId']),
       ),
       GoRoute(
         path: '/import-cards/:deckId',
@@ -202,6 +202,12 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             MatchGameScreen(deckId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/write/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            WriteModeScreen(deckId: state.pathParameters['id']!),
       ),
     ],
   );

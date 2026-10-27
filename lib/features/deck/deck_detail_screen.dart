@@ -803,6 +803,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         await context.push('/test/${deck.id}');
       case StudyMode.match:
         await context.push('/match/${deck.id}');
+      case StudyMode.write:
+        await context.push('/write/${deck.id}');
     }
   }
 

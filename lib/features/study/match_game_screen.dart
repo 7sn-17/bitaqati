@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/confetti_burst.dart';
 import '../../data/content_providers.dart';
@@ -70,17 +71,17 @@ class _MatchTile {
   final bool isQuestion;
 }
 
-class _MatchGame extends StatefulWidget {
+class _MatchGame extends ConsumerStatefulWidget {
   const _MatchGame({required this.deckTitle, required this.cards});
 
   final String deckTitle;
   final List<ReviewCard> cards;
 
   @override
-  State<_MatchGame> createState() => _MatchGameState();
+  ConsumerState<_MatchGame> createState() => _MatchGameState();
 }
 
-class _MatchGameState extends State<_MatchGame> {
+class _MatchGameState extends ConsumerState<_MatchGame> {
   static const int _rows = 3;
 
   final math.Random _random = math.Random();
@@ -211,8 +212,31 @@ class _MatchGameState extends State<_MatchGame> {
     }
   }
 
+  /// A match is a successful recall and a mismatch is a failed one, so the
+  /// game feeds the same scheduler as the review screen. The first tile is the
+  /// one the learner committed to, which is why it is the one that gets marked
+  /// on a mismatch.
+  void _record(String cardId, {required bool good}) {
+    unawaited(
+      ref
+          .read(contentRepositoryProvider)
+          .recordReview(cardId: cardId, rating: good ? 3 : 1, allowEarly: true)
+          .catchError((Object error) {
+            if (!mounted) {
+              return;
+            }
+            showAppMessage(
+              context,
+              'تعذّر حفظ نتيجة المطابقة في جدول المراجعة.',
+              kind: AppMessageKind.error,
+            );
+          }),
+    );
+  }
+
   void _clear(_MatchTile a, _MatchTile b) {
     HapticFeedback.mediumImpact();
+    _record(a.pairId, good: true);
     setState(() {
       _selected = null;
       _matched
@@ -249,6 +273,7 @@ class _MatchGameState extends State<_MatchGame> {
 
   void _reject(_MatchTile a, _MatchTile b) {
     HapticFeedback.heavyImpact();
+    _record(a.pairId, good: false);
     setState(() {
       _selected = null;
       _wrong
@@ -522,9 +547,9 @@ class _Board extends StatelessWidget {
         // two columns on a phone produced 180x270 cards glued to each other.
         // They now cap at a size a thumb can hit and a game board reads as,
         // and the whole grid is centred in whatever space is left.
-        const double gap = 12;
-        const double maxTileWidth = 152;
-        const double maxTileHeight = 116;
+        const double gap = 10;
+        const double maxTileWidth = 144;
+        const double maxTileHeight = 108;
 
         final int columnCount = columns.length;
         final double columnWidth = math.min(

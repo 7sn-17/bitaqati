@@ -57,16 +57,25 @@ class TestModeScreen extends ConsumerWidget {
   }
 }
 
+enum _QuestionKind { choice, trueFalse }
+
 class _Question {
   const _Question({
     required this.card,
     required this.options,
     required this.correct,
+    this.kind = _QuestionKind.choice,
+    this.candidate = '',
   });
 
   final ReviewCard card;
   final List<String> options;
   final int correct;
+  final _QuestionKind kind;
+
+  /// For a true/false question: the answer the learner is judging. Empty for a
+  /// multiple-choice question.
+  final String candidate;
 }
 
 List<_Question> _buildQuestions(List<ReviewCard> cards) {
@@ -84,6 +93,23 @@ List<_Question> _buildQuestions(List<ReviewCard> cards) {
       for (final String candidate in answers)
         if (candidate != answer) candidate,
     ]..shuffle(random);
+    // Roughly a third of the questions are a statement to judge instead of
+    // four options to pick. It breaks the rhythm of a session and it tests the
+    // pair in the other direction: the learner has to recognise the answer
+    // rather than recall it.
+    if (others.isNotEmpty && random.nextDouble() < 0.35) {
+      final bool isTrue = random.nextBool();
+      questions.add(
+        _Question(
+          card: card,
+          options: const <String>['صحيح', 'خطأ'],
+          correct: isTrue ? 0 : 1,
+          kind: _QuestionKind.trueFalse,
+          candidate: isTrue ? answer : others.first,
+        ),
+      );
+      continue;
+    }
     final List<String> options = <String>[answer, ...others.take(3)]
       ..shuffle(random);
     questions.add(
@@ -520,17 +546,44 @@ class _QuestionView extends StatelessWidget {
               curve: Curves.easeOutCubic,
             ),
         const SizedBox(height: 18),
-        for (int index = 0; index < question.options.length; index++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _OptionTile(
-              letter: letters[index % letters.length],
-              label: question.options[index],
-              state: _stateFor(index),
-              delay: 90 + index * 60,
-              onTap: () => onPick(index),
-            ),
+        if (question.kind == _QuestionKind.trueFalse) ...<Widget>[
+          _CandidatePanel(text: question.candidate),
+          const SizedBox(height: 14),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _TruthButton(
+                  label: 'صحيح',
+                  icon: CupertinoIcons.checkmark,
+                  state: _stateFor(0),
+                  delay: 90,
+                  onTap: () => onPick(0),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TruthButton(
+                  label: 'خطأ',
+                  icon: CupertinoIcons.xmark,
+                  state: _stateFor(1),
+                  delay: 150,
+                  onTap: () => onPick(1),
+                ),
+              ),
+            ],
           ),
+        ] else
+          for (int index = 0; index < question.options.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _OptionTile(
+                letter: letters[index % letters.length],
+                label: question.options[index],
+                state: _stateFor(index),
+                delay: 90 + index * 60,
+                onTap: () => onPick(index),
+              ),
+            ),
       ],
     );
   }
@@ -735,6 +788,197 @@ class _OptionTileState extends State<_OptionTile>
           duration: 340.ms,
           delay: Duration(milliseconds: widget.delay),
           curve: Curves.easeOutCubic,
+        );
+  }
+}
+
+/// The answer a true/false question asks the learner to judge.
+class _CandidatePanel extends StatelessWidget {
+  const _CandidatePanel({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: context.raisedSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(CupertinoIcons.quote_bubble, size: 12, color: context.muted),
+              const SizedBox(width: 5),
+              Text(
+                'الإجابة المقترحة',
+                style: TextStyle(
+                  color: context.muted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'ReadexPro',
+              fontSize: 16,
+              height: 1.6,
+              fontWeight: FontWeight.w600,
+              color: context.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of the two answers to a true/false question. Same verdict language as
+/// the option tiles: green glow when right, a short shake when wrong.
+class _TruthButton extends StatefulWidget {
+  const _TruthButton({
+    required this.label,
+    required this.icon,
+    required this.state,
+    required this.delay,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final _OptionState state;
+  final int delay;
+  final VoidCallback onTap;
+
+  @override
+  State<_TruthButton> createState() => _TruthButtonState();
+}
+
+class _TruthButtonState extends State<_TruthButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shake = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+  );
+
+  @override
+  void didUpdateWidget(_TruthButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.state == _OptionState.wrong &&
+        oldWidget.state != _OptionState.wrong) {
+      _shake.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _shake.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final _OptionState state = widget.state;
+    final bool correct = state == _OptionState.correct;
+    final bool wrong = state == _OptionState.wrong;
+    final bool muted = state == _OptionState.muted;
+
+    final Color tint = correct
+        ? AppColors.accent
+        : wrong
+        ? AppColors.danger
+        : context.hairline;
+
+    return AnimatedBuilder(
+          animation: _shake,
+          builder: (BuildContext context, Widget? child) {
+            final double offset =
+                math.sin(_shake.value * math.pi * 5) * (1 - _shake.value) * 8;
+            return Transform.translate(offset: Offset(offset, 0), child: child);
+          },
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 240),
+            opacity: muted ? 0.45 : 1,
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOut,
+                height: 86,
+                decoration: BoxDecoration(
+                  color: correct
+                      ? context.softAccent
+                      : wrong
+                      ? AppColors.danger.withValues(alpha: 0.09)
+                      : context.cardSurface,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: tint,
+                    width: correct || wrong ? 1.8 : 1,
+                  ),
+                  boxShadow: correct || wrong
+                      ? <BoxShadow>[
+                          BoxShadow(
+                            color: tint.withValues(alpha: 0.35),
+                            blurRadius: 22,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 8),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(
+                      widget.icon,
+                      size: 22,
+                      color: correct
+                          ? context.onSoftAccent
+                          : wrong
+                          ? AppColors.danger
+                          : context.muted,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        fontFamily: 'ReadexPro',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: correct
+                            ? context.onSoftAccent
+                            : wrong
+                            ? AppColors.danger
+                            : context.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        )
+        .animate()
+        .fadeIn(
+          duration: 260.ms,
+          delay: Duration(milliseconds: widget.delay),
+        )
+        .scale(
+          begin: const Offset(0.94, 0.94),
+          end: const Offset(1, 1),
+          duration: 300.ms,
+          delay: Duration(milliseconds: widget.delay),
+          curve: Curves.easeOutBack,
         );
   }
 }
