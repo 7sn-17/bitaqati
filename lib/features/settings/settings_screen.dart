@@ -307,7 +307,6 @@ class _Row extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.onTap,
-    this.danger = false,
   });
 
   final IconData icon;
@@ -315,11 +314,10 @@ class _Row extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
-  final bool danger;
 
   @override
   Widget build(BuildContext context) {
-    final Color ink = danger ? AppColors.danger : context.colors.onSurface;
+    final Color ink = context.colors.onSurface;
     final Widget content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
@@ -328,9 +326,7 @@ class _Row extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: danger
-                  ? AppColors.danger.withValues(alpha: 0.1)
-                  : context.isDark
+              color: context.isDark
                   ? AppColors.darkSurfaceHigh
                   : Colors.white,
               borderRadius: BorderRadius.circular(11),
@@ -338,7 +334,7 @@ class _Row extends StatelessWidget {
             child: Icon(
               icon,
               size: 18,
-              color: danger ? AppColors.danger : context.colors.primary,
+              color: context.colors.primary,
             ),
           ),
           const SizedBox(width: 10),

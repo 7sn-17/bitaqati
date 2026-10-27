@@ -1335,7 +1335,7 @@ String _formatDuration(Duration duration) {
     return '${duration.inMinutes} دقيقة';
   }
   final int minutes = duration.inMinutes.remainder(60);
-  return '${duration.inHours} س ${minutes} د';
+  return '${duration.inHours} س $minutes د';
 }
 
 String _durationShort(Duration duration) {

@@ -256,7 +256,7 @@ class LibraryRepository {
       return;
     }
     try {
-      await _client.rpc(
+      await _client.rpc<dynamic>(
         'record_deck_install',
         params: <String, dynamic>{'p_deck_id': deckId},
       );

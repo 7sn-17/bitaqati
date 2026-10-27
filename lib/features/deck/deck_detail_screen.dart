@@ -624,13 +624,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         cardIds: _selected.toList(growable: false),
         deckId: target,
       );
-      if (!mounted) {
+      if (!mounted || !context.mounted) {
         return;
       }
       showAppMessage(context, 'تم نقل البطاقات.');
       _clearSelection();
     } catch (_) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(
           context,
           'تعذّر نقل البطاقات. حاول مرة أخرى.',
@@ -683,13 +683,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         cardIds: _selected.toList(growable: false),
         tags: tags,
       );
-      if (!mounted) {
+      if (!mounted || !context.mounted) {
         return;
       }
       showAppMessage(context, 'تمت إضافة الوسوم.');
       _clearSelection();
     } catch (_) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(
           context,
           'تعذّرت إضافة الوسوم. حاول مرة أخرى.',
@@ -713,13 +713,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         cardIds: _selected.toList(growable: false),
         suspended: true,
       );
-      if (!mounted) {
+      if (!mounted || !context.mounted) {
         return;
       }
       showAppMessage(context, 'تم تعليق البطاقات.');
       _clearSelection();
     } catch (_) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(
           context,
           'تعذّر تعليق البطاقات. حاول مرة أخرى.',
@@ -768,13 +768,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       await ref.read(contentRepositoryProvider).deleteCards(
         _selected.toList(growable: false),
       );
-      if (!mounted) {
+      if (!mounted || !context.mounted) {
         return;
       }
       showAppMessage(context, 'تم حذف البطاقات.');
       _clearSelection();
     } catch (_) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(
           context,
           'تعذّر حذف البطاقات. حاول مرة أخرى.',
@@ -908,7 +908,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     }
     setState(() => _installing = true);
     final String? localId = await installLibraryDeck(context, ref, deck);
-    if (!mounted) {
+    if (!mounted || !context.mounted) {
       return;
     }
     setState(() => _installing = false);
@@ -942,7 +942,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       } else {
         await sharing.publish(deckId: deck.id, privacy: privacy);
       }
-      if (!mounted) {
+      if (!mounted || !context.mounted) {
         return;
       }
       showAppMessage(
@@ -952,11 +952,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
             : 'تم النشر. انسخ الرابط لمشاركة المجموعة.',
       );
     } on SharingFailure catch (error) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(context, error.message, kind: AppMessageKind.error);
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(
           context,
           'تعذّر تحديث حالة المشاركة. حاول مرة أخرى.',
@@ -1018,7 +1018,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     }
     try {
       await ref.read(contentRepositoryProvider).deleteDeck(deck.id);
-      if (!mounted) {
+      if (!mounted || !context.mounted) {
         return;
       }
       showAppMessage(context, 'تم حذف المجموعة.');
@@ -1028,7 +1028,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         context.go('/home');
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && context.mounted) {
         showAppMessage(
           context,
           'تعذّر حذف المجموعة. حاول مرة أخرى.',
