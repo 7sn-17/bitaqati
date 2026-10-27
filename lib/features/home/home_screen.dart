@@ -48,7 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final String? selected = ref.watch(selectedTagProvider);
-    final List<DeckNode> allDecks = ref.watch(deckForestProvider);
+    final List<DeckNode> allDecks = ref.watch(allDecksProvider);
     final List<DeckNode> decks = selected == null
         ? allDecks
         : allDecks

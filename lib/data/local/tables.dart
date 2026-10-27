@@ -53,32 +53,21 @@ CardStatus cardStatusFromCloud(String value) {
   }
 }
 
-/// A node in the deck tree: a root deck, a sub-deck, or a lesson.
+/// A deck. Decks are a flat list: each one owns its cards directly.
 ///
 /// Ids are client-generated UUID strings so rows can be created offline and
-/// pushed to Supabase unchanged. `path` holds the ancestor ids, root first,
-/// excluding the row itself; `depth` equals the length of `path`.
+/// pushed to Supabase unchanged.
 @DataClassName('DeckRow')
-@TableIndex(name: 'decks_parent_idx', columns: {#parentId, #position})
-@TableIndex(name: 'decks_root_idx', columns: {#rootId, #depth, #position})
 @TableIndex(name: 'decks_owner_idx', columns: {#ownerId})
+@TableIndex(name: 'decks_share_code_idx', columns: {#shareCode})
 class Decks extends Table {
   TextColumn get id => text()();
 
   /// Null until the user signs in; filled in during the first sync.
   TextColumn get ownerId => text().nullable()();
 
-  /// Null for a root deck.
-  TextColumn get parentId =>
-      text().nullable().references(Decks, #id, onDelete: KeyAction.cascade)();
-
-  /// The top-most ancestor (the row's own id for a root deck).
-  TextColumn get rootId => text().nullable()();
-
-  TextColumn get path =>
-      text().map(const StringsConverter()).withDefault(const Constant('[]'))();
-
-  IntColumn get depth => integer().withDefault(const Constant(0))();
+  /// Six-character code used to share the deck. Unique per account.
+  TextColumn get shareCode => text().nullable()();
 
   IntColumn get position => integer().withDefault(const Constant(0))();
 
@@ -123,11 +112,6 @@ class Decks extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {id};
-
-  @override
-  List<String> get customConstraints => <String>[
-    'CHECK (depth BETWEEN 0 AND 1)',
-  ];
 }
 
 @DataClassName('CardRow')

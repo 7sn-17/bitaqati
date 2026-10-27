@@ -25,8 +25,15 @@ final FutureProviderFamily<DeckNode?, String> libraryDeckProvider =
       final DeckBundle? bundle = await ref.watch(
         libraryBundleProvider(deckId).future,
       );
-      return bundle?.root;
+      return bundle?.deck;
     });
+
+/// A deck found by its six-character code, ready to preview and install.
+final FutureProviderFamily<DeckNode?, String> shareCodeDeckProvider =
+    FutureProvider.family<DeckNode?, String>(
+      (Ref ref, String code) =>
+          ref.watch(libraryRepositoryProvider).resolveShareCode(code),
+    );
 
 /// The signed-in user's 1-5 star rating for a public deck.
 final FutureProviderFamily<int?, String> myDeckRatingProvider =

@@ -671,6 +671,7 @@ class _CardBody extends StatelessWidget {
               CardMarkup(
                 text: card.front,
                 revealCloze: false,
+                mediaFirst: true,
                 style: TextStyle(
                   fontFamily: 'ReadexPro',
                   fontSize: 24,

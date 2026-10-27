@@ -13,6 +13,8 @@ import '../../core/user_display.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/auth_service.dart';
+import '../../data/sync_providers.dart';
+import '../../data/sync_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -32,6 +34,11 @@ class SettingsScreen extends ConsumerWidget {
     final bool isDark =
         themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && context.isDark);
+    final bool notificationsEnabled = ref.watch(notificationsEnabledProvider);
+    final int newLimit = ref.watch(dailyNewLimitProvider);
+    final int reviewLimit = ref.watch(dailyReviewLimitProvider);
+    final SyncState sync = ref.watch(syncControllerProvider);
+    final bool signedIn = user != null;
 
     return Scaffold(
       body: SafeArea(
@@ -135,6 +142,97 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
+                _Row(
+                  icon: CupertinoIcons.bell,
+                  title: 'التذكير اليومي',
+                  subtitle: 'تنبيه واحد في اليوم لمراجعة بطاقاتك',
+                  trailing: Switch.adaptive(
+                    value: notificationsEnabled,
+                    onChanged: (bool value) {
+                      ref
+                          .read(notificationsEnabledProvider.notifier)
+                          .state = value;
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const _SectionLabel('أهداف المراجعة'),
+            _Group(
+              children: <Widget>[
+                _StepperRow(
+                  icon: CupertinoIcons.sparkles,
+                  title: 'بطاقات جديدة في الجلسة',
+                  subtitle: 'كم بطاقة جديدة تُقدَّم لك في كل جلسة دراسة',
+                  value: newLimit,
+                  onIncrease: newLimit >= 200
+                      ? null
+                      : () => ref
+                            .read(dailyNewLimitProvider.notifier)
+                            .increment(),
+                  onDecrease: newLimit <= 0
+                      ? null
+                      : () => ref
+                            .read(dailyNewLimitProvider.notifier)
+                            .decrement(),
+                ),
+                _StepperRow(
+                  icon: CupertinoIcons.repeat,
+                  title: 'بطاقات المراجعة في الجلسة',
+                  subtitle: 'حد أقصى للمراجعات في الجلسة الواحدة',
+                  value: reviewLimit,
+                  onIncrease: reviewLimit >= 1000
+                      ? null
+                      : () => ref
+                            .read(dailyReviewLimitProvider.notifier)
+                            .increment(),
+                  onDecrease: reviewLimit <= 20
+                      ? null
+                      : () => ref
+                            .read(dailyReviewLimitProvider.notifier)
+                            .decrement(),
+                ),
+              ],
+            ),
+            const _SectionLabel('المزامنة'),
+            _Group(
+              children: <Widget>[
+                _Row(
+                  icon: CupertinoIcons.arrow_2_circlepath,
+                  title: sync.running ? 'جارٍ المزامنة…' : 'مزامنة الآن',
+                  subtitle: _syncSubtitle(sync.report, signedIn),
+                  trailing: sync.running
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                        )
+                      : null,
+                  onTap: signedIn && !sync.running
+                      ? () async {
+                          await ref
+                              .read(syncControllerProvider.notifier)
+                              .syncNow();
+                          final SyncReport? report =
+                              ref.read(syncControllerProvider).report;
+                          if (!context.mounted || report == null) {
+                            return;
+                          }
+                          showAppMessage(
+                            context,
+                            report.error ??
+                                (report.idle
+                                    ? 'كل شيء محدّث بالفعل.'
+                                    : 'تمت المزامنة: '
+                                          '${report.pushed} رفع، '
+                                          '${report.pulled} تنزيل.'),
+                            kind: report.ok
+                                ? AppMessageKind.success
+                                : AppMessageKind.error,
+                          );
+                        }
+                      : null,
+                ),
               ],
             ),
             const _SectionLabel('عن التطبيق'),
@@ -176,6 +274,23 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// One line explaining where the last sync left off.
+  String _syncSubtitle(SyncReport? report, bool signedIn) {
+    if (!signedIn) {
+      return 'سجّل الدخول لمزامنة بطاقاتك بين أجهزتك';
+    }
+    if (report == null) {
+      return 'لم تتم مزامنة بعد';
+    }
+    if (report.error != null) {
+      return report.error!;
+    }
+    if (report.idle) {
+      return 'كل شيء محدّث';
+    }
+    return 'رفع ${report.pushed} · نزّل ${report.pulled}';
   }
 
   /// Leaves guest mode. The router then shows the login screen, where the
@@ -375,6 +490,99 @@ class _Row extends StatelessWidget {
       return content;
     }
     return InkWell(onTap: onTap, child: content);
+  }
+}
+
+/// A row with − and + buttons, used for the numeric daily goals.
+class _StepperRow extends StatelessWidget {
+  const _StepperRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onIncrease,
+    required this.onDecrease,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final int value;
+  final VoidCallback? onIncrease;
+  final VoidCallback? onDecrease;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Row(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _StepButton(
+            icon: CupertinoIcons.minus,
+            onTap: onDecrease,
+            label: 'تقليل',
+          ),
+          SizedBox(
+            width: 38,
+            child: Text(
+              '$value',
+              textAlign: TextAlign.center,
+              style: context.texts.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          _StepButton(
+            icon: CupertinoIcons.plus,
+            onTap: onIncrease,
+            label: 'زيادة',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.icon,
+    required this.onTap,
+    required this.label,
+  });
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onTap != null;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: enabled
+                ? context.softAccent
+                : context.raisedSurface,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            size: 15,
+            color: enabled ? context.brandInk : context.muted,
+          ),
+        ),
+      ),
+    );
   }
 }
 

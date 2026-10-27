@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -19,17 +21,14 @@ class ContentRepository {
   final Uuid _uuid;
   final DateTime Function() _clock;
 
-  /// The app allows exactly two levels: a main deck and its sub-decks.
-  ///
-  /// This matches the cloud `decks_depth_check` and local Drift constraints;
-  /// it is also enforced here so every screen inherits the invariant before a
-  /// write ever reaches SQLite.
-  static const int maxDepth = kMaxDeckDepth;
+  /// Alphabet for share codes. No vowels, so codes cannot spell a word, and
+  /// no characters that are easy to confuse when typed (0/O, 1/I/L).
+  static const String _shareAlphabet = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 
   static const String _deckStatsSql = '''
 SELECT d.*,
   (SELECT COUNT(*) FROM cards c
-    WHERE c.deck_id = d.id AND c.deleted_at IS NULL) AS own_cards,
+    WHERE c.deck_id = d.id AND c.deleted_at IS NULL) AS card_total,
   (SELECT COUNT(*) FROM cards c
     JOIN card_states s ON s.card_id = c.id
     WHERE c.deck_id = d.id AND c.deleted_at IS NULL
@@ -57,15 +56,15 @@ SELECT d.*,
       AND r.rating >= 2) AS log_ok
 FROM decks d
 WHERE d.deleted_at IS NULL
-ORDER BY d.depth, d.position, d.created_at
+ORDER BY d.position, d.created_at
 ''';
 
   // ---------------------------------------------------------------------------
   // Decks
   // ---------------------------------------------------------------------------
 
-  /// Every live deck as a flat list, parents first. Counts include sub-decks.
-  /// Use [buildDeckForest] to turn it into trees.
+  /// Every live deck, in display order. Each deck owns its cards directly,
+  /// so the counts are exact rather than aggregated over sub-decks.
   Stream<List<DeckNode>> watchDecks() {
     final Selectable<QueryRow> query = _db.customSelect(
       _deckStatsSql,
@@ -75,79 +74,12 @@ ORDER BY d.depth, d.position, d.created_at
   }
 
   List<DeckNode> _buildNodes(List<QueryRow> rows) {
-    final List<_DeckStats> all = <_DeckStats>[];
-    for (final QueryRow row in rows) {
-      all.add(
-        _DeckStats(
-          deck: _db.decks.map(row.data),
-          ownCards: row.read<int>('own_cards'),
-          mastered: row.read<int>('mastered'),
-          dueNew: row.read<int>('due_new'),
-          dueLearning: row.read<int>('due_learning'),
-          dueReview: row.read<int>('due_review'),
-          reviews: row.read<int>('log_total'),
-          correct: row.read<int>('log_ok'),
-        ),
-      );
-    }
-
-    final Map<String, List<_DeckStats>> childrenOf =
-        <String, List<_DeckStats>>{};
-    for (final _DeckStats item in all) {
-      final String? parent = item.deck.parentId;
-      if (parent != null) {
-        childrenOf.putIfAbsent(parent, () => <_DeckStats>[]).add(item);
-      }
-    }
-
-    final Map<String, _Totals> memo = <String, _Totals>{};
-    _Totals totalsOf(_DeckStats item) {
-      final _Totals? cached = memo[item.deck.id];
-      if (cached != null) {
-        return cached;
-      }
-      int cards = item.ownCards;
-      int mastered = item.mastered;
-      int dueNew = item.dueNew;
-      int dueLearning = item.dueLearning;
-      int dueReview = item.dueReview;
-      int reviews = item.reviews;
-      int correct = item.correct;
-      final List<_DeckStats> kids =
-          childrenOf[item.deck.id] ?? const <_DeckStats>[];
-      for (final _DeckStats child in kids) {
-        final _Totals sub = totalsOf(child);
-        cards += sub.cards;
-        mastered += sub.mastered;
-        dueNew += sub.dueNew;
-        dueLearning += sub.dueLearning;
-        dueReview += sub.dueReview;
-        reviews += sub.reviews;
-        correct += sub.correct;
-      }
-      final _Totals result = _Totals(
-        cards: cards,
-        mastered: mastered,
-        dueNew: dueNew,
-        dueLearning: dueLearning,
-        dueReview: dueReview,
-        reviews: reviews,
-        correct: correct,
-      );
-      memo[item.deck.id] = result;
-      return result;
-    }
-
     final List<DeckNode> nodes = <DeckNode>[];
-    for (final _DeckStats item in all) {
-      final DeckRow deck = item.deck;
-      final _Totals totals = totalsOf(item);
+    for (final QueryRow row in rows) {
+      final DeckRow deck = _db.decks.map(row.data);
       nodes.add(
         DeckNode(
           id: deck.id,
-          parentId: deck.parentId,
-          rootId: deck.rootId,
-          depth: deck.depth,
           position: deck.position,
           title: deck.title,
           description: deck.description,
@@ -158,28 +90,26 @@ ORDER BY d.depth, d.position, d.created_at
           isPublic: deck.privacy == DeckPrivacy.public,
           publishedAt: deck.publishedAt,
           sourceDeckId: deck.sourceDeckId,
-          ownCardCount: item.ownCards,
-          cardCount: totals.cards,
-          masteredCount: totals.mastered,
-          dueNew: totals.dueNew,
-          dueLearning: totals.dueLearning,
-          dueReview: totals.dueReview,
-          reviewCount: totals.reviews,
-          correctCount: totals.correct,
-          childCount: childrenOf[deck.id]?.length ?? 0,
+          shareCode: deck.shareCode,
+          cardCount: row.read<int>('card_total'),
+          masteredCount: row.read<int>('mastered'),
+          dueNew: row.read<int>('due_new'),
+          dueLearning: row.read<int>('due_learning'),
+          dueReview: row.read<int>('due_review'),
+          reviewCount: row.read<int>('log_total'),
+          correctCount: row.read<int>('log_ok'),
         ),
       );
     }
     return nodes;
   }
 
-  /// Creates a root deck, or a sub-deck when [parentId] is given.
+  /// Creates a deck. Every deck owns its cards directly; nothing nests.
   ///
-  /// `root_id`, `path` and `depth` are computed here the same way the cloud
-  /// trigger does, so rows can be pushed to Supabase unchanged.
+  /// A share code is minted up front so the deck can be sent to a friend
+  /// before it is ever published.
   Future<String> createDeck({
     required String title,
-    String? parentId,
     String description = '',
     String colorHex = kDefaultDeckColorHex,
     String icon = 'layers',
@@ -191,35 +121,10 @@ ORDER BY d.depth, d.position, d.created_at
     }
     return _db.transaction(() async {
       final String id = _uuid.v4();
-      String rootId = id;
-      List<String> path = const <String>[];
-      int depth = 0;
-
-      if (parentId != null) {
-        final String parentKey = parentId;
-        final DeckRow? parent =
-            await (_db.select(_db.decks)
-                  ..where((d) => d.id.equals(parentKey) & d.deletedAt.isNull()))
-                .getSingleOrNull();
-        if (parent == null) {
-          throw StateError('Parent deck $parentKey does not exist');
-        }
-        if (parent.depth >= maxDepth) {
-          throw StateError(
-            'A sub-deck cannot contain another sub-deck '
-            '(maximum depth is $maxDepth)',
-          );
-        }
-        rootId = parent.rootId ?? parent.id;
-        path = <String>[...parent.path, parent.id];
-        depth = parent.depth + 1;
-      }
-
       final QueryRow next = await _db
           .customSelect(
             'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM decks '
-            'WHERE parent_id IS ? AND deleted_at IS NULL',
-            variables: [Variable<String>(parentId)],
+            'WHERE deleted_at IS NULL',
             readsFrom: {_db.decks},
           )
           .getSingle();
@@ -230,10 +135,7 @@ ORDER BY d.depth, d.position, d.created_at
             DecksCompanion.insert(
               id: id,
               title: cleanTitle,
-              parentId: Value(parentId),
-              rootId: Value(rootId),
-              path: Value(path),
-              depth: Value(depth),
+              shareCode: Value<String?>(await _freshShareCode()),
               position: Value(next.read<int>('next')),
               description: Value(description.trim()),
               colorHex: Value(colorHex),
@@ -244,6 +146,74 @@ ORDER BY d.depth, d.position, d.created_at
       await _enqueue('decks', id, SyncOperation.upsert);
       return id;
     });
+  }
+
+  /// Reserves a share code that no live local deck is using yet.
+  ///
+  /// The cloud enforces global uniqueness when the deck is published; this
+  /// only keeps the code stable and collision-free on this device.
+  Future<String> _freshShareCode() async {
+    final List<DeckRow> live = await (_db.select(
+      _db.decks,
+    )..where((d) => d.deletedAt.isNull())).get();
+    final Set<String> taken = <String>{
+      for (final DeckRow deck in live)
+        if (deck.shareCode != null) deck.shareCode!,
+    };
+    for (int attempt = 0; attempt < 64; attempt++) {
+      final String code = _randomShareCode();
+      if (!taken.contains(code)) {
+        return code;
+      }
+    }
+    // 31^6 is ~887 million combinations; 64 collisions in a row means the
+    // device RNG is broken, so fall back to something time-derived.
+    return _randomShareCode(seed: _clock().microsecondsSinceEpoch);
+  }
+
+  String _randomShareCode({int? seed}) {
+    final Random random = seed == null
+        ? Random.secure()
+        : Random(seed);
+    final StringBuffer out = StringBuffer();
+    for (int index = 0; index < 6; index++) {
+      out.write(
+        _shareAlphabet[random.nextInt(_shareAlphabet.length)],
+      );
+    }
+    return out.toString();
+  }
+
+  /// Stores the code the server settled on, which can differ from the local
+  /// one when it collided with another account's deck.
+  Future<void> setDeckShareCode(String deckId, String code) {
+    return _db.transaction(() async {
+      await (_db.update(_db.decks)
+            ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
+          .write(
+            DecksCompanion(
+              shareCode: Value<String?>(code.toUpperCase()),
+              updatedAt: Value<DateTime>(_clock()),
+            ),
+          );
+      await _enqueue('decks', deckId, SyncOperation.upsert);
+    });
+  }
+
+  /// Looks up a local deck by its share code. Used by the "enter a code"
+  /// sheet so a deck you already own is never duplicated.
+  Future<DeckNode?> deckByShareCode(String code) async {
+    final String needle = code.trim().toUpperCase();
+    if (needle.isEmpty) {
+      return null;
+    }
+    final DeckRow? row =
+        await (_db.select(_db.decks)
+              ..where(
+                (d) => d.shareCode.equals(needle) & d.deletedAt.isNull(),
+              ))
+            .getSingleOrNull();
+    return row == null ? null : _deckNodeFromRow(row);
   }
 
   /// Updates the editable identity of a deck. Cards and scheduling state are
@@ -286,34 +256,30 @@ ORDER BY d.depth, d.position, d.created_at
     });
   }
 
-  /// Soft-deletes a deck, its sub-decks, and every card inside them.
+  /// Soft-deletes a deck and every card inside it.
   Future<void> deleteDeck(String deckId) {
     return _db.transaction(() async {
       final DateTime now = _clock();
-      final List<DeckRow> live = await (_db.select(
-        _db.decks,
-      )..where((d) => d.deletedAt.isNull())).get();
-      final List<String> ids = <String>[];
-      for (final DeckRow deck in live) {
-        if (deck.id == deckId || deck.path.contains(deckId)) {
-          ids.add(deck.id);
-        }
-      }
-      if (!ids.contains(deckId)) {
+      final DeckRow? deck =
+          await (_db.select(_db.decks)
+                ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
+              .getSingleOrNull();
+      if (deck == null) {
         throw StateError('Deck $deckId does not exist');
       }
       final List<CardRow> cards = await (_db.select(_db.cards)
-            ..where((c) => c.deckId.isIn(ids) & c.deletedAt.isNull()))
+            ..where((c) => c.deckId.equals(deckId) & c.deletedAt.isNull()))
           .get();
-      await (_db.update(_db.cards)
-            ..where((c) => c.deckId.isIn(ids) & c.deletedAt.isNull()))
+      await (_db.update(_db.cards)..where(
+            (c) => c.deckId.equals(deckId) & c.deletedAt.isNull(),
+          ))
           .write(
             CardsCompanion(
               deletedAt: Value<DateTime>(now),
               updatedAt: Value<DateTime>(now),
             ),
           );
-      await (_db.update(_db.decks)..where((d) => d.id.isIn(ids))).write(
+      await (_db.update(_db.decks)..where((d) => d.id.equals(deckId))).write(
         DecksCompanion(
           deletedAt: Value<DateTime>(now),
           updatedAt: Value<DateTime>(now),
@@ -322,9 +288,7 @@ ORDER BY d.depth, d.position, d.created_at
       for (final CardRow card in cards) {
         await _enqueue('cards', card.id, SyncOperation.delete);
       }
-      for (final String id in ids) {
-        await _enqueue('decks', id, SyncOperation.delete);
-      }
+      await _enqueue('decks', deckId, SyncOperation.delete);
     });
   }
 
@@ -337,88 +301,64 @@ ORDER BY d.depth, d.position, d.created_at
   }
 
   /// Stores the sharing state locally after a successful cloud publish.
-  Future<void> setDeckPrivacy(
-    String deckId,
-    DeckPrivacy privacy, {
-    bool includeChildren = true,
-  }) {
+  Future<void> setDeckPrivacy(String deckId, DeckPrivacy privacy) {
     return _db.transaction(() async {
       final DateTime now = _clock();
-      final List<DeckRow> live = await (_db.select(
-        _db.decks,
-      )..where((d) => d.deletedAt.isNull())).get();
-      final List<String> ids = <String>[];
-      for (final DeckRow deck in live) {
-        if (deck.id == deckId ||
-            (includeChildren && deck.path.contains(deckId))) {
-          ids.add(deck.id);
-        }
-      }
-      if (ids.isEmpty) {
+      final DeckRow? deck =
+          await (_db.select(_db.decks)
+                ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
+              .getSingleOrNull();
+      if (deck == null) {
         throw StateError('Deck $deckId does not exist');
       }
-      await (_db.update(_db.decks)..where((d) => d.id.isIn(ids))).write(
+      await (_db.update(_db.decks)..where((d) => d.id.equals(deckId))).write(
         DecksCompanion(
           privacy: Value<DeckPrivacy>(privacy),
+          shareCode: deck.shareCode == null
+              ? Value<String?>(await _freshShareCode())
+              : const Value<String?>.absent(),
           publishedAt: Value<DateTime?>(
             privacy == DeckPrivacy.private ? null : now,
           ),
           updatedAt: Value<DateTime>(now),
         ),
       );
-      for (final String id in ids) {
-        await _enqueue('decks', id, SyncOperation.upsert);
-      }
+      await _enqueue('decks', deckId, SyncOperation.upsert);
     });
   }
 
-  /// Reads a deck (and, for a main deck, its sub-decks) plus every card.
+  /// Reads one deck plus every card in it, ready for publishing or sharing.
   Future<DeckBundle> exportDeckBundle(String deckId) async {
-    final DeckRow? root =
+    final DeckRow? deck =
         await (_db.select(_db.decks)
               ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
             .getSingleOrNull();
-    if (root == null) {
+    if (deck == null) {
       throw StateError('Deck $deckId does not exist');
     }
-    final List<DeckRow> children = root.depth == kMainDeckDepth
-        ? await (_db.select(_db.decks)
-              ..where(
-                (d) => d.parentId.equals(deckId) & d.deletedAt.isNull(),
-              )
-              ..orderBy([(d) => OrderingTerm.asc(d.position)]))
-            .get()
-        : const <DeckRow>[];
-    final List<DeckRow> rows = <DeckRow>[root, ...children];
-    final List<String> ids = rows.map((DeckRow deck) => deck.id).toList();
     final List<CardRow> cards = await (_db.select(_db.cards)
-          ..where((c) => c.deckId.isIn(ids) & c.deletedAt.isNull())
+          ..where((c) => c.deckId.equals(deckId) & c.deletedAt.isNull())
           ..orderBy([(c) => OrderingTerm.asc(c.position)]))
         .get();
 
     return DeckBundle(
-      root: _deckNodeFromRow(root, cardCount: cards.length),
-      nodes: <DeckBundleNode>[
-        for (final DeckRow row in rows)
-          DeckBundleNode(
-            id: row.id,
-            parentId: row.parentId,
-            depth: row.depth,
-            position: row.position,
-            title: row.title,
-            description: row.description,
-            colorHex: row.colorHex,
-            icon: row.icon,
-            tags: row.tags,
-            settings: row.settings,
-            coverUrl: row.coverUrl,
-            sourceDeckId: row.sourceDeckId,
-            sourceVersion: row.sourceVersion,
-            publishedAt: row.publishedAt,
-            createdAt: row.createdAt,
-            updatedAt: row.updatedAt,
-          ),
-      ],
+      deck: _deckNodeFromRow(deck, cardCount: cards.length),
+      row: DeckBundleNode(
+        id: deck.id,
+        position: deck.position,
+        title: deck.title,
+        description: deck.description,
+        colorHex: deck.colorHex,
+        icon: deck.icon,
+        tags: deck.tags,
+        settings: deck.settings,
+        coverUrl: deck.coverUrl,
+        sourceDeckId: deck.sourceDeckId,
+        sourceVersion: deck.sourceVersion,
+        publishedAt: deck.publishedAt,
+        createdAt: deck.createdAt,
+        updatedAt: deck.updatedAt,
+      ),
       cards: <DeckBundleCard>[
         for (final CardRow card in cards)
           DeckBundleCard(
@@ -442,142 +382,49 @@ ORDER BY d.depth, d.position, d.created_at
     );
   }
 
-  /// Copies a library or shared deck into the local database.
+  /// Deep-copies a library or shared deck into the local database.
   ///
-  /// The source root becomes a main deck. Cards that live directly on the
-  /// source root are placed in a generated sub-deck, because the local
-  /// hierarchy never allows cards on a main deck.
+  /// Every deck and card gets a fresh id, so the copy is fully independent:
+  /// editing or deleting it never touches the original, and the same deck can
+  /// be installed twice. Card content is copied verbatim; scheduling starts
+  /// empty so a fresh install is a fresh start.
   Future<String> importDeckBundle(DeckBundle bundle) {
     return _db.transaction(() async {
       final DateTime now = _clock();
-      final DeckBundleNode rootNode = bundle.nodes.firstWhere(
-        (DeckBundleNode node) => node.id == bundle.root.id,
-        orElse: () => DeckBundleNode(
-          id: bundle.root.id,
-          parentId: null,
-          depth: 0,
-          position: 0,
-          title: bundle.root.title,
-          description: bundle.root.description,
-          colorHex: colorToHex(bundle.root.color),
-          icon: bundle.root.iconKey,
-          tags: bundle.root.tags,
-        ),
-      );
-      final List<DeckBundleNode> childNodes = bundle.nodes
-          .where(
-            (DeckBundleNode node) =>
-                node.id != rootNode.id &&
-                (node.parentId == rootNode.id || node.depth == 1),
-          )
-          .toList(growable: false);
-
-      final String rootId = _uuid.v4();
-      final Map<String, String> deckIds = <String, String>{
-        rootNode.id: rootId,
-      };
+      final DeckBundleNode source = bundle.row;
+      final String deckId = _uuid.v4();
 
       await _db
           .into(_db.decks)
           .insert(
             DecksCompanion.insert(
-              id: rootId,
-              title: rootNode.title,
-              rootId: Value<String>(rootId),
-              depth: const Value<int>(kMainDeckDepth),
-              position: const Value<int>(0),
-              description: Value<String>(rootNode.description),
+              id: deckId,
+              title: source.title,
+              shareCode: Value<String?>(await _freshShareCode()),
+              position: Value<int>(await _nextDeckPosition()),
+              description: Value<String>(source.description),
               colorHex: Value<String?>(
-                rootNode.colorHex ?? colorToHex(bundle.root.color),
+                source.colorHex ?? colorToHex(bundle.deck.color),
               ),
-              icon: Value<String>(rootNode.icon),
-              tags: Value<List<String>>(rootNode.tags),
-              settings: Value<Map<String, Object?>>(rootNode.settings),
-              sourceDeckId: Value<String?>(bundle.root.id),
-              sourceVersion: Value<int>(rootNode.sourceVersion),
+              icon: Value<String>(source.icon),
+              tags: Value<List<String>>(source.tags),
+              settings: Value<Map<String, Object?>>(source.settings),
+              sourceDeckId: Value<String?>(bundle.deck.id),
+              sourceVersion: Value<int>(source.sourceVersion),
               forkedAt: Value<DateTime>(now),
             ),
           );
 
-      for (int index = 0; index < childNodes.length; index++) {
-        final DeckBundleNode child = childNodes[index];
-        final String childId = _uuid.v4();
-        deckIds[child.id] = childId;
-        await _db
-            .into(_db.decks)
-            .insert(
-              DecksCompanion.insert(
-                id: childId,
-                title: child.title,
-                parentId: Value<String?>(rootId),
-                rootId: Value<String>(rootId),
-                path: Value<List<String>>(<String>[rootId]),
-                depth: const Value<int>(kSubDeckDepth),
-                position: Value<int>(index),
-                description: Value<String>(child.description),
-                colorHex: Value<String?>(
-                  child.colorHex ?? colorToHex(bundle.root.color),
-                ),
-                icon: Value<String>(child.icon),
-                tags: Value<List<String>>(child.tags),
-                settings: Value<Map<String, Object?>>(child.settings),
-                sourceDeckId: Value<String?>(child.id),
-                sourceVersion: Value<int>(child.sourceVersion),
-                forkedAt: Value<DateTime>(now),
-              ),
-            );
-      }
-
-      final Map<String, String> cardDeckIds = <String, String>{
-        ...deckIds,
-      };
-      final bool rootHasCards = bundle.cards.any(
-        (DeckBundleCard card) => card.deckId == rootNode.id,
-      );
-      if (rootHasCards) {
-        final String containerId = _uuid.v4();
-        cardDeckIds[rootNode.id] = containerId;
-        await _db
-            .into(_db.decks)
-            .insert(
-              DecksCompanion.insert(
-                id: containerId,
-                title: 'البطاقات',
-                parentId: Value<String?>(rootId),
-                rootId: Value<String>(rootId),
-                path: Value<List<String>>(<String>[rootId]),
-                depth: const Value<int>(kSubDeckDepth),
-                position: Value<int>(childNodes.length),
-                description: const Value<String>(''),
-                colorHex: Value<String?>(
-                  rootNode.colorHex ?? colorToHex(bundle.root.color),
-                ),
-                icon: Value<String>(rootNode.icon),
-                sourceDeckId: const Value<String?>(null),
-                sourceVersion: Value<int>(rootNode.sourceVersion),
-                forkedAt: Value<DateTime>(now),
-              ),
-            );
-      }
-
-      for (final DeckBundleCard card in bundle.cards) {
-        final String? localDeckId =
-            cardDeckIds[card.deckId] ?? deckIds[card.deckId];
-        if (localDeckId == null) {
-          continue;
-        }
-        final CardType type = CardType.values.firstWhere(
-          (CardType value) => value.name == card.type,
-          orElse: () => CardType.basic,
-        );
+      for (int index = 0; index < bundle.cards.length; index++) {
+        final DeckBundleCard card = bundle.cards[index];
         final String cardId = _uuid.v4();
         await _db
             .into(_db.cards)
             .insert(
               CardsCompanion.insert(
                 id: cardId,
-                deckId: localDeckId,
-                type: Value<CardType>(type),
+                deckId: deckId,
+                type: Value<CardType>(_cardTypeFromName(card.type)),
                 front: Value<String>(card.front),
                 back: Value<String>(card.back),
                 notes: Value<String>(card.notes),
@@ -587,7 +434,7 @@ ORDER BY d.depth, d.position, d.created_at
                 occlusion: Value<Map<String, Object?>?>(card.occlusion),
                 source: Value<String?>(card.source),
                 aiGenerated: Value<bool>(card.aiGenerated),
-                position: Value<int>(card.position),
+                position: Value<int>(index),
                 createdAt: Value<DateTime>(now),
                 updatedAt: Value<DateTime>(now),
               ),
@@ -595,20 +442,20 @@ ORDER BY d.depth, d.position, d.created_at
         await _enqueue('cards', cardId, SyncOperation.upsert);
       }
 
-      await _enqueue('decks', rootId, SyncOperation.upsert);
-      for (final String id in deckIds.values) {
-        if (id != rootId) {
-          await _enqueue('decks', id, SyncOperation.upsert);
-        }
-      }
-      if (rootHasCards) {
-        final String? container = cardDeckIds[rootNode.id];
-        if (container != null) {
-          await _enqueue('decks', container, SyncOperation.upsert);
-        }
-      }
-      return rootId;
+      await _enqueue('decks', deckId, SyncOperation.upsert);
+      return deckId;
     });
+  }
+
+  Future<int> _nextDeckPosition() async {
+    final QueryRow row = await _db
+        .customSelect(
+          'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM decks '
+          'WHERE deleted_at IS NULL',
+          readsFrom: {_db.decks},
+        )
+        .getSingle();
+    return row.read<int>('next');
   }
 
   // ---------------------------------------------------------------------------
@@ -654,11 +501,6 @@ ORDER BY d.depth, d.position, d.created_at
               .getSingleOrNull();
       if (deck == null) {
         throw StateError('Deck $deckId does not exist');
-      }
-      if (deck.depth < kSubDeckDepth) {
-        throw StateError(
-          'Cards belong to sub-decks; deck $deckId is a main deck',
-        );
       }
       final String id = _uuid.v4();
       final QueryRow next = await _db
@@ -748,7 +590,7 @@ ORDER BY d.depth, d.position, d.created_at
     });
   }
 
-  /// Moves several cards into another sub-deck in one transaction.
+  /// Moves several cards into another deck in one transaction.
   Future<void> moveCards({
     required List<String> cardIds,
     required String deckId,
@@ -758,8 +600,8 @@ ORDER BY d.depth, d.position, d.created_at
           await (_db.select(_db.decks)
                 ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
               .getSingleOrNull();
-      if (deck == null || deck.depth < kSubDeckDepth) {
-        throw StateError('Cards can only move into a sub-deck');
+      if (deck == null) {
+        throw StateError('Deck $deckId does not exist');
       }
       await (_db.update(_db.cards)..where(
             (c) => c.id.isIn(cardIds) & c.deletedAt.isNull(),
@@ -884,22 +726,13 @@ ORDER BY d.depth, d.position, d.created_at
     });
   }
 
-  /// Cards to study now in [deckId] and every deck nested under it:
-  /// learning first, then reviews, then new cards.
-  Future<List<ReviewCard>> studyQueue(String deckId, {int limit = 200}) async {
-    final List<DeckRow> decks = await (_db.select(
-      _db.decks,
-    )..where((d) => d.deletedAt.isNull())).get();
-    final List<String> ids = <String>[];
-    for (final DeckRow deck in decks) {
-      if (deck.id == deckId || deck.path.contains(deckId)) {
-        ids.add(deck.id);
-      }
-    }
-    if (ids.isEmpty) {
-      return const <ReviewCard>[];
-    }
-
+  /// Cards to study now in [deckId]: learning first, then reviews, then new
+  /// cards, each capped by the user's daily limits.
+  Future<List<ReviewCard>> studyQueue(
+    String deckId, {
+    int newLimit = 10,
+    int reviewLimit = 200,
+  }) async {
     final query = _db.select(_db.cards).join([
       leftOuterJoin(
         _db.cardStates,
@@ -907,7 +740,7 @@ ORDER BY d.depth, d.position, d.created_at
       ),
     ]);
     query
-      ..where(_db.cards.deckId.isIn(ids) & _db.cards.deletedAt.isNull())
+      ..where(_db.cards.deckId.equals(deckId) & _db.cards.deletedAt.isNull())
       ..orderBy([
         OrderingTerm.asc(_db.cards.position),
         OrderingTerm.asc(_db.cards.createdAt),
@@ -937,12 +770,11 @@ ORDER BY d.depth, d.position, d.created_at
           break;
       }
     }
-    final List<ReviewCard> queue = <ReviewCard>[
-      ...learning,
-      ...review,
-      ...fresh,
+    return <ReviewCard>[
+      ...learning.take(reviewLimit),
+      ...review.take(reviewLimit),
+      ...fresh.take(newLimit),
     ];
-    return queue.take(limit).toList(growable: false);
   }
 
   /// Cards whose front, back or tags contain [query]. With an empty query it
@@ -1194,14 +1026,9 @@ ORDER BY d.depth, d.position, d.created_at
     });
   }
 
-  /// Real totals for one deck. A main deck includes its sub-decks.
+  /// Real totals for one deck.
   Stream<DeckStatistics> watchDeckStatistics(String deckId) {
     final Selectable<QueryRow> query = _db.customSelect(
-      'WITH subtree(id) AS ('
-      '  SELECT id FROM decks WHERE id = ? AND deleted_at IS NULL '
-      '  UNION ALL '
-      '  SELECT id FROM decks WHERE parent_id = ? AND deleted_at IS NULL'
-      ') '
       'SELECT '
       '  COUNT(c.id) AS total_cards, '
       '  COALESCE(SUM(CASE WHEN s.card_id IS NULL OR s.status = \'newCard\' '
@@ -1215,16 +1042,16 @@ ORDER BY d.depth, d.position, d.created_at
       '    AND s.scheduled_days >= 21 THEN 1 ELSE 0 END), 0) AS mature_cards, '
       '  (SELECT COUNT(*) FROM review_logs r '
       '    JOIN cards rc ON rc.id = r.card_id '
-      '    WHERE rc.deleted_at IS NULL '
-      '      AND rc.deck_id IN (SELECT id FROM subtree)) AS review_count, '
+      '    WHERE rc.deleted_at IS NULL AND rc.deck_id = ?) AS review_count, '
       '  (SELECT COUNT(*) FROM review_logs r '
       '    JOIN cards rc ON rc.id = r.card_id '
       '    WHERE rc.deleted_at IS NULL AND r.rating >= 2 '
-      '      AND rc.deck_id IN (SELECT id FROM subtree)) AS correct_count '
+      '      AND rc.deck_id = ?) AS correct_count '
       'FROM cards c '
       'LEFT JOIN card_states s ON s.card_id = c.id '
-      'WHERE c.deleted_at IS NULL AND c.deck_id IN (SELECT id FROM subtree)',
+      'WHERE c.deleted_at IS NULL AND c.deck_id = ?',
       variables: <Variable<Object>>[
+        Variable<String>(deckId),
         Variable<String>(deckId),
         Variable<String>(deckId),
       ],
@@ -1292,9 +1119,6 @@ ORDER BY d.depth, d.position, d.created_at
   DeckNode _deckNodeFromRow(DeckRow row, {int cardCount = 0}) {
     return DeckNode(
       id: row.id,
-      parentId: row.parentId,
-      rootId: row.rootId,
-      depth: row.depth,
       position: row.position,
       title: row.title,
       description: row.description,
@@ -1305,7 +1129,7 @@ ORDER BY d.depth, d.position, d.created_at
       isPublic: row.privacy == DeckPrivacy.public,
       publishedAt: row.publishedAt,
       sourceDeckId: row.sourceDeckId,
-      ownCardCount: cardCount,
+      shareCode: row.shareCode,
       cardCount: cardCount,
     );
   }
@@ -1336,46 +1160,4 @@ ORDER BY d.depth, d.position, d.created_at
     }
     return out;
   }
-}
-
-class _DeckStats {
-  const _DeckStats({
-    required this.deck,
-    required this.ownCards,
-    required this.mastered,
-    required this.dueNew,
-    required this.dueLearning,
-    required this.dueReview,
-    required this.reviews,
-    required this.correct,
-  });
-
-  final DeckRow deck;
-  final int ownCards;
-  final int mastered;
-  final int dueNew;
-  final int dueLearning;
-  final int dueReview;
-  final int reviews;
-  final int correct;
-}
-
-class _Totals {
-  const _Totals({
-    required this.cards,
-    required this.mastered,
-    required this.dueNew,
-    required this.dueLearning,
-    required this.dueReview,
-    required this.reviews,
-    required this.correct,
-  });
-
-  final int cards;
-  final int mastered;
-  final int dueNew;
-  final int dueLearning;
-  final int dueReview;
-  final int reviews;
-  final int correct;
 }

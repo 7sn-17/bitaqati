@@ -45,3 +45,4 @@ Thumbs.db
 # Release keystore copied into the Android module by CI. The canonical file is
 # bitaqati.p12 at the repository root.
 android/app/bitaqati.p12
+.mcp.json

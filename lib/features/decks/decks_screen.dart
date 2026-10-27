@@ -30,7 +30,7 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
   Widget build(BuildContext context) {
     final String? selected = ref.watch(selectedTagProvider);
     final String query = _search.text.trim();
-    final List<DeckNode> allDecks = ref.watch(deckForestProvider);
+    final List<DeckNode> allDecks = ref.watch(allDecksProvider);
     final List<DeckNode> decks = allDecks
         .where((DeckNode deck) {
           final bool tagMatches = selected == null || deck.hasTag(selected);

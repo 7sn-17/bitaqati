@@ -19,8 +19,9 @@ ImageProvider imageProviderFor(String url) {
 
 /// Interactive canvas for image occlusion.
 ///
-/// Drag anywhere on the image to draw a box; tap a box to remove it. Geometry
-/// is stored normalised (0..1) so the same card renders correctly at any size.
+/// Drag on empty image space to draw a box. Drag a box to move it, drag its
+/// corner handle to resize it, and tap the × to delete it. Geometry is stored
+/// normalised (0..1) so the same card renders correctly at any size.
 class OcclusionCanvas extends StatefulWidget {
   const OcclusionCanvas({
     required this.imageUrl,
@@ -62,9 +63,7 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
   /// screen, whatever the source resolution is.
   void _resolveAspect() {
     final ImageProvider provider = imageProviderFor(widget.imageUrl);
-    final ImageStream stream = provider.resolve(
-      const ImageConfiguration(),
-    );
+    final ImageStream stream = provider.resolve(const ImageConfiguration());
     late final ImageStreamListener listener;
     listener = ImageStreamListener(
       (ImageInfo info, bool synchronousCall) {
@@ -111,6 +110,12 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
         height: rect.height / size.height,
       ),
     ]);
+  }
+
+  void _replace(int index, OcclusionBox box) {
+    final List<OcclusionBox> next = <OcclusionBox>[...widget.boxes];
+    next[index] = box;
+    widget.onChanged(next);
   }
 
   @override
@@ -165,11 +170,15 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                       for (int index = 0; index < widget.boxes.length; index++)
                         _BoxOverlay(
                           rect: widget.boxes[index].toRect(size),
+                          canvas: size,
+                          box: widget.boxes[index],
                           index: index,
+                          onChanged: (OcclusionBox box) =>
+                              _replace(index, box),
                           onRemove: () {
-                            final List<OcclusionBox> next = <OcclusionBox>[
-                              ...widget.boxes,
-                            ]..removeAt(index);
+                            final List<OcclusionBox> next =
+                                <OcclusionBox>[...widget.boxes]
+                                  ..removeAt(index);
                             widget.onChanged(next);
                           },
                         ),
@@ -207,7 +216,7 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
               child: Text(
                 widget.boxes.isEmpty
                     ? 'اسحب إصبعك فوق الصورة لرسم مستطيل التغطية.'
-                    : 'اسحب لإضافة تغطية، واضغط × لحذف واحدة.',
+                    : 'اسحب داخل المربّع لتحريكه، ومن زاويته لتكبير‌ه.',
                 style: context.texts.bodySmall,
               ),
             ),
@@ -225,61 +234,154 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
   }
 }
 
-class _BoxOverlay extends StatelessWidget {
+class _BoxOverlay extends StatefulWidget {
   const _BoxOverlay({
     required this.rect,
+    required this.canvas,
+    required this.box,
     required this.index,
+    required this.onChanged,
     required this.onRemove,
   });
 
   final Rect rect;
+  final Size canvas;
+  final OcclusionBox box;
   final int index;
+  final ValueChanged<OcclusionBox> onChanged;
   final VoidCallback onRemove;
+
+  @override
+  State<_BoxOverlay> createState() => _BoxOverlayState();
+}
+
+class _BoxOverlayState extends State<_BoxOverlay> {
+  /// Half the corner handle, in logical pixels. A drag that starts inside this
+  /// square resizes; anywhere else moves the whole box.
+  static const double _handle = 24;
+
+  bool _resizing = false;
+  bool _moving = false;
 
   @override
   Widget build(BuildContext context) {
     return Positioned.fromRect(
-      rect: rect,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: <Widget>[
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.82),
-              border: Border.all(color: AppColors.accent, width: 1.6),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              (index + 1).toString(),
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Positioned(
-            top: -8,
-            left: -8,
-            child: GestureDetector(
-              onTap: onRemove,
+      rect: widget.rect,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanStart: (DragStartDetails details) {
+          final Offset corner = Offset(
+            widget.rect.width - details.localPosition.dx,
+            widget.rect.height - details.localPosition.dy,
+          );
+          setState(() {
+            _resizing = corner.dx < _handle && corner.dy < _handle;
+            _moving = !_resizing;
+          });
+        },
+        onPanUpdate: (DragUpdateDetails details) {
+          final Size canvas = widget.canvas;
+          final OcclusionBox box = widget.box;
+          if (_resizing) {
+            final double width =
+                (box.width + details.delta.dx / canvas.width).clamp(
+                  0.04,
+                  1 - box.left,
+                );
+            final double height =
+                (box.height + details.delta.dy / canvas.height).clamp(
+                  0.04,
+                  1 - box.top,
+                );
+            widget.onChanged(box.copyWith(width: width, height: height));
+            return;
+          }
+          if (!_moving) {
+            return;
+          }
+          final double left = (box.left + details.delta.dx / canvas.width)
+              .clamp(0.0, 1 - box.width);
+          final double top = (box.top + details.delta.dy / canvas.height)
+              .clamp(0.0, 1 - box.height);
+          widget.onChanged(box.copyWith(left: left, top: top));
+        },
+        onPanEnd: (DragEndDetails details) => setState(() {
+          _resizing = false;
+          _moving = false;
+        }),
+        onPanCancel: () => setState(() {
+          _resizing = false;
+          _moving = false;
+        }),
+        child: Stack(
+          children: <Widget>[
+            Positioned.fill(
               child: Container(
-                width: 20,
-                height: 20,
-                decoration: const BoxDecoration(
-                  color: AppColors.danger,
-                  shape: BoxShape.circle,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.78),
+                  border: Border.all(
+                    color: _moving || _resizing
+                        ? AppColors.accent
+                        : AppColors.accent.withValues(alpha: 0.7),
+                    width: _moving || _resizing ? 2.2 : 1.6,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(
-                  Icons.close_rounded,
-                  size: 13,
-                  color: Colors.white,
+                alignment: Alignment.center,
+                child: Text(
+                  (widget.index + 1).toString(),
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              top: 2,
+              left: 2,
+              child: GestureDetector(
+                onTap: widget.onRemove,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: AppColors.danger,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close_rounded,
+                    size: 13,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(6),
+                      bottomRight: Radius.circular(6),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.open_in_full_rounded,
+                    size: 10,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

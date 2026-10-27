@@ -32,7 +32,7 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
         ref.watch(dueForecastProvider).valueOrNull ?? const <DueForecastDay>[];
     final DueTotals due = ref.watch(dueTotalsProvider);
     final DeckNode? todayDeck = ref.watch(todayReviewDeckProvider);
-    final List<DeckNode> forest = ref.watch(deckForestProvider);
+    final List<DeckNode> decks = ref.watch(allDecksProvider);
     final int reviews = activity.fold<int>(
       0,
       (int sum, ReviewActivityDay day) => sum + day.reviews,
@@ -172,7 +172,7 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
             const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _DeckRetention(decks: forest),
+              child: _DeckRetention(decks: decks),
             ),
             const SizedBox(height: 22),
             Padding(

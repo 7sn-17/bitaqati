@@ -14,11 +14,11 @@ class LibraryFailure implements Exception {
   String toString() => message;
 }
 
-/// Reads the public catalog and loads shareable deck snapshots.
+/// Reads the public catalog, resolves share codes, and loads deck snapshots.
 ///
-/// The catalog uses the `public_decks` projection. Direct links use the
-/// `decks` and `cards` tables so unlisted decks work without appearing in the
-/// library.
+/// The catalog uses the `public_decks` projection. Share codes and direct
+/// links read the `decks` and `cards` tables so an unlisted deck works
+/// without ever appearing in the library.
 class LibraryRepository {
   bool get isAvailable {
     if (!AppConfig.hasSupabase) {
@@ -34,22 +34,35 @@ class LibraryRepository {
 
   SupabaseClient get _client => Supabase.instance.client;
 
-  Future<List<DeckNode>> fetchCatalog() async {
+  /// Every published deck, newest first.
+  Future<List<DeckNode>> fetchCatalog({String query = ''}) async {
     _ensureAvailable();
     try {
       final List<Map<String, dynamic>> rows = await _client
           .from('public_decks')
           .select(
-            'id,parent_id,root_id,depth,title,description,color_hex,icon,tags,'
-            'settings,author_name,rating,rating_count,card_count,'
-            'subdeck_count,is_standalone,published_at,source_deck_id,'
-            'install_count',
+            'id,title,description,color_hex,icon,tags,settings,author_name,'
+            'rating,rating_count,card_count,published_at,source_deck_id,'
+            'install_count,created_at',
           )
-          .eq('is_standalone', true)
           .order('created_at', ascending: false)
-          .limit(100);
-      return <DeckNode>[
+          .limit(120);
+      final String needle = query.trim().toLowerCase();
+      final List<DeckNode> decks = <DeckNode>[
         for (final Map<String, dynamic> row in rows) _catalogDeck(row),
+      ];
+      if (needle.isEmpty) {
+        return decks;
+      }
+      return <DeckNode>[
+        for (final DeckNode deck in decks)
+          if (deck.title.toLowerCase().contains(needle) ||
+              deck.description.toLowerCase().contains(needle) ||
+              deck.tags.any(
+                (String tag) => tag.toLowerCase().contains(needle),
+              ) ||
+              (deck.author ?? '').toLowerCase().contains(needle))
+            deck,
       ];
     } on PostgrestException {
       throw const LibraryFailure(
@@ -62,134 +75,76 @@ class LibraryRepository {
     }
   }
 
-  /// Loads one deck and its direct children, plus every card in them.
+  /// Turns a share code into the deck it points at, or null when the code is
+  /// unknown, expired, or belongs to a deck that is no longer shared.
+  Future<DeckNode?> resolveShareCode(String code) async {
+    _ensureAvailable();
+    final String needle = code.trim().toUpperCase();
+    if (needle.length != 6) {
+      return null;
+    }
+    try {
+      final dynamic raw = await _client
+          .rpc<dynamic>(
+            'resolve_share_code',
+            params: <String, dynamic>{'p_code': needle},
+          )
+          .timeout(const Duration(seconds: 12));
+      final List<Map<String, dynamic>> hits = _asRows(raw);
+      if (hits.isEmpty) {
+        return null;
+      }
+      final String? deckId = _string(hits.first['id']);
+      if (deckId == null) {
+        return null;
+      }
+      return _deckById(deckId);
+    } on LibraryFailure {
+      rethrow;
+    } catch (_) {
+      throw const LibraryFailure(
+        'تعذّر البحث عن الرمز. تحقّق من اتصالك وحاول مرة أخرى.',
+      );
+    }
+  }
+
+  /// Loads one deck and every card in it.
   Future<DeckBundle?> loadBundle(String deckId) async {
     _ensureAvailable();
     try {
-      final List<Map<String, dynamic>> deckRows = await _client
-          .from('decks')
-          .select(
-            'id,owner_id,parent_id,root_id,depth,position,title,description,'
-            'color_hex,icon,cover_url,tags,settings,privacy,source_deck_id,'
-            'source_version,published_at,created_at,updated_at',
-          )
-          .or('id.eq.$deckId,parent_id.eq.$deckId')
-          .isFilter('deleted_at', null)
-          .order('depth')
-          .order('position');
-      if (deckRows.isEmpty) {
+      final Map<String, dynamic>? deckRow = await _deckRow(deckId);
+      if (deckRow == null) {
         return null;
       }
-      Map<String, dynamic>? rootRow;
-      for (final Map<String, dynamic> row in deckRows) {
-        if (_string(row['id']) == deckId) {
-          rootRow = row;
-          break;
-        }
-      }
-      rootRow ??= deckRows.first;
-      final List<String> ids = <String>[
-        for (final Map<String, dynamic> row in deckRows)
-          if (_string(row['id']) != null) _string(row['id'])!,
-      ];
-      if (ids.isEmpty) {
-        return null;
-      }
-
+      final DeckNode deck = await _deckById(deckId);
       final List<Map<String, dynamic>> cardRows = await _client
           .from('cards')
           .select(
             'id,deck_id,type,front,back,notes,hint,tags,media,occlusion,'
             'source,ai_generated,position,created_at,updated_at',
           )
-          .inFilter('deck_id', ids)
+          .eq('deck_id', deckId)
           .isFilter('deleted_at', null)
           .order('position');
 
-      final String? ownerId = _string(rootRow['owner_id']);
-      String? author;
-      if (ownerId != null) {
-        final List<Map<String, dynamic>> profiles = await _client
-            .from('profiles')
-            .select('display_name')
-            .eq('id', ownerId)
-            .limit(1);
-        if (profiles.isNotEmpty) {
-          author = _string(profiles.first['display_name']);
-        }
-      }
-
-      double? averageRating;
-      int ratingCount = 0;
-      try {
-        final List<Map<String, dynamic>> ratingRows = await _client
-            .from('deck_ratings')
-            .select('rating')
-            .eq('deck_id', deckId);
-        if (ratingRows.isNotEmpty) {
-          int sum = 0;
-          for (final Map<String, dynamic> row in ratingRows) {
-            sum += _int(row['rating']);
-          }
-          ratingCount = ratingRows.length;
-          averageRating = sum / ratingRows.length;
-        }
-      } catch (_) {
-        // Ratings are optional; a preview must still load without them.
-      }
-
-      final DeckPrivacy privacy = deckPrivacyFromCloud(
-        _string(rootRow['privacy']),
-      );
-      final int ownCards = cardRows
-          .where((Map<String, dynamic> card) => card['deck_id'] == deckId)
-          .length;
-      final DeckNode root = DeckNode(
-        id: deckId,
-        title: _string(rootRow['title']) ?? '',
-        color: colorFromHex(_string(rootRow['color_hex'])),
-        parentId: null,
-        rootId: deckId,
-        depth: _int(rootRow['depth']),
-        position: _int(rootRow['position']),
-        description: _string(rootRow['description']) ?? '',
-        iconKey: _string(rootRow['icon']) ?? 'layers',
-        tags: _strings(rootRow['tags']),
-        privacy: privacy,
-        isPublic: privacy == DeckPrivacy.public,
-        publishedAt: _date(rootRow['published_at']),
-        sourceDeckId: _string(rootRow['source_deck_id']),
-        ownCardCount: ownCards,
-        cardCount: cardRows.length,
-        childCount: deckRows.length > 1 ? deckRows.length - 1 : 0,
-        author: author,
-        rating: averageRating,
-        ratingCount: ratingCount,
-      );
-
       return DeckBundle(
-        root: root,
-        nodes: <DeckBundleNode>[
-          for (final Map<String, dynamic> row in deckRows)
-            DeckBundleNode(
-              id: _string(row['id']) ?? '',
-              parentId: _string(row['parent_id']),
-              depth: _int(row['depth']),
-              position: _int(row['position']),
-              title: _string(row['title']) ?? '',
-              description: _string(row['description']) ?? '',
-              colorHex: _string(row['color_hex']),
-              icon: _string(row['icon']) ?? 'layers',
-              tags: _strings(row['tags']),
-              settings: _map(row['settings']) ?? const <String, Object?>{},
-              coverUrl: _string(row['cover_url']),
-              sourceDeckId: _string(row['source_deck_id']),
-              sourceVersion: _int(row['source_version'], fallback: 1),
-              publishedAt: _date(row['published_at']),
-              createdAt: _date(row['created_at']),
-              updatedAt: _date(row['updated_at']),
-            ),
-        ],
+        deck: deck,
+        row: DeckBundleNode(
+          id: deck.id,
+          position: _int(deckRow['position']),
+          title: deck.title,
+          description: deck.description,
+          colorHex: _string(deckRow['color_hex']),
+          icon: deck.iconKey,
+          tags: deck.tags,
+          settings: _map(deckRow['settings']) ?? const <String, Object?>{},
+          coverUrl: _string(deckRow['cover_url']),
+          sourceDeckId: _string(deckRow['source_deck_id']),
+          sourceVersion: _int(deckRow['source_version'], fallback: 1),
+          publishedAt: _date(deckRow['published_at']),
+          createdAt: _date(deckRow['created_at']),
+          updatedAt: _date(deckRow['updated_at']),
+        ),
         cards: <DeckBundleCard>[
           for (final Map<String, dynamic> row in cardRows)
             DeckBundleCard(
@@ -222,6 +177,86 @@ class LibraryRepository {
     }
   }
 
+  Future<Map<String, dynamic>?> _deckRow(String deckId) async {
+    final List<Map<String, dynamic>> rows = await _client
+        .from('decks')
+        .select(
+          'id,owner_id,position,title,description,color_hex,icon,cover_url,'
+          'tags,settings,privacy,source_deck_id,source_version,published_at,'
+          'created_at,updated_at',
+        )
+        .eq('id', deckId)
+        .isFilter('deleted_at', null)
+        .limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Reads the deck plus its author and rating summary.
+  Future<DeckNode> _deckById(String deckId) async {
+    final Map<String, dynamic>? row = await _deckRow(deckId);
+    if (row == null) {
+      throw const LibraryFailure('هذه المجموعة لم تعد متاحة.');
+    }
+    final String? ownerId = _string(row['owner_id']);
+    String? author;
+    if (ownerId != null) {
+      final List<Map<String, dynamic>> profiles = await _client
+          .from('profiles')
+          .select('display_name')
+          .eq('id', ownerId)
+          .limit(1);
+      if (profiles.isNotEmpty) {
+        author = _string(profiles.first['display_name']);
+      }
+    }
+
+    double? averageRating;
+    int ratingCount = 0;
+    try {
+      final List<Map<String, dynamic>> ratingRows = await _client
+          .from('deck_ratings')
+          .select('rating')
+          .eq('deck_id', deckId);
+      if (ratingRows.isNotEmpty) {
+        int sum = 0;
+        for (final Map<String, dynamic> rating in ratingRows) {
+          sum += _int(rating['rating']);
+        }
+        ratingCount = ratingRows.length;
+        averageRating = sum / ratingRows.length;
+      }
+    } catch (_) {
+      // Ratings are optional; a preview must still load without them.
+    }
+
+    final List<Map<String, dynamic>> countRows = await _client
+        .from('cards')
+        .select('id')
+        .eq('deck_id', deckId)
+        .isFilter('deleted_at', null);
+    final DeckPrivacy privacy = deckPrivacyFromCloud(
+      _string(row['privacy']),
+    );
+
+    return DeckNode(
+      id: deckId,
+      title: _string(row['title']) ?? '',
+      color: colorFromHex(_string(row['color_hex'])),
+      position: _int(row['position']),
+      description: _string(row['description']) ?? '',
+      iconKey: _string(row['icon']) ?? 'layers',
+      tags: _strings(row['tags']),
+      privacy: privacy,
+      isPublic: privacy == DeckPrivacy.public,
+      publishedAt: _date(row['published_at']),
+      sourceDeckId: _string(row['source_deck_id']),
+      cardCount: countRows.length,
+      author: author,
+      rating: averageRating,
+      ratingCount: ratingCount,
+    );
+  }
+
   DeckNode _catalogDeck(Map<String, dynamic> row) {
     final int cardCount = _int(row['card_count']);
     final double rating = _double(row['rating']);
@@ -229,9 +264,6 @@ class LibraryRepository {
       id: _string(row['id']) ?? '',
       title: _string(row['title']) ?? '',
       color: colorFromHex(_string(row['color_hex'])),
-      parentId: null,
-      rootId: _string(row['id']),
-      depth: 0,
       description: _string(row['description']) ?? '',
       iconKey: _string(row['icon']) ?? 'layers',
       tags: _strings(row['tags']),
@@ -239,9 +271,7 @@ class LibraryRepository {
       isPublic: true,
       publishedAt: _date(row['published_at']),
       sourceDeckId: _string(row['source_deck_id']),
-      ownCardCount: cardCount,
       cardCount: cardCount,
-      childCount: _int(row['subdeck_count']),
       author: _string(row['author_name']),
       rating: rating > 0 ? rating : null,
       ratingCount: _int(row['rating_count']),
@@ -323,6 +353,27 @@ class LibraryRepository {
         'المكتبة تحتاج اتصالاً بالإنترنت وحساب Supabase مهيّأ في هذا البناء.',
       );
     }
+  }
+
+  List<Map<String, dynamic>> _asRows(dynamic value) {
+    if (value is List<Object?>) {
+      return <Map<String, dynamic>>[
+        for (final Object? row in value)
+          if (row is Map<Object?, Object?>) _stringMap(row),
+      ];
+    }
+    if (value is Map<Object?, Object?>) {
+      return <Map<String, dynamic>>[_stringMap(value)];
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
+  Map<String, dynamic> _stringMap(Map<Object?, Object?> value) {
+    final Map<String, dynamic> out = <String, dynamic>{};
+    for (final Object? key in value.keys) {
+      out[key.toString()] = value[key];
+    }
+    return out;
   }
 
   String? _string(Object? value) => value is String ? value : null;

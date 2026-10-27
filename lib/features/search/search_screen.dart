@@ -28,10 +28,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final String query = _query.trim();
-    final List<DeckNode> forest = ref.watch(deckForestProvider);
+    final List<DeckNode> all = ref.watch(allDecksProvider);
     final List<DeckNode> decks = query.isEmpty
-        ? forest
-        : flattenDeckForest(forest)
+        ? all
+        : all
               .where(
                 (DeckNode deck) =>
                     deck.title.contains(query) ||

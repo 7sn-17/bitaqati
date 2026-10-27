@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
 import '../../core/widgets/deck_card.dart';
 import '../../data/content_providers.dart';
 import '../../data/library_providers.dart';
@@ -33,6 +34,111 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.dispose();
   }
 
+  /// Opens the code sheet and jumps to the deck it resolves to.
+  Future<void> _enterShareCode() async {
+    final TextEditingController controller = TextEditingController();
+    final String? code = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialog) => AlertDialog(
+        title: const Text('رمز المشاركة'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Text(
+              'اطلب من صاحب المجموعة رمزاً من ستة أحرف.',
+              style: TextStyle(fontSize: 12.5),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              textCapitalization: TextCapitalization.characters,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 7,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'ABC123',
+                counterText: '',
+              ),
+              onSubmitted: (String value) =>
+                  Navigator.of(dialog).pop(value.trim()),
+            ),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialog).pop(),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialog).pop(controller.text.trim()),
+            child: const Text('فتح'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (code == null || !mounted) {
+      return;
+    }
+    final String needle = code.trim().toUpperCase();
+    if (needle.length != 6) {
+      showAppMessage(
+        context,
+        'الرمز يتكوّن من ستة أحرف.',
+        kind: AppMessageKind.error,
+      );
+      return;
+    }
+    try {
+      // A code for a deck this account already owns must open that deck, not
+      // install a second copy of it.
+      final DeckNode? owned = await ref
+          .read(contentRepositoryProvider)
+          .deckByShareCode(needle);
+      if (!mounted) {
+        return;
+      }
+      if (owned != null) {
+        context.push('/deck/${owned.id}');
+        return;
+      }
+      final DeckNode? deck = await ref
+          .read(libraryRepositoryProvider)
+          .resolveShareCode(needle);
+      if (!mounted) {
+        return;
+      }
+      if (deck == null) {
+        showAppMessage(
+          context,
+          'لا توجد مجموعة بهذا الرمز. تأكّد منه وحاول مرة أخرى.',
+          kind: AppMessageKind.error,
+        );
+        return;
+      }
+      final String? localId = ref.read(localDeckIdForSourceProvider(deck.id));
+      context.push('/deck/${localId ?? deck.id}');
+    } on LibraryFailure catch (error) {
+      if (mounted) {
+        showAppMessage(context, error.message, kind: AppMessageKind.error);
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppMessage(
+          context,
+          'تعذّر البحث عن الرمز. تحقّق من اتصالك وحاول مرة أخرى.',
+          kind: AppMessageKind.error,
+        );
+      }
+    }
+  }
+
   Future<void> _refresh() async {
     ref.invalidate(libraryDecksProvider);
     try {
@@ -55,9 +161,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
     final Map<String, String> installed = <String, String>{};
     for (final DeckNode deck in localDecks) {
-      if (deck.parentId == null) {
-        installed.putIfAbsent(deck.id, () => deck.id);
-      }
+      installed.putIfAbsent(deck.id, () => deck.id);
       final String? source = deck.sourceDeckId;
       if (source != null) {
         installed.putIfAbsent(source, () => deck.id);
@@ -93,6 +197,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ],
                     ),
                   ),
+                  GestureDetector(
+                    onTap: _enterShareCode,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: context.colors.surfaceContainerHighest,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(CupertinoIcons.number, size: 21),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Container(
                     width: 44,
                     height: 44,

@@ -77,15 +77,6 @@ Color colorFromHex(String? hex) {
   return Color(int.parse('FF${hex.substring(1)}', radix: 16));
 }
 
-/// The deck hierarchy is exactly two levels deep.
-///
-/// A *main deck* sits at [kMainDeckDepth] and may only contain sub-decks. A
-/// *sub-deck* sits at [kSubDeckDepth] and may only contain cards. Nothing may
-/// be nested below a sub-deck, so [kMaxDeckDepth] is the deepest legal depth.
-const int kMainDeckDepth = 0;
-const int kSubDeckDepth = 1;
-const int kMaxDeckDepth = kSubDeckDepth;
-
 /// Where a card is in its learning cycle, as far as the UI cares.
 enum CardPhase { newCard, learning, review, paused }
 
@@ -161,20 +152,14 @@ class DueTotals {
   int get total => fresh + learning + review;
 }
 
-/// One node of the deck tree: a root deck, a sub-deck, or a lesson.
-///
-/// Counts on a node cover its whole subtree, so a parent deck shows the
-/// totals of everything nested under it. [ownCardCount] is only the cards
-/// that sit directly in this deck.
+/// A deck. Decks are a flat list: each one owns its cards directly, and
+/// nothing nests. [cardCount] is the number of live cards in the deck.
 @immutable
 class DeckNode {
   const DeckNode({
     required this.id,
     required this.title,
     required this.color,
-    this.parentId,
-    this.rootId,
-    this.depth = 0,
     this.position = 0,
     this.description = '',
     this.iconKey = 'layers',
@@ -183,7 +168,7 @@ class DeckNode {
     this.isPublic = false,
     this.publishedAt,
     this.sourceDeckId,
-    this.ownCardCount = 0,
+    this.shareCode,
     this.cardCount = 0,
     this.masteredCount = 0,
     this.dueNew = 0,
@@ -191,18 +176,13 @@ class DeckNode {
     this.dueReview = 0,
     this.reviewCount = 0,
     this.correctCount = 0,
-    this.childCount = 0,
     this.author,
     this.rating,
     this.ratingCount = 0,
     this.installCount = 0,
-    this.children = const <DeckNode>[],
   });
 
   final String id;
-  final String? parentId;
-  final String? rootId;
-  final int depth;
   final int position;
   final String title;
   final String description;
@@ -213,42 +193,30 @@ class DeckNode {
   final bool isPublic;
   final DateTime? publishedAt;
   final String? sourceDeckId;
-  final int ownCardCount;
+
+  /// Six-character code used to share and find the deck in the library.
+  final String? shareCode;
+
   final int cardCount;
 
-  /// Cards in this deck (and its sub-decks) that reached the review state.
+  /// Cards in this deck that reached the review state.
   final int masteredCount;
   final int dueNew;
   final int dueLearning;
   final int dueReview;
   final int reviewCount;
   final int correctCount;
-  final int childCount;
   final String? author;
   final double? rating;
   final int ratingCount;
   final int installCount;
-  final List<DeckNode> children;
 
   IconData get icon => kDeckIcons[iconKey] ?? Icons.layers_rounded;
 
   int get dueCount => dueNew + dueLearning + dueReview;
 
-  bool get isRoot => parentId == null;
-
-  /// A main deck is the top level of the hierarchy: it groups sub-decks.
-  bool get isMainDeck => depth == kMainDeckDepth;
-
-  /// Anything below the top level is a sub-deck. Legacy rows that were nested
-  /// deeper than the two-level rule are treated as sub-decks as well, so they
-  /// keep working instead of disappearing from the UI.
-  bool get isSubDeck => !isMainDeck;
-
-  /// Only main decks may contain sub-decks; the depth limit is one level.
-  bool get canHoldSubDecks => isMainDeck;
-
-  /// Only sub-decks hold cards. Main decks never do.
-  bool get canHoldCards => isSubDeck;
+  /// True when the deck can be found by its share code.
+  bool get isShareable => (shareCode ?? '').isNotEmpty;
 
   /// A deck that came from the public library or a share link.
   bool get isPreview => author != null;
@@ -278,97 +246,64 @@ class DeckNode {
     return ratio;
   }
 
-  /// True when this deck, or anything nested in it, carries [tag].
-  bool hasTag(String tag) {
-    if (tags.contains(tag)) {
-      return true;
-    }
-    for (final DeckNode child in children) {
-      if (child.hasTag(tag)) {
-        return true;
-      }
-    }
-    return false;
-  }
+  /// True when the deck carries [tag].
+  bool hasTag(String tag) => tags.contains(tag);
 
-  DeckNode copyWith({List<DeckNode>? children}) {
+  DeckNode copyWith({
+    String? title,
+    String? description,
+    Color? color,
+    String? iconKey,
+    List<String>? tags,
+    DeckPrivacy? privacy,
+    bool? isPublic,
+    int? position,
+    String? shareCode,
+    int? cardCount,
+    int? masteredCount,
+    int? dueNew,
+    int? dueLearning,
+    int? dueReview,
+    int? reviewCount,
+    int? correctCount,
+    String? author,
+    double? rating,
+    int? ratingCount,
+    int? installCount,
+  }) {
     return DeckNode(
       id: id,
-      title: title,
-      color: color,
-      parentId: parentId,
-      rootId: rootId,
-      depth: depth,
-      position: position,
-      description: description,
-      iconKey: iconKey,
-      tags: tags,
-      privacy: privacy,
-      isPublic: isPublic,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      color: color ?? this.color,
+      iconKey: iconKey ?? this.iconKey,
+      tags: tags ?? this.tags,
+      privacy: privacy ?? this.privacy,
+      isPublic: isPublic ?? this.isPublic,
       publishedAt: publishedAt,
       sourceDeckId: sourceDeckId,
-      ownCardCount: ownCardCount,
-      cardCount: cardCount,
-      masteredCount: masteredCount,
-      dueNew: dueNew,
-      dueLearning: dueLearning,
-      dueReview: dueReview,
-      reviewCount: reviewCount,
-      correctCount: correctCount,
-      childCount: childCount,
-      author: author,
-      rating: rating,
-      ratingCount: ratingCount,
-      installCount: installCount,
-      children: children ?? this.children,
+      shareCode: shareCode ?? this.shareCode,
+      position: position ?? this.position,
+      cardCount: cardCount ?? this.cardCount,
+      masteredCount: masteredCount ?? this.masteredCount,
+      dueNew: dueNew ?? this.dueNew,
+      dueLearning: dueLearning ?? this.dueLearning,
+      dueReview: dueReview ?? this.dueReview,
+      reviewCount: reviewCount ?? this.reviewCount,
+      correctCount: correctCount ?? this.correctCount,
+      author: author ?? this.author,
+      rating: rating ?? this.rating,
+      ratingCount: ratingCount ?? this.ratingCount,
+      installCount: installCount ?? this.installCount,
     );
   }
 }
 
-/// Turns the flat list from the database into trees, one per root deck.
-///
-/// A deck whose parent is missing is treated as a root so it never vanishes.
-List<DeckNode> buildDeckForest(List<DeckNode> flat) {
-  final Set<String> ids = flat.map((DeckNode deck) => deck.id).toSet();
-  final Map<String, List<DeckNode>> byParent = <String, List<DeckNode>>{};
-  final List<DeckNode> roots = <DeckNode>[];
-  for (final DeckNode node in flat) {
-    final String? parent = node.parentId;
-    if (parent == null || !ids.contains(parent)) {
-      roots.add(node);
-    } else {
-      byParent.putIfAbsent(parent, () => <DeckNode>[]).add(node);
-    }
-  }
-
-  DeckNode attach(DeckNode node) {
-    final List<DeckNode> kids = byParent[node.id] ?? const <DeckNode>[];
-    return node.copyWith(children: kids.map(attach).toList(growable: false));
-  }
-
-  return roots.map(attach).toList(growable: false);
-}
-
-/// Every node of [forest], parents before their children.
-List<DeckNode> flattenDeckForest(List<DeckNode> forest) {
-  final List<DeckNode> out = <DeckNode>[];
-  void visit(DeckNode node) {
-    out.add(node);
-    node.children.forEach(visit);
-  }
-
-  forest.forEach(visit);
-  return out;
-}
-
-DeckNode? findDeckNode(List<DeckNode> forest, String id) {
-  for (final DeckNode node in forest) {
+/// Looks a deck up in a flat list.
+DeckNode? findDeckNode(List<DeckNode> decks, String id) {
+  for (final DeckNode node in decks) {
     if (node.id == id) {
       return node;
-    }
-    final DeckNode? nested = findDeckNode(node.children, id);
-    if (nested != null) {
-      return nested;
     }
   }
   return null;
@@ -397,7 +332,7 @@ class DueForecastDay {
   final int count;
 }
 
-/// Real statistics for a deck and, when it is a main deck, its sub-decks.
+/// Real statistics for a single deck.
 @immutable
 class DeckStatistics {
   const DeckStatistics({
@@ -432,8 +367,6 @@ class DeckStatistics {
 class DeckBundleNode {
   const DeckBundleNode({
     required this.id,
-    required this.parentId,
-    required this.depth,
     required this.position,
     required this.title,
     this.description = '',
@@ -450,8 +383,6 @@ class DeckBundleNode {
   });
 
   final String id;
-  final String? parentId;
-  final int depth;
   final int position;
   final String title;
   final String description;
@@ -505,17 +436,13 @@ class DeckBundleCard {
   final DateTime? updatedAt;
 }
 
-/// A deck subtree and its cards, used for publishing and for installing a
-/// deck from the library or a share link.
+/// A deck and its cards, used for publishing and for installing a deck from
+/// the library or a share link.
 @immutable
 class DeckBundle {
-  const DeckBundle({
-    required this.root,
-    required this.nodes,
-    required this.cards,
-  });
+  const DeckBundle({required this.deck, required this.row, required this.cards});
 
-  final DeckNode root;
-  final List<DeckBundleNode> nodes;
+  final DeckNode deck;
+  final DeckBundleNode row;
   final List<DeckBundleCard> cards;
 }

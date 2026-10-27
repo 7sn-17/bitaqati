@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/providers.dart';
 import '../domain/models.dart';
 import 'content_repository.dart';
 import 'local/database_provider.dart';
@@ -15,19 +16,16 @@ final StreamProvider<List<DeckNode>> deckListProvider =
       (Ref ref) => ref.watch(contentRepositoryProvider).watchDecks(),
     );
 
-/// Root decks, each with its sub-decks nested in `children`.
-final Provider<List<DeckNode>> deckForestProvider = Provider<List<DeckNode>>((
-  Ref ref,
-) {
-  final List<DeckNode> flat =
-      ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
-  return buildDeckForest(flat);
-});
+/// Every deck as a flat list, read synchronously. Use this in widgets that
+/// already show their own loading state.
+final Provider<List<DeckNode>> allDecksProvider = Provider<List<DeckNode>>(
+  (Ref ref) => ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[],
+);
 
-/// One deck (with its children) by id, or null when it does not exist.
+/// One deck by id, or null when it does not exist.
 final ProviderFamily<DeckNode?, String> deckByIdProvider =
     Provider.family<DeckNode?, String>(
-      (Ref ref, String id) => findDeckNode(ref.watch(deckForestProvider), id),
+      (Ref ref, String id) => findDeckNode(ref.watch(allDecksProvider), id),
     );
 
 /// Cards that sit directly in a deck.
@@ -41,8 +39,13 @@ final StreamProviderFamily<List<ReviewCard>, String> deckCardsProvider =
 final AutoDisposeFutureProviderFamily<List<ReviewCard>, String>
 studyQueueProvider = FutureProvider.autoDispose
     .family<List<ReviewCard>, String>(
-      (Ref ref, String deckId) =>
-          ref.watch(contentRepositoryProvider).studyQueue(deckId),
+      (Ref ref, String deckId) => ref
+          .watch(contentRepositoryProvider)
+          .studyQueue(
+            deckId,
+            newLimit: ref.watch(dailyNewLimitProvider),
+            reviewLimit: ref.watch(dailyReviewLimitProvider),
+          ),
     );
 
 final AutoDisposeFutureProviderFamily<List<ReviewCard>, String>
@@ -72,12 +75,12 @@ final Provider<List<String>> deckTagsProvider = Provider<List<String>>((
   return tags;
 });
 
-/// Cards waiting today across all root decks.
+/// Cards waiting today across every deck.
 final Provider<DueTotals> dueTotalsProvider = Provider<DueTotals>((Ref ref) {
   int fresh = 0;
   int learning = 0;
   int review = 0;
-  for (final DeckNode deck in ref.watch(deckForestProvider)) {
+  for (final DeckNode deck in ref.watch(allDecksProvider)) {
     fresh += deck.dueNew;
     learning += deck.dueLearning;
     review += deck.dueReview;
@@ -89,12 +92,12 @@ final Provider<int> totalDueProvider = Provider<int>(
   (Ref ref) => ref.watch(dueTotalsProvider).total,
 );
 
-/// The root deck with the most cards due, or null when nothing is due.
+/// The deck with the most cards due, or null when nothing is due.
 final Provider<DeckNode?> todayReviewDeckProvider = Provider<DeckNode?>((
   Ref ref,
 ) {
   DeckNode? best;
-  for (final DeckNode deck in ref.watch(deckForestProvider)) {
+  for (final DeckNode deck in ref.watch(allDecksProvider)) {
     if (deck.dueCount > 0 && (best == null || deck.dueCount > best.dueCount)) {
       best = deck;
     }

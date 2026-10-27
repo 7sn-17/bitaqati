@@ -17,7 +17,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'bitaqati'));
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -26,17 +26,17 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createAll();
       },
       onUpgrade: (Migrator migrator, int from, int to) async {
-        if (from < 2) {
-          // Phase C tightens the deck depth limit from 20 to 1. Legacy rows
-          // that are deeper than a sub-deck are flattened onto level 1 so the
-          // rebuilt table satisfies the new constraint; their cards stay
-          // attached and remain editable.
-          await customStatement('UPDATE decks SET depth = 1 WHERE depth > 1');
-          // ignore: experimental_member_use
-          await migrator.alterTable(TableMigration(decks));
-        }
         if (from < 3) {
           await migrator.addColumn(cards, cards.favorite);
+        }
+        if (from < 4) {
+          // Decks are a flat list now, so parent_id, root_id, path, depth and
+          // the depth CHECK constraint are all gone and share_code replaces
+          // them. TableMigration rebuilds the table from the current schema
+          // and copies every column that still exists, which keeps the decks
+          // and their cards intact.
+          // ignore: experimental_member_use
+          await migrator.alterTable(TableMigration(decks));
         }
       },
       beforeOpen: (OpeningDetails details) async {

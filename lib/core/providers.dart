@@ -20,6 +20,67 @@ final StateProvider<bool> notificationsEnabledProvider = StateProvider<bool>((
   return ref.watch(sharedPreferencesProvider).getBool('notifications') ?? true;
 });
 
+/// A per-day cap the user can raise or lower in Settings.
+///
+/// The value is stored in SharedPreferences so it survives a restart without
+/// needing the database, and it is clamped so a typo can never lock the user
+/// out of studying.
+class DailyLimitNotifier extends Notifier<int> {
+  DailyLimitNotifier({
+    required this.key,
+    required this.fallback,
+    required this.min,
+    required this.max,
+    required this.step,
+  });
+
+  final String key;
+  final int fallback;
+  final int min;
+  final int max;
+  final int step;
+
+  @override
+  int build() {
+    final int? saved = ref.watch(sharedPreferencesProvider).getInt(key);
+    return (saved ?? fallback).clamp(min, max);
+  }
+
+  Future<void> set(int value) async {
+    final int next = value.clamp(min, max);
+    state = next;
+    await ref.read(sharedPreferencesProvider).setInt(key, next);
+  }
+
+  Future<void> increment() => set(state + step);
+
+  Future<void> decrement() => set(state - step);
+}
+
+/// New cards introduced per study session.
+final NotifierProvider<DailyLimitNotifier, int> dailyNewLimitProvider =
+    NotifierProvider<DailyLimitNotifier, int>(
+      () => DailyLimitNotifier(
+        key: 'daily_new_limit',
+        fallback: 10,
+        min: 0,
+        max: 200,
+        step: 5,
+      ),
+    );
+
+/// Review cards shown per study session.
+final NotifierProvider<DailyLimitNotifier, int> dailyReviewLimitProvider =
+    NotifierProvider<DailyLimitNotifier, int>(
+      () => DailyLimitNotifier(
+        key: 'daily_review_limit',
+        fallback: 200,
+        min: 20,
+        max: 1000,
+        step: 25,
+      ),
+    );
+
 /// Tag chosen in the filter bar of the home and decks screens.
 final StateProvider<String?> selectedTagProvider = StateProvider<String?>(
   (Ref ref) => null,

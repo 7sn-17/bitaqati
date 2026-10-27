@@ -27,11 +27,8 @@ class DeckCard extends StatelessWidget {
       return '${deck.cardCount} بطاقة · '
           '${deck.author ?? 'مجموعة مشاركة'}$usage';
     }
-    final String subDecks = deck.childCount > 0
-        ? ' · ${deck.childCount} فرعية'
-        : '';
     return '${deck.cardCount} بطاقة · ${deck.privacy.shortLabelAr} · '
-        'أتقنت ${deck.masteryPercent.round()}%$subDecks';
+        'أتقنت ${deck.masteryPercent.round()}%';
   }
 
   String get _statusLabel {

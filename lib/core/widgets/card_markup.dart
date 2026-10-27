@@ -177,6 +177,7 @@ class CardMarkup extends StatelessWidget {
     this.maxLines,
     this.alignment = CrossAxisAlignment.start,
     this.mediaHeight = 180,
+    this.mediaFirst = false,
     super.key,
   });
 
@@ -186,6 +187,10 @@ class CardMarkup extends StatelessWidget {
   final int? maxLines;
   final CrossAxisAlignment alignment;
   final double mediaHeight;
+
+  /// Puts every attachment above the text instead of inline. The review
+  /// screen uses this so a picture is the first thing the learner sees.
+  final bool mediaFirst;
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +217,45 @@ class CardMarkup extends StatelessWidget {
         ),
         maxLines: maxLines,
         overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      );
+    }
+
+    if (mediaFirst) {
+      final List<Widget> leading = <Widget>[];
+      for (final RegExpMatch match in media) {
+        final String token = match.group(0)!;
+        final RegExpMatch? image = kImageRegex.firstMatch(token);
+        if (image != null) {
+          leading.add(CardImage(url: image.group(2) ?? '', height: mediaHeight));
+        } else {
+          leading.add(AudioAttachment(url: kAudioRegex.firstMatch(token)?.group(2) ?? ''));
+        }
+        leading.add(const SizedBox(height: 10));
+      }
+      final String rest = value
+          .replaceAll(kImageRegex, ' ')
+          .replaceAll(kAudioRegex, ' ')
+          .trim();
+      return Column(
+        crossAxisAlignment: alignment,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          ...leading,
+          if (rest.isNotEmpty)
+            Text.rich(
+              TextSpan(
+                children: markupSpans(
+                  context,
+                  rest,
+                  style: style,
+                  revealCloze: revealCloze,
+                ),
+                style: style,
+              ),
+              maxLines: maxLines,
+              overflow: maxLines == null ? null : TextOverflow.ellipsis,
+            ),
+        ],
       );
     }
 
@@ -461,6 +505,7 @@ class OcclusionBox {
     required this.top,
     required this.width,
     required this.height,
+    this.answer = '',
   });
 
   factory OcclusionBox.fromJson(Map<String, Object?> json) {
@@ -472,11 +517,13 @@ class OcclusionBox {
       return 0;
     }
 
+    final Object? answer = json['a'];
     return OcclusionBox(
       left: read('l'),
       top: read('t'),
       width: read('w'),
       height: read('h'),
+      answer: answer is String ? answer : '',
     );
   }
 
@@ -484,6 +531,9 @@ class OcclusionBox {
   final double top;
   final double width;
   final double height;
+
+  /// What the hidden region says. Shown once the learner taps the mask.
+  final String answer;
 
   Rect toRect(Size size) => Rect.fromLTWH(
     left * size.width,
@@ -497,6 +547,7 @@ class OcclusionBox {
     't': double.parse(top.toStringAsFixed(4)),
     'w': double.parse(width.toStringAsFixed(4)),
     'h': double.parse(height.toStringAsFixed(4)),
+    if (answer.isNotEmpty) 'a': answer,
   };
 
   OcclusionBox copyWith({
@@ -504,12 +555,14 @@ class OcclusionBox {
     double? top,
     double? width,
     double? height,
+    String? answer,
   }) {
     return OcclusionBox(
       left: left ?? this.left,
       top: top ?? this.top,
       width: width ?? this.width,
       height: height ?? this.height,
+      answer: answer ?? this.answer,
     );
   }
 }
@@ -549,9 +602,12 @@ Map<String, Object?>? occlusionPayload(List<OcclusionBox> boxes) {
   };
 }
 
-/// Image with occlusion masks. When [masked] is true every box is covered, so
-/// the learner recalls the hidden region before revealing it.
-class OcclusionView extends StatelessWidget {
+/// Image with occlusion masks.
+///
+/// Each box hides one region until the learner taps it, which reveals the
+/// answer written for that box. This is what makes occlusion work as a real
+/// study card instead of a picture with black squares on it.
+class OcclusionView extends StatefulWidget {
   const OcclusionView({
     required this.imageUrl,
     required this.boxes,
@@ -566,45 +622,53 @@ class OcclusionView extends StatelessWidget {
   final double height;
 
   @override
+  State<OcclusionView> createState() => _OcclusionViewState();
+}
+
+class _OcclusionViewState extends State<OcclusionView> {
+  final Set<int> _revealed = <int>{};
+
+  @override
+  void didUpdateWidget(covariant OcclusionView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.boxes.length != widget.boxes.length) {
+      _revealed.clear();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: SizedBox(
-        height: height,
+        height: widget.height,
         width: double.infinity,
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            CardImage(url: imageUrl, height: height, radius: 0),
-            if (masked)
+            CardImage(url: widget.imageUrl, height: widget.height, radius: 0),
+            if (widget.masked)
               LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
-                  final Size size = Size(constraints.maxWidth, height);
+                  final Size size = Size(constraints.maxWidth, widget.height);
                   return Stack(
                     children: <Widget>[
-                      for (final OcclusionBox box in boxes)
+                      for (
+                        int index = 0;
+                        index < widget.boxes.length;
+                        index++
+                      )
                         Positioned.fromRect(
-                          rect: box.toRect(size),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: context.isDark
-                                  ? AppColors.darkSurfaceHigh
-                                  : AppColors.primary,
-                              border: Border.all(
-                                color: context.brandInk.withValues(alpha: 0.55),
-                                width: 1.4,
-                              ),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Center(
-                              child: Icon(
-                                Icons.question_mark_rounded,
-                                size: 18,
-                                color: context.isDark
-                                    ? AppColors.darkAccent
-                                    : AppColors.accent,
-                              ),
-                            ),
+                          rect: widget.boxes[index].toRect(size),
+                          child: _OcclusionMask(
+                            box: widget.boxes[index],
+                            revealed: _revealed.contains(index),
+                            onTap: () => setState(() {
+                              if (!_revealed.remove(index)) {
+                                _revealed.add(index);
+                              }
+                            }),
                           ),
                         ),
                     ],
@@ -613,6 +677,88 @@ class OcclusionView extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _OcclusionMask extends StatelessWidget {
+  const _OcclusionMask({
+    required this.box,
+    required this.revealed,
+    required this.onTap,
+  });
+
+  final OcclusionBox box;
+  final bool revealed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!revealed) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: context.isDark
+                ? AppColors.darkSurfaceHigh
+                : AppColors.primary,
+            border: Border.all(
+              color: context.brandInk.withValues(alpha: 0.55),
+              width: 1.4,
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.question_mark_rounded,
+              size: 18,
+              color: context.isDark ? AppColors.darkAccent : AppColors.accent,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final bool hasAnswer = box.answer.trim().isNotEmpty;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.accent, width: 1.8),
+          borderRadius: BorderRadius.circular(6),
+          color: AppColors.accent.withValues(alpha: 0.12),
+        ),
+        padding: const EdgeInsets.all(3),
+        alignment: Alignment.center,
+        child: hasAnswer
+            ? FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.isDark
+                        ? AppColors.darkAnswerSurface
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    box.answer,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: context.isDark
+                          ? AppColors.darkInk
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }

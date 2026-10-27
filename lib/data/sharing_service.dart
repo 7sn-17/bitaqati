@@ -15,18 +15,30 @@ class SharingFailure implements Exception {
   String toString() => message;
 }
 
+/// What the user needs to hand a deck to someone else.
+class SharingResult {
+  const SharingResult({
+    required this.deckId,
+    required this.shareCode,
+    required this.link,
+  });
+
+  final String deckId;
+  final String shareCode;
+  final String link;
+}
+
 /// Publishes a local deck snapshot to Supabase.
 ///
-/// A main deck is published with its sub-decks. A sub-deck can also be
-/// published on its own; it becomes a standalone shareable deck without
-/// exposing its siblings or parent. The local UUID is kept, so the same link
-/// can be used before and after installing.
+/// Decks are flat, so publishing is one deck row plus its cards. The local
+/// UUID is kept, so the same link works before and after someone installs it,
+/// and re-publishing updates in place instead of creating duplicates.
 class SharingService {
   SharingService(this._repository);
 
   final ContentRepository _repository;
 
-  Future<String> publish({
+  Future<SharingResult> publish({
     required String deckId,
     required DeckPrivacy privacy,
   }) async {
@@ -42,90 +54,62 @@ class SharingService {
           'أضف بطاقة واحدة على الأقل قبل مشاركة المجموعة.',
         );
       }
-      final DeckBundleNode root = bundle.nodes.firstWhere(
-        (DeckBundleNode node) => node.id == deckId,
-        orElse: () => bundle.nodes.first,
+
+      await client.from('decks').upsert(
+        _deckPayload(
+          bundle.row,
+          ownerId: user.id,
+          privacy: privacy,
+          shareCode: bundle.deck.shareCode,
+        ),
       );
-      final List<DeckBundleNode> children = bundle.nodes
-          .where((DeckBundleNode node) => node.id != deckId)
-          .toList(growable: false);
 
-      final String? localParentId = bundle.root.parentId;
-      DeckPrivacy? parentPrivacy;
-      if (bundle.root.depth == kSubDeckDepth && localParentId != null) {
-        parentPrivacy = await _repository.deckPrivacy(localParentId);
-      }
-      // A sub-deck keeps its place under a published main deck. If the parent
-      // is private, the sub-deck is published as a standalone shareable deck.
-      final bool keepParent =
-          bundle.root.depth == kSubDeckDepth &&
-          localParentId != null &&
-          parentPrivacy != null &&
-          parentPrivacy != DeckPrivacy.private;
-      final String rootId = keepParent
-          ? (bundle.root.rootId ?? localParentId)
-          : deckId;
-      final String? rootParentId = keepParent ? localParentId : null;
-      final int rootDepth = keepParent ? kSubDeckDepth : kMainDeckDepth;
-      final List<String> rootPath = keepParent
-          ? <String>[rootId]
-          : const <String>[];
-
-      await client
+      // The server owns uniqueness: it keeps our code unless another account
+      // already claimed it, in which case it minted a fresh one. Read back
+      // whatever it settled on so the local copy always matches.
+      final List<Map<String, dynamic>> stored = await client
           .from('decks')
-          .upsert(
-            _deckPayload(
-              root,
-              parentId: rootParentId,
-              rootId: rootId,
-              depth: rootDepth,
-              path: rootPath,
-              position: keepParent ? root.position : 0,
-              ownerId: user.id,
-              privacy: privacy,
-            ),
-          );
-      if (children.isNotEmpty) {
-        await client.from('decks').upsert(
-          <Map<String, Object?>>[
-            for (final DeckBundleNode child in children)
-              _deckPayload(
-                child,
-                parentId: deckId,
-                rootId: deckId,
-                depth: kSubDeckDepth,
-                path: <String>[deckId],
-                position: child.position,
-                ownerId: user.id,
-                privacy: privacy,
-              ),
-          ],
+          .select('share_code')
+          .eq('id', deckId)
+          .limit(1);
+      final String code = stored.isNotEmpty
+          ? (stored.first['share_code'] as String? ?? '')
+          : (bundle.deck.shareCode ?? '');
+      if (code.isEmpty) {
+        throw const SharingFailure(
+          'تعذّر توليد رمز المشاركة. حاول مرة أخرى.',
         );
       }
-      if (bundle.cards.isNotEmpty) {
-        await client.from('cards').upsert(
-          <Map<String, Object?>>[
-            for (final DeckBundleCard card in bundle.cards)
-              <String, Object?>{
-                'id': card.id,
-                'deck_id': card.deckId,
-                'type': card.type,
-                'front': card.front,
-                'back': card.back,
-                'notes': card.notes,
-                'hint': card.hint,
-                'tags': card.tags,
-                'media': card.media,
-                'occlusion': card.occlusion,
-                'source': card.source,
-                'ai_generated': card.aiGenerated,
-                'position': card.position,
-              },
-          ],
-        );
-      }
+      // The server owns uniqueness, so it may have replaced a colliding code.
+      await _repository.setDeckShareCode(deckId, code);
+
+      await client.from('cards').upsert(
+        <Map<String, Object?>>[
+          for (final DeckBundleCard card in bundle.cards)
+            <String, Object?>{
+              'id': card.id,
+              'deck_id': card.deckId,
+              'type': card.type,
+              'front': card.front,
+              'back': card.back,
+              'notes': card.notes,
+              'hint': card.hint,
+              'tags': card.tags,
+              'media': card.media,
+              'occlusion': card.occlusion,
+              'source': card.source,
+              'ai_generated': card.aiGenerated,
+              'position': card.position,
+            },
+        ],
+      );
+
       await _repository.setDeckPrivacy(deckId, privacy);
-      return AppConfig.deckShareLink(deckId);
+      return SharingResult(
+        deckId: deckId,
+        shareCode: code,
+        link: AppConfig.deckShareLink(deckId),
+      );
     } on SharingFailure {
       rethrow;
     } on PostgrestException {
@@ -146,7 +130,7 @@ class SharingService {
       await client
           .from('decks')
           .update(<String, Object?>{'privacy': 'private'})
-          .or('id.eq.$deckId,root_id.eq.$deckId');
+          .eq('id', deckId);
       await _repository.setDeckPrivacy(deckId, DeckPrivacy.private);
     } on PostgrestException {
       throw const SharingFailure(
@@ -161,22 +145,14 @@ class SharingService {
 
   Map<String, Object?> _deckPayload(
     DeckBundleNode node, {
-    required String? parentId,
-    required String rootId,
-    required int depth,
-    required List<String> path,
-    required int position,
     required String ownerId,
     required DeckPrivacy privacy,
+    required String? shareCode,
   }) {
     return <String, Object?>{
       'id': node.id,
       'owner_id': ownerId,
-      'parent_id': parentId,
-      'root_id': rootId,
-      'path': path,
-      'depth': depth,
-      'position': position,
+      'position': node.position,
       'title': node.title,
       'description': node.description,
       'color_hex': node.colorHex,
@@ -186,6 +162,7 @@ class SharingService {
       'tags': node.tags,
       'settings': node.settings,
       'is_starter': false,
+      'share_code': shareCode,
     };
   }
 

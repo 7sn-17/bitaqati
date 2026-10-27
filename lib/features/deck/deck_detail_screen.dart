@@ -11,7 +11,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
-import '../../core/widgets/deck_card.dart';
 import '../../core/widgets/section_header.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/content_providers.dart';
@@ -66,22 +65,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
 
     final DeckNode deck = found;
     final bool isPreview = local == null;
-    final bool isSubDeck = !isPreview && deck.isSubDeck;
-    final String? parentId = deck.parentId;
-    final DeckNode? parent = isSubDeck && parentId != null
-        ? ref.watch(deckByIdProvider(parentId))
-        : null;
 
-    // Only sub-decks read cards; only main decks read sub-decks. Each mode
-    // ignores the other side of the hierarchy entirely.
-    final List<ReviewCard> cards = isSubDeck
-        ? (ref.watch(deckCardsProvider(deck.id)).valueOrNull ??
-              const <ReviewCard>[])
-        : const <ReviewCard>[];
+    final List<ReviewCard> cards =
+        ref.watch(deckCardsProvider(deck.id)).valueOrNull ??
+        const <ReviewCard>[];
     final List<ReviewCard> visibleCards = _matching(cards);
-    final List<DeckNode> subDecks = isSubDeck
-        ? const <DeckNode>[]
-        : deck.children;
     final bool canStudy =
         !isPreview && deck.cardCount > 0 && deck.dueCount > 0;
     final String studyLabel = isPreview
@@ -90,8 +78,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         ? 'لا بطاقات للمراجعة بعد'
         : deck.dueCount == 0
         ? 'لا بطاقات مستحقة الآن'
-        : deck.isMainDeck
-        ? 'ادرس كل البطاقات · ${deck.dueCount} مستحقة'
         : 'ادرس هذه المجموعة · ${deck.dueCount} مستحقة';
 
     return Scaffold(
@@ -126,16 +112,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            if (isSubDeck && parent != null) ...<Widget>[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _ParentChip(
-                  parent: parent,
-                  onTap: () => context.push('/deck/${parent.id}'),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -181,11 +157,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                             isPreview
                                 ? '${deck.cardCount} بطاقة · '
                                       '${deck.author ?? 'مجموعة مشاركة'}'
-                                : isSubDeck
-                                ? 'نسبة الحفظ ${deck.retention.round()}% · '
-                                      '${deck.dueCount} مستحقة'
-                                : '${deck.children.length} مجموعات فرعية · '
-                                      '${deck.cardCount} بطاقة',
+                                : '${deck.cardCount} بطاقة · '
+                                      'نسبة الحفظ ${deck.retention.round()}%',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 11.5,
@@ -286,10 +259,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Text(
-                  isSubDeck
-                      ? 'أضف أول بطاقة من الزر أدناه لتبدأ المراجعة.'
-                      : 'أنشئ مجموعة فرعية، ثم أضف البطاقات داخلها '
-                            'لتبدأ المراجعة.',
+                  'أضف أول بطاقة من الزر أدناه لتبدأ المراجعة.',
                   textAlign: TextAlign.center,
                   style: context.texts.bodySmall,
                 ),
@@ -311,7 +281,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: _Tabs(
                   selected: _tab,
-                  firstLabel: isSubDeck ? 'البطاقات' : 'المجموعات الفرعية',
+                  firstLabel: 'البطاقات',
                   onChanged: (int value) => setState(() {
                     _tab = value;
                     _selecting = false;
@@ -321,9 +291,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               ),
               const SizedBox(height: 14),
               if (_tab == 0)
-                ...(isSubDeck
-                    ? _cardSection(context, deck, cards, visibleCards)
-                    : _subDeckSection(context, deck, subDecks))
+                ..._cardSection(context, deck, cards, visibleCards)
               else if (_tab == 1)
                 _DeckStatisticsTab(deck: deck)
               else
@@ -349,20 +317,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
                 child: SizedBox(
                   width: double.infinity,
-                  child: isSubDeck
-                      ? FilledButton.icon(
-                          onPressed: () => _addCard(context, deck),
-                          icon: const Icon(CupertinoIcons.plus, size: 18),
-                          label: const Text('بطاقة جديدة'),
-                        )
-                      : FilledButton.icon(
-                          onPressed: () => _addSubDeck(context, deck),
-                          icon: const Icon(
-                            CupertinoIcons.folder_badge_plus,
-                            size: 18,
-                          ),
-                          label: const Text('مجموعة فرعية جديدة'),
-                        ),
+                  child: FilledButton.icon(
+                    onPressed: () => _addCard(context, deck),
+                    icon: const Icon(CupertinoIcons.plus, size: 18),
+                    label: const Text('بطاقة جديدة'),
+                  ),
                 ),
               ),
             ),
@@ -372,43 +331,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   // ---------------------------------------------------------------------------
   // Sections
   // ---------------------------------------------------------------------------
-
-  List<Widget> _subDeckSection(
-    BuildContext context,
-    DeckNode deck,
-    List<DeckNode> subDecks,
-  ) {
-    if (subDecks.isEmpty) {
-      return <Widget>[
-        _EmptyState(
-          icon: CupertinoIcons.folder_badge_plus,
-          title: 'لا مجموعات فرعية بعد',
-          body:
-              'المجموعة الرئيسية تنظّم فقط. أنشئ مجموعة فرعية '
-              'لتضع فيها البطاقات.',
-          actionLabel: 'إنشاء مجموعة فرعية',
-          onAction: () => _addSubDeck(context, deck),
-        ),
-      ];
-    }
-    return <Widget>[
-      SectionHeader(
-        title: 'المجموعات الفرعية',
-        subtitle: '${subDecks.length} مجموعة · البطاقات داخل كل مجموعة',
-        actionLabel: 'إضافة',
-        onAction: () => _addSubDeck(context, deck),
-      ),
-      const SizedBox(height: 10),
-      for (final DeckNode child in subDecks)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
-          child: DeckCard(
-            deck: child,
-            onTap: () => context.push('/deck/${child.id}'),
-          ),
-        ),
-    ];
-  }
 
   List<Widget> _cardSection(
     BuildContext context,
@@ -422,7 +344,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           icon: CupertinoIcons.rectangle_stack,
           title: 'لا بطاقات بعد',
           body:
-              'هذه المجموعة الفرعية جاهزة لبطاقاتك. أضف أول بطاقة '
+              'هذه المجموعة جاهزة لبطاقاتك. أضف أول بطاقة '
               'لتظهر في المراجعة.',
           actionLabel: 'إضافة بطاقة',
           onAction: () => _addCard(context, deck),
@@ -563,13 +485,14 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     )) {
       return;
     }
-    final List<DeckNode> targets = flattenDeckForest(
-      ref.read(deckForestProvider),
-    ).where((DeckNode node) => node.canHoldCards && node.id != deck.id).toList();
+    final List<DeckNode> targets = ref
+        .read(allDecksProvider)
+        .where((DeckNode node) => node.id != deck.id)
+        .toList(growable: false);
     if (targets.isEmpty) {
       showAppMessage(
         context,
-        'لا توجد مجموعة فرعية أخرى لنقل البطاقات إليها.',
+        'لا توجد مجموعة أخرى لنقل البطاقات إليها.',
         kind: AppMessageKind.info,
       );
       return;
@@ -604,11 +527,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     color: node.color,
                   ),
                   title: Text(node.title),
-                  subtitle: Text(
-                    node.parentId == null
-                        ? 'مجموعة رئيسية'
-                        : 'داخل ${findDeckNode(flattenDeckForest(ref.read(deckForestProvider)), node.parentId!)?.title ?? ''}',
-                  ),
+                  subtitle: Text('${node.cardCount} بطاقة'),
                   onTap: () => Navigator.of(sheet).pop(node.id),
                 ),
             ],
@@ -788,31 +707,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   // Actions
   // ---------------------------------------------------------------------------
 
-  void _addSubDeck(BuildContext context, DeckNode deck) {
-    if (!ensureCanCreate(context, ref)) {
-      return;
-    }
-    if (!deck.canHoldSubDecks) {
-      showAppMessage(
-        context,
-        'لا يمكن إنشاء مجموعة فرعية داخل مجموعة فرعية.',
-        kind: AppMessageKind.info,
-      );
-      return;
-    }
-    showDeckEditorSheet(context, parentId: deck.id, parentTitle: deck.title);
-  }
-
   Future<void> _addCard(BuildContext context, DeckNode deck) async {
     if (!ensureCanCreate(context, ref)) {
-      return;
-    }
-    if (!deck.canHoldCards) {
-      showAppMessage(
-        context,
-        'البطاقات تُضاف داخل المجموعات الفرعية فقط.',
-        kind: AppMessageKind.info,
-      );
       return;
     }
     final String? message = await context.push<String>(
@@ -856,15 +752,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              if (deck.canHoldSubDecks)
-                ListTile(
-                  leading: const Icon(CupertinoIcons.folder_badge_plus),
-                  title: const Text('مجموعة فرعية جديدة'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _addSubDeck(screenContext, deck);
-                  },
-                ),
               ListTile(
                 leading: const Icon(CupertinoIcons.pencil),
                 title: const Text('تعديل المجموعة'),
@@ -888,6 +775,15 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                   onTap: () {
                     Navigator.of(context).pop();
                     _copyLink(screenContext, deck);
+                  },
+                ),
+              if (deck.isPublished && deck.isShareable)
+                ListTile(
+                  leading: const Icon(CupertinoIcons.number),
+                  title: Text('نسخ رمز المشاركة · ${deck.shareCode}'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _copyCode(screenContext, deck);
                   },
                 ),
             ],
@@ -944,10 +840,15 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     setState(() => _publishing = true);
     try {
       final SharingService sharing = ref.read(sharingServiceProvider);
+      String? code;
       if (privacy == DeckPrivacy.private) {
         await sharing.unpublish(deck.id);
       } else {
-        await sharing.publish(deckId: deck.id, privacy: privacy);
+        final SharingResult result = await sharing.publish(
+          deckId: deck.id,
+          privacy: privacy,
+        );
+        code = result.shareCode;
       }
       if (!mounted || !context.mounted) {
         return;
@@ -956,7 +857,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         context,
         privacy == DeckPrivacy.private
             ? 'تم إيقاف المشاركة. أصبحت المجموعة خاصة.'
-            : 'تم النشر. انسخ الرابط لمشاركة المجموعة.',
+            : 'تم النشر. رمز المشاركة ${code ?? ''}',
       );
     } on SharingFailure catch (error) {
       if (mounted && context.mounted) {
@@ -985,6 +886,17 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     }
   }
 
+  Future<void> _copyCode(BuildContext context, DeckNode deck) async {
+    final String? code = deck.shareCode;
+    if (code == null || code.isEmpty) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: code));
+    if (context.mounted) {
+      showAppMessage(context, 'تم نسخ الرمز ${code}.');
+    }
+  }
+
   Future<void> _confirmDelete(BuildContext context, DeckNode deck) async {
     if (!ensureSignedIn(
       context,
@@ -999,11 +911,8 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       builder: (BuildContext dialog) => AlertDialog(
         title: const Text('حذف المجموعة؟'),
         content: Text(
-          deck.isMainDeck
-              ? 'سيتم حذف «${deck.title}» وكل مجموعاتها الفرعية '
-                    'وبطاقاتها. لا يمكن التراجع عن هذا الإجراء.'
-              : 'سيتم حذف «${deck.title}» وكل بطاقاتها. '
-                    'لا يمكن التراجع عن هذا الإجراء.',
+          'سيتم حذف «${deck.title}» وكل بطاقاتها. '
+          'لا يمكن التراجع عن هذا الإجراء.',
         ),
         actions: <Widget>[
           TextButton(
@@ -1081,9 +990,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     Text(deck.title, style: context.texts.titleMedium),
                     const SizedBox(height: 2),
                     Text(
-                      deck.isMainDeck
-                          ? 'تعديل الاسم واللون والأيقونة'
-                          : 'تعديل هذه المجموعة الفرعية',
+                      'تعديل الاسم واللون والأيقونة',
                       style: context.texts.bodySmall,
                     ),
                   ],
@@ -1107,8 +1014,40 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           onSelect: (DeckPrivacy privacy) =>
               _setPrivacy(context, deck, privacy),
           onCopy: () => _copyLink(context, deck),
+          onCopyCode: () => _copyCode(context, deck),
         ),
       ),
+      if (deck.sourceDeckId != null) ...<Widget>[
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: SurfaceCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  'تقييم المجموعة الأصلية',
+                  style: context.texts.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ساعد الآخرين على اختيار مجموعات جيدة.',
+                  style: context.texts.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                _DeckRatingBar(
+                  deck: DeckNode(
+                    id: deck.sourceDeckId!,
+                    title: deck.title,
+                    color: deck.color,
+                    isPublic: true,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
       const SizedBox(height: 14),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -1124,9 +1063,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                deck.isMainDeck
-                    ? 'حذف المجموعة يحذف كل المجموعات الفرعية والبطاقات التابعة لها.'
-                    : 'حذف المجموعة يحذف بطاقاتها وسجل مراجعتها.',
+                'حذف المجموعة يحذف بطاقاتها وسجل مراجعتها.',
                 style: context.texts.bodySmall,
               ),
               const SizedBox(height: 12),
@@ -1195,54 +1132,6 @@ class _MiniStat extends StatelessWidget {
           ),
           Text(label, style: context.texts.bodySmall),
         ],
-      ),
-    );
-  }
-}
-
-/// Small chip that shows where a sub-deck sits and jumps to its main deck.
-class _ParentChip extends StatelessWidget {
-  const _ParentChip({required this.parent, required this.onTap});
-
-  final DeckNode parent;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: context.colors.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                CupertinoIcons.folder,
-                size: 13,
-                color: context.texts.bodySmall?.color,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'داخل: ${parent.title}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.texts.labelSmall,
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                CupertinoIcons.chevron_back,
-                size: 12,
-                color: context.texts.bodySmall?.color,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1875,7 +1764,6 @@ class _PreviewPanel extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               '${deck.cardCount} بطاقة'
-              '${deck.childCount > 0 ? ' · ${deck.childCount} مجموعة فرعية' : ''}'
               '${deck.author != null ? ' · بواسطة ${deck.author}' : ''}',
               style: context.texts.bodySmall,
             ),
@@ -2038,20 +1926,18 @@ class _DeckStatisticsTab extends ConsumerWidget {
               icon: CupertinoIcons.chart_bar,
               title: 'لا إحصائيات بعد',
               body: 'أضف بطاقات وابدأ المراجعة لتظهر الأرقام الحقيقية هنا.',
-              actionLabel: deck.canHoldCards ? 'إضافة بطاقة' : null,
-              onAction: deck.canHoldCards
-                  ? () async {
-                      if (!ensureCanCreate(context, ref)) {
-                        return;
-                      }
-                      final String? message = await context.push<String>(
-                        '/create-card?deckId=${deck.id}',
-                      );
-                      if (message != null && context.mounted) {
-                        showAppMessage(context, message);
-                      }
-                    }
-                  : null,
+              actionLabel: 'إضافة بطاقة',
+              onAction: () async {
+                if (!ensureCanCreate(context, ref)) {
+                  return;
+                }
+                final String? message = await context.push<String>(
+                  '/create-card?deckId=${deck.id}',
+                );
+                if (message != null && context.mounted) {
+                  showAppMessage(context, message);
+                }
+              },
             ),
           );
         }
@@ -2229,6 +2115,7 @@ class _PrivacyCard extends StatelessWidget {
     required this.publishing,
     required this.onSelect,
     required this.onCopy,
+    required this.onCopyCode,
   });
 
   final DeckNode deck;
@@ -2236,6 +2123,7 @@ class _PrivacyCard extends StatelessWidget {
   final bool publishing;
   final ValueChanged<DeckPrivacy> onSelect;
   final VoidCallback onCopy;
+  final VoidCallback onCopyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -2267,9 +2155,7 @@ class _PrivacyCard extends StatelessWidget {
                     Text('الخصوصية والمشاركة', style: context.texts.titleMedium),
                     const SizedBox(height: 1),
                     Text(
-                      deck.isMainDeck
-                          ? 'نشر المجموعة الرئيسية يشمل كل مجموعاتها الفرعية.'
-                          : 'يمكنك نشر هذه المجموعة الفرعية وحدها.',
+                      'انشر المجموعة لمشاركتها برابط أو برمز.',
                       style: context.texts.bodySmall,
                     ),
                   ],
@@ -2320,6 +2206,56 @@ class _PrivacyCard extends StatelessWidget {
               onTap: () => onSelect(privacy),
             ),
           if (deck.isPublished) ...<Widget>[
+            if (deck.isShareable) ...<Widget>[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentSoft.withValues(
+                    alpha: context.isDark ? 0.2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: <Widget>[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'رمز المشاركة',
+                          style: context.texts.labelSmall?.copyWith(
+                            color: context.isDark
+                                ? AppColors.darkMuted
+                                : AppColors.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          deck.shareCode!,
+                          style: const TextStyle(
+                            fontFamily: 'ReadexPro',
+                            fontSize: 21,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 4.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: onCopyCode,
+                      icon: const Icon(CupertinoIcons.doc_on_doc, size: 14),
+                      label: const Text('نسخ'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 34),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        textStyle: const TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),

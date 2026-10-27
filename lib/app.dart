@@ -10,6 +10,7 @@ import 'core/config/app_config.dart';
 import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'data/sync_providers.dart';
 
 class BitaqatiApp extends ConsumerStatefulWidget {
   const BitaqatiApp({super.key});
@@ -25,6 +26,9 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp> {
   @override
   void initState() {
     super.initState();
+    // Kicks off the first pull as soon as a session is restored, so a fresh
+    // install on a new device shows the account's decks without a tap.
+    ref.read(syncControllerProvider);
     _linkSubscription = _appLinks.uriLinkStream.listen(
       _handleUri,
       onError: (Object _) {
