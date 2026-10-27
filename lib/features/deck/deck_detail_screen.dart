@@ -15,6 +15,14 @@ import '../../domain/models.dart';
 import '../create/card_editor_sheet.dart';
 import '../create/deck_editor_sheet.dart';
 
+/// A deck screen with two strict modes, matching the two-level hierarchy:
+///
+/// * A **main deck** (depth 0) lists sub-decks only, and its only creation
+///   action is "new sub-deck". It can never receive a card.
+/// * A **sub-deck** (depth 1) lists cards only, and its only creation action is
+///   "new card". It can never receive a sub-deck.
+///
+/// Public-library decks are previews and are read-only in both modes.
 class DeckDetailScreen extends ConsumerStatefulWidget {
   const DeckDetailScreen({required this.deckId, super.key});
 
@@ -26,6 +34,7 @@ class DeckDetailScreen extends ConsumerStatefulWidget {
 
 class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   int _tab = 0;
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
@@ -35,10 +44,25 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     if (found == null) {
       return _MissingDeck(loading: ref.watch(deckListProvider).isLoading);
     }
+
     final DeckNode deck = found;
-    final List<ReviewCard> cards =
-        ref.watch(deckCardsProvider(widget.deckId)).valueOrNull ??
-        const <ReviewCard>[];
+    final bool isPreview = deck.isPreview;
+    final bool isSubDeck = !isPreview && deck.isSubDeck;
+    final String? parentId = deck.parentId;
+    final DeckNode? parent = isSubDeck && parentId != null
+        ? ref.watch(deckByIdProvider(parentId))
+        : null;
+
+    // Only sub-decks read cards; only main decks read sub-decks. Each mode
+    // ignores the other side of the hierarchy entirely.
+    final List<ReviewCard> cards = isSubDeck
+        ? (ref.watch(deckCardsProvider(deck.id)).valueOrNull ??
+              const <ReviewCard>[])
+        : const <ReviewCard>[];
+    final List<ReviewCard> visibleCards = _matching(cards);
+    final List<DeckNode> subDecks = isSubDeck
+        ? const <DeckNode>[]
+        : deck.children;
 
     return Scaffold(
       body: SafeArea(
@@ -68,21 +92,39 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          '${deck.cardCount} بطاقة · ${deck.isPublic ? 'عامة' : 'خاصة'}',
+                          _headerSubtitle(
+                            deck,
+                            isSubDeck,
+                            cards.length,
+                            isPreview,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: context.texts.bodySmall,
                         ),
                       ],
                     ),
                   ),
-                  _RoundButton(
-                    icon: CupertinoIcons.ellipsis,
-                    label: 'المزيد',
-                    onTap: () => _showActions(context, deck),
-                  ),
+                  if (!isPreview)
+                    _RoundButton(
+                      icon: CupertinoIcons.ellipsis,
+                      label: 'المزيد',
+                      onTap: () => _showActions(context, deck),
+                    ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            if (isSubDeck && parent != null) ...<Widget>[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _ParentChip(
+                  parent: parent,
+                  onTap: () => context.push('/deck/${parent.id}'),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -113,9 +155,9 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            deck.tags.isEmpty
-                                ? 'مجموعة'
-                                : deck.tags.join(' · '),
+                            _heroTitle(deck, isSubDeck, isPreview),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
@@ -124,9 +166,10 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            deck.isPreview
+                            isPreview
                                 ? '${deck.cardCount} بطاقة · ${deck.author}'
-                                : 'نسبة الحفظ ${deck.retention.round()}% · ${deck.dueCount} مستحقة',
+                                : 'نسبة الحفظ ${deck.retention.round()}% · '
+                                      '${deck.dueCount} مستحقة',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 11.5,
@@ -195,125 +238,231 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: () {
-                    if (deck.isPreview) {
-                      _showPreviewNotice(context);
-                    } else {
-                      context.push('/review/${deck.id}');
-                    }
-                  },
+                  onPressed: isPreview
+                      ? () => _showPreviewNotice(context)
+                      : (deck.cardCount == 0
+                            ? null
+                            : () => context.push('/review/${deck.id}')),
                   style: FilledButton.styleFrom(
-                    backgroundColor: deck.isPreview
+                    backgroundColor: isPreview
                         ? AppColors.primary
                         : AppColors.accent,
-                    foregroundColor: deck.isPreview
+                    foregroundColor: isPreview
                         ? AppColors.accent
                         : AppColors.primary,
                   ),
                   child: Text(
-                    deck.isPreview
+                    isPreview
                         ? 'أضف نسخة إلى مجموعاتي'
-                        : 'ادرس هذه المجموعة',
+                        : (deck.cardCount == 0
+                              ? 'لا بطاقات للمراجعة بعد'
+                              : 'ادرس هذه المجموعة'),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _Tabs(
-                selected: _tab,
-                onChanged: (int value) => setState(() => _tab = value),
+            if (!isPreview && deck.cardCount == 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                child: Text(
+                  isSubDeck
+                      ? 'أضف أول بطاقة من الزر أدناه لتبدأ المراجعة.'
+                      : 'أنشئ مجموعة فرعية، ثم أضف البطاقات داخلها لتبدأ المراجعة.',
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodySmall,
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            if (_tab == 0) ...<Widget>[
-              if (deck.children.isNotEmpty) ...<Widget>[
-                const SectionHeader(title: 'مجموعات فرعية'),
-                const SizedBox(height: 10),
-                for (final DeckNode child in deck.children)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
-                    child: DeckCard(
-                      deck: child,
-                      onTap: () => context.push('/deck/${child.id}'),
-                    ),
-                  ),
-                const SizedBox(height: 10),
-              ],
+            const SizedBox(height: 16),
+            if (isPreview)
+              const _TabPlaceholder(
+                icon: CupertinoIcons.book,
+                title: 'مجموعة من المكتبة العامة',
+                body:
+                    'هذه معاينة فقط: لا يمكن دراستها أو تعديلها قبل ربط المكتبة العامة بالسحابة.',
+              )
+            else ...<Widget>[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'ابحث في البطاقات',
-                    prefixIcon: const Icon(CupertinoIcons.search, size: 18),
-                  ),
+                child: _Tabs(
+                  selected: _tab,
+                  firstLabel: isSubDeck ? 'البطاقات' : 'المجموعات الفرعية',
+                  onChanged: (int value) => setState(() => _tab = value),
                 ),
               ),
-              const SizedBox(height: 12),
-              if (cards.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(30),
-                  child: Text(
-                    'لا توجد بطاقات بعد.',
-                    textAlign: TextAlign.center,
-                    style: context.texts.bodySmall,
-                  ),
+              const SizedBox(height: 14),
+              if (_tab == 0)
+                ...(isSubDeck
+                    ? _cardSection(context, deck, cards, visibleCards)
+                    : _subDeckSection(context, deck, subDecks))
+              else if (_tab == 1)
+                const _TabPlaceholder(
+                  icon: CupertinoIcons.chart_bar,
+                  title: 'إحصائيات المجموعة',
+                  body:
+                      'ستظهر هنا نسبة الحفظ وتوزيع البطاقات بعد تفعيل محرّك المراجعة.',
                 )
               else
-                for (int index = 0; index < cards.length; index++)
-                  _CardRow(card: cards[index], index: index),
-            ] else if (_tab == 1)
-              const _TabPlaceholder(
-                icon: CupertinoIcons.chart_bar,
-                title: 'إحصائيات المجموعة',
-                body: 'ستظهر هنا نسبة الحفظ وتوزيع البطاقات بعد تفعيل محرّك المراجعة.',
-              )
-            else
-              const _TabPlaceholder(
-                icon: CupertinoIcons.gear,
-                title: 'إعدادات المجموعة',
-                body:
-                    'يمكنك تعديل الخصوصية، عدد البطاقات اليومية، ونسبة التذكر.',
-              ),
+                const _TabPlaceholder(
+                  icon: CupertinoIcons.gear,
+                  title: 'إعدادات المجموعة',
+                  body:
+                      'يمكنك تعديل الخصوصية، عدد البطاقات اليومية، ونسبة التذكر.',
+                ),
+            ],
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () {
-                    if (deck.isPreview) {
-                      _showPreviewNotice(context);
-                    } else {
-                      showCardEditorSheet(context, deckId: deck.id);
-                    }
-                  },
-                  icon: const Icon(CupertinoIcons.plus, size: 18),
-                  label: const Text('بطاقة'),
+      bottomNavigationBar: isPreview
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: isSubDeck
+                      ? FilledButton.icon(
+                          onPressed: () => _addCard(context, deck),
+                          icon: const Icon(CupertinoIcons.plus, size: 18),
+                          label: const Text('بطاقة جديدة'),
+                        )
+                      : FilledButton.icon(
+                          onPressed: () => _addSubDeck(context, deck),
+                          icon: const Icon(
+                            CupertinoIcons.folder_badge_plus,
+                            size: 18,
+                          ),
+                          label: const Text('مجموعة فرعية جديدة'),
+                        ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showComingSoon(context, 'استيراد البطاقات'),
-                  icon: const Icon(CupertinoIcons.square_arrow_down, size: 18),
-                  label: const Text('استيراد'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Sections
+  // ---------------------------------------------------------------------------
+
+  List<Widget> _subDeckSection(
+    BuildContext context,
+    DeckNode deck,
+    List<DeckNode> subDecks,
+  ) {
+    if (subDecks.isEmpty) {
+      return <Widget>[
+        _EmptyState(
+          icon: CupertinoIcons.folder_badge_plus,
+          title: 'لا مجموعات فرعية بعد',
+          body: 'المجموعة الرئيسية تنظّم فقط. أنشئ مجموعة فرعية '
+              'لتضع فيها البطاقات.',
+          actionLabel: 'إنشاء مجموعة فرعية',
+          onAction: () => _addSubDeck(context, deck),
+        ),
+      ];
+    }
+    return <Widget>[
+      SectionHeader(
+        title: 'المجموعات الفرعية',
+        subtitle: '${subDecks.length} مجموعة · البطاقات داخل كل مجموعة',
+        actionLabel: 'إضافة',
+        onAction: () => _addSubDeck(context, deck),
+      ),
+      const SizedBox(height: 10),
+      for (final DeckNode child in subDecks)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 9),
+          child: DeckCard(
+            deck: child,
+            onTap: () => context.push('/deck/${child.id}'),
+          ),
+        ),
+    ];
+  }
+
+  List<Widget> _cardSection(
+    BuildContext context,
+    DeckNode deck,
+    List<ReviewCard> cards,
+    List<ReviewCard> visibleCards,
+  ) {
+    if (cards.isEmpty) {
+      return <Widget>[
+        _EmptyState(
+          icon: CupertinoIcons.rectangle_stack,
+          title: 'لا بطاقات بعد',
+          body: 'هذه المجموعة الفرعية جاهزة لبطاقاتك. أضف أول بطاقة '
+              'لتظهر في المراجعة.',
+          actionLabel: 'إضافة بطاقة',
+          onAction: () => _addCard(context, deck),
+        ),
+      ];
+    }
+    return <Widget>[
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: TextField(
+          onChanged: (String value) => setState(() => _query = value),
+          decoration: InputDecoration(
+            hintText: 'ابحث في البطاقات',
+            prefixIcon: const Icon(CupertinoIcons.search, size: 18),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      if (visibleCards.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(30),
+          child: Text(
+            'لا نتائج مطابقة لبحثك.',
+            textAlign: TextAlign.center,
+            style: context.texts.bodySmall,
+          ),
+        )
+      else
+        for (int index = 0; index < visibleCards.length; index++)
+          _CardRow(card: visibleCards[index], index: index),
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
+
+  void _addSubDeck(BuildContext context, DeckNode deck) {
+    if (deck.isPreview) {
+      _showPreviewNotice(context);
+      return;
+    }
+    if (!deck.canHoldSubDecks) {
+      showAppMessage(
+        context,
+        'لا يمكن إنشاء مجموعة فرعية داخل مجموعة فرعية.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    showDeckEditorSheet(
+      context,
+      parentId: deck.id,
+      parentTitle: deck.title,
+    );
+  }
+
+  void _addCard(BuildContext context, DeckNode deck) {
+    if (!deck.canHoldCards) {
+      showAppMessage(
+        context,
+        'البطاقات تُضاف داخل المجموعات الفرعية فقط.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    showCardEditorSheet(context, deckId: deck.id);
+  }
+
   void _showActions(BuildContext screenContext, DeckNode deck) {
+    final bool canAddSubDeck = deck.canHoldSubDecks;
     showModalBottomSheet<void>(
       context: screenContext,
       backgroundColor: Colors.transparent,
@@ -329,26 +478,22 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              ListTile(
-                leading: const Icon(CupertinoIcons.folder_badge_plus),
-                title: const Text('مجموعة فرعية جديدة'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  if (deck.isPreview) {
-                    _showPreviewNotice(screenContext);
-                  } else {
-                    showDeckEditorSheet(
-                      screenContext,
-                      parentId: deck.id,
-                      parentTitle: deck.title,
-                    );
-                  }
-                },
-              ),
+              if (canAddSubDeck)
+                ListTile(
+                  leading: const Icon(CupertinoIcons.folder_badge_plus),
+                  title: const Text('مجموعة فرعية جديدة'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _addSubDeck(screenContext, deck);
+                  },
+                ),
               ListTile(
                 leading: const Icon(CupertinoIcons.pencil),
                 title: const Text('تعديل المجموعة'),
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _showComingSoon(screenContext, 'تعديل المجموعة');
+                },
               ),
               ListTile(
                 leading: const Icon(CupertinoIcons.square_arrow_up),
@@ -365,6 +510,46 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         ),
       ),
     );
+  }
+
+  List<ReviewCard> _matching(List<ReviewCard> cards) {
+    final String needle = _query.trim();
+    if (needle.isEmpty) {
+      return cards;
+    }
+    return cards
+        .where(
+          (ReviewCard card) =>
+              card.front.contains(needle) ||
+              card.back.contains(needle) ||
+              card.tags.any((String tag) => tag.contains(needle)),
+        )
+        .toList(growable: false);
+  }
+
+  String _headerSubtitle(
+    DeckNode deck,
+    bool isSubDeck,
+    int cardTotal,
+    bool isPreview,
+  ) {
+    if (isPreview) {
+      return '${deck.cardCount} بطاقة · ${deck.author}';
+    }
+    if (isSubDeck) {
+      return '$cardTotal بطاقة · ${deck.isPublic ? 'عامة' : 'خاصة'}';
+    }
+    return '${deck.children.length} مجموعات فرعية · ${deck.cardCount} بطاقة';
+  }
+
+  String _heroTitle(DeckNode deck, bool isSubDeck, bool isPreview) {
+    if (isPreview) {
+      return deck.tags.isEmpty ? 'من المكتبة العامة' : deck.tags.join(' · ');
+    }
+    if (isSubDeck) {
+      return deck.tags.isEmpty ? 'مجموعة فرعية' : deck.tags.join(' · ');
+    }
+    return deck.tags.isEmpty ? 'مجموعة رئيسية' : deck.tags.join(' · ');
   }
 
   void _showComingSoon(BuildContext context, String feature) {
@@ -421,15 +606,122 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
+/// Small chip that shows where a sub-deck sits and jumps to its main deck.
+class _ParentChip extends StatelessWidget {
+  const _ParentChip({required this.parent, required this.onTap});
+
+  final DeckNode parent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: context.colors.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                CupertinoIcons.folder,
+                size: 13,
+                color: context.texts.bodySmall?.color,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'داخل: ${parent.title}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.texts.labelSmall,
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                CupertinoIcons.chevron_back,
+                size: 12,
+                color: context.texts.bodySmall?.color,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      child: SurfaceCard(
+        child: Column(
+          children: <Widget>[
+            Icon(icon, size: 34, color: context.colors.primary),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: context.texts.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: context.texts.bodySmall,
+            ),
+            if (actionLabel != null) ...<Widget>[
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: onAction,
+                icon: const Icon(CupertinoIcons.plus, size: 16),
+                label: Text(actionLabel!),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Tabs extends StatelessWidget {
-  const _Tabs({required this.selected, required this.onChanged});
+  const _Tabs({
+    required this.selected,
+    required this.firstLabel,
+    required this.onChanged,
+  });
 
   final int selected;
+  final String firstLabel;
   final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    const List<String> labels = <String>['البطاقات', 'إحصائيات', 'الإعدادات'];
+    final List<String> labels = <String>[
+      firstLabel,
+      'إحصائيات',
+      'الإعدادات',
+    ];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -454,6 +746,8 @@ class _Tabs extends StatelessWidget {
                   ),
                   child: Text(
                     labels[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: selected == index

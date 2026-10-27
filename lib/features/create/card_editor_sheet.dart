@@ -128,9 +128,10 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // Cards live in sub-decks only: main decks are containers for sub-decks.
     final List<DeckNode> decks = flattenDeckForest(
       ref.watch(deckForestProvider),
-    );
+    ).where((DeckNode deck) => deck.canHoldCards).toList(growable: false);
 
     if (decks.isEmpty) {
       return const EditorSheetFrame(
@@ -138,7 +139,8 @@ class _CardEditorSheetState extends ConsumerState<_CardEditorSheet> {
         child: Padding(
           padding: EdgeInsets.only(top: 16, bottom: 8),
           child: Text(
-            'أنشئ مجموعة أولاً من زر + ثم أضف بطاقاتك إليها.',
+            'البطاقات تُضاف داخل المجموعات الفرعية. أنشئ مجموعة رئيسية، '
+            'ثم أضف إليها مجموعة فرعية، ثم أضف بطاقاتك.',
             style: TextStyle(height: 1.7),
           ),
         ),

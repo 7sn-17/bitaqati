@@ -43,6 +43,15 @@ Color colorFromHex(String? hex) {
   return Color(int.parse('FF${hex.substring(1)}', radix: 16));
 }
 
+/// The deck hierarchy is exactly two levels deep.
+///
+/// A *main deck* sits at [kMainDeckDepth] and may only contain sub-decks. A
+/// *sub-deck* sits at [kSubDeckDepth] and may only contain cards. Nothing may
+/// be nested below a sub-deck, so [kMaxDeckDepth] is the deepest legal depth.
+const int kMainDeckDepth = 0;
+const int kSubDeckDepth = 1;
+const int kMaxDeckDepth = kSubDeckDepth;
+
 /// Where a card is in its learning cycle, as far as the UI cares.
 enum CardPhase { newCard, learning, review, paused }
 
@@ -154,6 +163,20 @@ class DeckNode {
   int get dueCount => dueNew + dueLearning + dueReview;
 
   bool get isRoot => parentId == null;
+
+  /// A main deck is the top level of the hierarchy: it groups sub-decks.
+  bool get isMainDeck => depth == kMainDeckDepth;
+
+  /// Anything below the top level is a sub-deck. Legacy rows that were nested
+  /// deeper than the two-level rule are treated as sub-decks as well, so they
+  /// keep working instead of disappearing from the UI.
+  bool get isSubDeck => !isMainDeck;
+
+  /// Only main decks may contain sub-decks; the depth limit is one level.
+  bool get canHoldSubDecks => isMainDeck;
+
+  /// Only sub-decks hold cards. Main decks never do.
+  bool get canHoldCards => isSubDeck;
 
   /// Library decks shown before the cloud library is connected.
   bool get isPreview => author != null;

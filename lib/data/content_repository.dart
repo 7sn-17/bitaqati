@@ -18,8 +18,12 @@ class ContentRepository {
   final Uuid _uuid;
   final DateTime Function() _clock;
 
-  /// Same limit as the cloud `decks_depth_check` constraint.
-  static const int maxDepth = 20;
+  /// The app allows exactly two levels: a main deck and its sub-decks.
+  ///
+  /// This is stricter than the cloud `decks_depth_check` constraint, which is
+  /// kept permissive so old rows stay readable; the invariant is enforced here
+  /// so every screen inherits it.
+  static const int maxDepth = kMaxDeckDepth;
 
   static const String _deckStatsSql = '''
 SELECT d.*,
@@ -188,7 +192,10 @@ ORDER BY d.depth, d.position, d.created_at
           throw StateError('Parent deck $parentKey does not exist');
         }
         if (parent.depth >= maxDepth) {
-          throw StateError('Deck nesting is limited to $maxDepth levels');
+          throw StateError(
+            'A sub-deck cannot contain another sub-deck '
+            '(maximum depth is $maxDepth)',
+          );
         }
         rootId = parent.rootId ?? parent.id;
         path = <String>[...parent.path, parent.id];
@@ -270,6 +277,11 @@ ORDER BY d.depth, d.position, d.created_at
               .getSingleOrNull();
       if (deck == null) {
         throw StateError('Deck $deckId does not exist');
+      }
+      if (deck.depth < kSubDeckDepth) {
+        throw StateError(
+          'Cards belong to sub-decks; deck $deckId is a main deck',
+        );
       }
       final String id = _uuid.v4();
       final QueryRow next = await _db
