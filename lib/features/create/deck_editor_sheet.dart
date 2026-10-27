@@ -44,7 +44,6 @@ class _DeckEditorSheet extends ConsumerStatefulWidget {
 
 class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
   final TextEditingController _title = TextEditingController();
-  final TextEditingController _tags = TextEditingController();
   int _colorIndex = 0;
   String _iconKey = 'layers';
   String? _error;
@@ -53,7 +52,6 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
   @override
   void dispose() {
     _title.dispose();
-    _tags.dispose();
     super.dispose();
   }
 
@@ -75,7 +73,6 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
             parentId: widget.parentId,
             colorHex: colorToHex(kDeckColors[_colorIndex]),
             icon: _iconKey,
-            tags: parseTags(_tags.text),
           );
       if (!mounted) {
         return;
@@ -96,6 +93,8 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
   Widget build(BuildContext context) {
     final bool isSub = widget.parentId != null;
     final Color chosen = kDeckColors[_colorIndex];
+    final IconData icon = kDeckIcons[_iconKey] ?? Icons.layers_rounded;
+    final String previewTitle = _title.text.trim();
 
     return EditorSheetFrame(
       title: isSub ? 'مجموعة فرعية جديدة' : 'مجموعة جديدة',
@@ -105,30 +104,80 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: <Color>[
+                  chosen,
+                  Color.lerp(chosen, Colors.black, 0.22) ?? chosen,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: chosen.withValues(alpha: 0.26),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        previewTitle.isEmpty ? 'اسم المجموعة' : previewTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(
+                            alpha: previewTitle.isEmpty ? 0.55 : 1,
+                          ),
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isSub ? 'مجموعة فرعية' : 'مجموعة رئيسية',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           const EditorLabel('الاسم'),
           TextField(
             controller: _title,
             autofocus: true,
             maxLength: 160,
-            textInputAction: TextInputAction.next,
-            onChanged: (_) {
-              if (_error != null) {
-                setState(() => _error = null);
-              }
-            },
+            textInputAction: TextInputAction.done,
+            onChanged: (_) => setState(() => _error = null),
             decoration: editorDecoration(
               context,
               hint: 'مثال: الفيزياء · الحركة',
               errorText: _error,
-            ),
-          ),
-          const EditorLabel('الوسوم (اختياري)'),
-          TextField(
-            controller: _tags,
-            textInputAction: TextInputAction.done,
-            decoration: editorDecoration(
-              context,
-              hint: 'افصل بينها بفاصلة، مثال: الفيزياء، الفصل الأول',
             ),
           ),
           const EditorLabel('اللون'),
@@ -137,29 +186,40 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
             runSpacing: 10,
             children: <Widget>[
               for (int index = 0; index < kDeckColors.length; index++)
-                GestureDetector(
-                  onTap: () => setState(() => _colorIndex = index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: kDeckColors[index],
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: index == _colorIndex
-                            ? context.colors.onSurface
-                            : Colors.transparent,
-                        width: 2.4,
+                Semantics(
+                  button: true,
+                  selected: index == _colorIndex,
+                  label: 'اللون ${index + 1}',
+                  child: GestureDetector(
+                    onTap: () => setState(() => _colorIndex = index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 42,
+                      height: 42,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: index == _colorIndex
+                              ? context.colors.onSurface
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: kDeckColors[index],
+                          shape: BoxShape.circle,
+                        ),
+                        child: index == _colorIndex
+                            ? const Icon(
+                                CupertinoIcons.checkmark_alt,
+                                size: 17,
+                                color: Colors.white,
+                              )
+                            : null,
                       ),
                     ),
-                    child: index == _colorIndex
-                        ? const Icon(
-                            CupertinoIcons.checkmark_alt,
-                            size: 18,
-                            color: Colors.white,
-                          )
-                        : null,
                   ),
                 ),
             ],
@@ -181,6 +241,22 @@ class _DeckEditorSheetState extends ConsumerState<_DeckEditorSheet> {
                           ? chosen
                           : editorFieldFill(context),
                       borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: entry.key == _iconKey
+                            ? chosen
+                            : context.colors.outlineVariant.withValues(
+                                alpha: 0.6,
+                              ),
+                      ),
+                      boxShadow: entry.key == _iconKey
+                          ? <BoxShadow>[
+                              BoxShadow(
+                                color: chosen.withValues(alpha: 0.24),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Icon(
                       entry.value,

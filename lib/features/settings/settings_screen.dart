@@ -21,7 +21,6 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeMode themeMode = ref.watch(themeModeProvider);
     final bool notifications = ref.watch(notificationsEnabledProvider);
-    final Locale locale = ref.watch(languageProvider);
     final User? user = ref.watch(currentUserProvider).valueOrNull;
     final bool guestMode = ref.watch(guestModeProvider);
     final bool guest = user == null && guestMode;
@@ -30,7 +29,7 @@ class SettingsScreen extends ConsumerWidget {
         userFirstName(user) ?? (guest ? 'زائر' : 'بطاقاتي');
     final String accountSubtitle =
         user?.email ??
-        (guest ? 'وضع الزائر · البيانات محلية' : 'غير مسجل الدخول');
+        (guest ? 'وضع الزائر · للتصفح فقط' : 'غير مسجل الدخول');
     final bool isDark =
         themeMode == ThemeMode.dark ||
         (themeMode == ThemeMode.system && context.isDark);
@@ -119,9 +118,11 @@ class SettingsScreen extends ConsumerWidget {
                   icon: CupertinoIcons.mail,
                   title: 'البريد الإلكتروني',
                   subtitle: user?.email ?? 'غير مرتبط بعد',
-                  onTap: user == null
-                      ? () => _comingSoon(context, 'ربط الحساب')
-                      : null,
+                  onTap: user != null
+                      ? null
+                      : guest
+                      ? () => _goToLogin(ref)
+                      : () => _comingSoon(context, 'ربط الحساب'),
                 ),
                 _Row(
                   icon: CupertinoIcons.arrow_2_circlepath,
@@ -150,12 +151,6 @@ class SettingsScreen extends ConsumerWidget {
                       ref.read(themeModeProvider.notifier).toggleDark();
                     },
                   ),
-                ),
-                _Row(
-                  icon: CupertinoIcons.globe,
-                  title: 'لغة التطبيق',
-                  subtitle: locale.languageCode == 'ar' ? 'العربية' : 'English',
-                  onTap: () => _pickLanguage(context, ref),
                 ),
               ],
             ),
@@ -255,14 +250,20 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: OutlinedButton(
-                onPressed: () => _signOut(context, ref),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.danger,
-                  side: const BorderSide(color: AppColors.danger),
-                ),
-                child: const Text('تسجيل الخروج'),
-              ),
+              child: guest
+                  ? FilledButton.icon(
+                      onPressed: () => _goToLogin(ref),
+                      icon: const Icon(CupertinoIcons.person, size: 17),
+                      label: const Text('تسجيل الدخول بحساب Google'),
+                    )
+                  : OutlinedButton(
+                      onPressed: () => _signOut(context, ref),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        side: const BorderSide(color: AppColors.danger),
+                      ),
+                      child: const Text('تسجيل الخروج'),
+                    ),
             ),
             const SizedBox(height: 16),
             Center(
@@ -285,81 +286,10 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _pickLanguage(BuildContext context, WidgetRef ref) async {
-    final String current = ref.read(languageProvider).languageCode;
-    final String? chosen = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (BuildContext sheet) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: AppColors.accentSoft,
-                  child: Text(
-                    'ع',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                title: const Text('العربية'),
-                trailing: current == 'ar'
-                    ? Icon(
-                        CupertinoIcons.checkmark_alt,
-                        color: context.colors.primary,
-                      )
-                    : null,
-                onTap: () => Navigator.of(sheet).pop('ar'),
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: AppColors.accentSoft,
-                  child: Text(
-                    'EN',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                title: const Text('English'),
-                trailing: current == 'en'
-                    ? Icon(
-                        CupertinoIcons.checkmark_alt,
-                        color: context.colors.primary,
-                      )
-                    : null,
-                onTap: () => Navigator.of(sheet).pop('en'),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
-                child: Text(
-                  'الواجهة تتغيّر الآن، وترجمة النصوص الكاملة قادمة في تحديث '
-                  'لاحق.',
-                  textAlign: TextAlign.center,
-                  style: context.texts.bodySmall?.copyWith(height: 1.7),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    if (chosen == null || chosen == current || !context.mounted) {
-      return;
-    }
-    await ref.read(languageProvider.notifier).setLanguage(chosen);
-    if (context.mounted) {
-      showAppMessage(
-        context,
-        chosen == 'ar' ? 'تم تغيير اللغة إلى العربية' : 'Language changed',
-      );
-    }
+  /// Leaves guest mode. The router then shows the login screen, where the
+  /// user can link a Google account without losing local data.
+  Future<void> _goToLogin(WidgetRef ref) async {
+    await ref.read(guestModeProvider.notifier).exit();
   }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
@@ -85,8 +86,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'سجّل الدخول لتحفظ تقدّمك في كل أجهزتك، أو تابع كزائر '
-                'وتبقى بطاقاتك على هذا الجهاز.',
+                'سجّل الدخول لتنشئ مجموعاتك وبطاقاتك وتحفظ تقدّمك '
+                'في كل أجهزتك.',
                 textAlign: TextAlign.center,
                 style: context.texts.bodySmall?.copyWith(height: 1.8),
               ),
@@ -156,16 +157,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               const SizedBox(height: 18),
               SizedBox(
-                height: 50,
-                child: TextButton(
+                height: 52,
+                child: OutlinedButton.icon(
                   onPressed: _busy ? null : _continueAsGuest,
-                  child: const Text('المتابعة كزائر'),
+                  icon: const Icon(CupertinoIcons.person, size: 18),
+                  label: const Text('المتابعة كزائر'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.colors.onSurface,
+                    side: BorderSide(color: context.colors.outlineVariant),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    textStyle: context.texts.titleSmall,
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'وضع الزائر يحفظ كل شيء محلياً على هذا الجهاز فقط، '
-                'ولن تتم مزامنة تقدّمك.',
+                'وضع الزائر للتصفح فقط: إنشاء المجموعات والبطاقات '
+                'يتطلب حساباً.',
                 textAlign: TextAlign.center,
                 style: context.texts.bodySmall?.copyWith(
                   fontSize: 11,
@@ -186,31 +196,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-/// Simple placeholder for the Google "G". Swap for the official asset when it
-/// is added to `assets/branding/`.
+/// Official multi-colour Google "G" mark from `assets/branding/google_g.svg`.
 class _GoogleMark extends StatelessWidget {
   const _GoogleMark();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: const Color(0xFFE3E3E3)),
-      ),
-      child: const Text(
-        'G',
-        style: TextStyle(
-          fontFamily: 'ReadexPro',
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF4285F4),
-        ),
-      ),
+    return SvgPicture.asset(
+      'assets/branding/google_g.svg',
+      width: 20,
+      height: 20,
+      semanticsLabel: 'Google',
     );
   }
 }

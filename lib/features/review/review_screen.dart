@@ -433,9 +433,7 @@ class _CardBody extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  deck.tags.isEmpty
-                      ? deck.title
-                      : '${deck.tags.first} · ${deck.title}',
+                  deck.title,
                   style: TextStyle(
                     color: revealed ? AppColors.accent : AppColors.primary,
                     fontSize: 10.5,

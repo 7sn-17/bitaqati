@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
@@ -79,32 +80,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     label: 'رجوع',
                     onTap: () => context.pop(),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          deck.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.texts.headlineSmall,
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          _headerSubtitle(
-                            deck,
-                            isSubDeck,
-                            cards.length,
-                            isPreview,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.texts.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
+                  const Spacer(),
                   if (!isPreview)
                     _RoundButton(
                       icon: CupertinoIcons.ellipsis,
@@ -114,7 +90,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             if (isSubDeck && parent != null) ...<Widget>[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -155,21 +131,25 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            _heroTitle(deck, isSubDeck, isPreview),
-                            maxLines: 1,
+                            deck.title,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 17.5,
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 3),
                           Text(
                             isPreview
                                 ? '${deck.cardCount} بطاقة · ${deck.author}'
-                                : 'نسبة الحفظ ${deck.retention.round()}% · '
-                                      '${deck.dueCount} مستحقة',
+                                : isSubDeck
+                                ? 'نسبة الحفظ ${deck.retention.round()}% · '
+                                      '${deck.dueCount} مستحقة'
+                                : '${deck.children.length} مجموعات فرعية · '
+                                      '${deck.cardCount} بطاقة',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 11.5,
@@ -418,7 +398,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
         )
       else
         for (int index = 0; index < visibleCards.length; index++)
-          _CardRow(card: visibleCards[index], index: index),
+          _CardRow(
+            card: visibleCards[index],
+            index: index,
+            onEdit: () => _editCard(context, visibleCards[index]),
+          ),
     ];
   }
 
@@ -429,6 +413,9 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   void _addSubDeck(BuildContext context, DeckNode deck) {
     if (deck.isPreview) {
       _showPreviewNotice(context);
+      return;
+    }
+    if (!ensureCanCreate(context, ref)) {
       return;
     }
     if (!deck.canHoldSubDecks) {
@@ -443,6 +430,9 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   }
 
   void _addCard(BuildContext context, DeckNode deck) {
+    if (!ensureCanCreate(context, ref)) {
+      return;
+    }
     if (!deck.canHoldCards) {
       showAppMessage(
         context,
@@ -452,6 +442,13 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     showCardEditorSheet(context, deckId: deck.id);
+  }
+
+  Future<void> _editCard(BuildContext context, ReviewCard card) async {
+    final ReviewCard? updated = await showCardEditSheet(context, card);
+    if (updated != null && context.mounted) {
+      showAppMessage(context, 'تم تحديث البطاقة.');
+    }
   }
 
   void _showActions(BuildContext screenContext, DeckNode deck) {
@@ -518,31 +515,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               card.tags.any((String tag) => tag.contains(needle)),
         )
         .toList(growable: false);
-  }
-
-  String _headerSubtitle(
-    DeckNode deck,
-    bool isSubDeck,
-    int cardTotal,
-    bool isPreview,
-  ) {
-    if (isPreview) {
-      return '${deck.cardCount} بطاقة · ${deck.author}';
-    }
-    if (isSubDeck) {
-      return '$cardTotal بطاقة · ${deck.isPublic ? 'عامة' : 'خاصة'}';
-    }
-    return '${deck.children.length} مجموعات فرعية · ${deck.cardCount} بطاقة';
-  }
-
-  String _heroTitle(DeckNode deck, bool isSubDeck, bool isPreview) {
-    if (isPreview) {
-      return deck.tags.isEmpty ? 'من المكتبة العامة' : deck.tags.join(' · ');
-    }
-    if (isSubDeck) {
-      return deck.tags.isEmpty ? 'مجموعة فرعية' : deck.tags.join(' · ');
-    }
-    return deck.tags.isEmpty ? 'مجموعة رئيسية' : deck.tags.join(' · ');
   }
 
   void _showComingSoon(BuildContext context, String feature) {
@@ -757,70 +729,212 @@ class _Tabs extends StatelessWidget {
 }
 
 class _CardRow extends StatelessWidget {
-  const _CardRow({required this.card, required this.index});
+  const _CardRow({
+    required this.card,
+    required this.index,
+    required this.onEdit,
+  });
 
   final ReviewCard card;
   final int index;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final List<Color> stateColors = <Color>[
-      AppColors.blue,
-      AppColors.danger,
-      AppColors.primary,
-    ];
+    final List<Color> stateColors = context.isDark
+        ? const <Color>[
+            Color(0xFF7CB8DE),
+            Color(0xFFFF9A9E),
+            AppColors.accent,
+          ]
+        : const <Color>[
+            AppColors.blue,
+            AppColors.danger,
+            AppColors.primary,
+          ];
     final List<String> stateLabels = <String>['جديدة', 'تعلّم', 'راسخة'];
     final int state = card.stateIndex;
+    final Color stateColor = stateColors[state];
+    final String front = card.front.trim().isEmpty
+        ? 'بدون نص'
+        : card.front.trim();
+    final String back = card.back.trim();
+    final Color surface = context.isDark
+        ? AppColors.darkSurfaceHigh
+        : Colors.white;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 14),
         decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: context.colors.outlineVariant,
-              width: 0.7,
+          color: surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: context.colors.outlineVariant.withValues(
+              alpha: context.isDark ? 0.45 : 0.7,
             ),
           ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(
+                alpha: context.isDark ? 0.22 : 0.05,
+              ),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentSoft,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: stateColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  stateLabels[state],
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: stateColor,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(CupertinoIcons.pencil, size: 14),
+                  label: const Text('تعديل'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: context.colors.primary,
+                    minimumSize: const Size(64, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
             Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: stateColors[state],
-                  shape: BoxShape.circle,
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Text(
+                front,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: context.texts.titleMedium?.copyWith(
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(card.front, style: context.texts.titleSmall),
-                  const SizedBox(height: 2),
-                  Text(
-                    card.back,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.texts.bodySmall,
+            if (back.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? AppColors.darkCanvas
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: context.colors.outlineVariant.withValues(alpha: 0.6),
                   ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(
+                        CupertinoIcons.reply,
+                        size: 14,
+                        color: context.texts.bodySmall?.color,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        back,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.texts.bodySmall?.copyWith(height: 1.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (card.tags.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: <Widget>[
+                  for (final String tag in card.tags.take(3))
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentSoft.withValues(
+                          alpha: context.isDark ? 0.18 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                          color: context.isDark
+                              ? AppColors.accent
+                              : AppColors.primary,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(stateLabels[state], style: context.texts.labelSmall),
+            ],
           ],
         ),
       ),
     );
   }
 }
+
 
 class _TabPlaceholder extends StatelessWidget {
   const _TabPlaceholder({

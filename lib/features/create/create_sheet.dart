@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
@@ -17,7 +19,7 @@ Future<void> showCreateSheet(BuildContext context) {
   );
 }
 
-class _CreateSheet extends StatelessWidget {
+class _CreateSheet extends ConsumerWidget {
   const _CreateSheet({required this.parentContext});
 
   /// Context of the screen that opened the sheet. It stays mounted after the
@@ -25,7 +27,7 @@ class _CreateSheet extends StatelessWidget {
   final BuildContext parentContext;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final Color surface = context.isDark
         ? AppColors.darkSurfaceHigh
         : Colors.white;
@@ -71,13 +73,13 @@ class _CreateSheet extends StatelessWidget {
                 icon: CupertinoIcons.rectangle_stack,
                 title: 'مجموعة جديدة',
                 subtitle: 'نظّم بطاقاتك حسب المادة والفصل',
-                onTap: () => _openDeckEditor(context),
+                onTap: () => _openDeckEditor(context, ref),
               ),
               _Option(
                 icon: CupertinoIcons.doc_text,
                 title: 'بطاقة جديدة',
                 subtitle: 'أساسية، إخفاء كلمة، اختيار، أو صورة',
-                onTap: () => _openCardEditor(context),
+                onTap: () => _openCardEditor(context, ref),
               ),
               _Option(
                 icon: CupertinoIcons.text_alignleft,
@@ -105,13 +107,19 @@ class _CreateSheet extends StatelessWidget {
     );
   }
 
-  void _openDeckEditor(BuildContext context) {
+  void _openDeckEditor(BuildContext context, WidgetRef ref) {
     Navigator.of(context).pop();
+    if (!ensureCanCreate(parentContext, ref)) {
+      return;
+    }
     showDeckEditorSheet(parentContext);
   }
 
-  void _openCardEditor(BuildContext context) {
+  void _openCardEditor(BuildContext context, WidgetRef ref) {
     Navigator.of(context).pop();
+    if (!ensureCanCreate(parentContext, ref)) {
+      return;
+    }
     showCardEditorSheet(parentContext);
   }
 

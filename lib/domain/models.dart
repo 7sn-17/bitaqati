@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// Icons a deck can use. The key is what gets stored in `decks.icon`.
+///
+/// The keys are stable: never rename one without a data migration, because
+/// existing decks reference them by name.
 const Map<String, IconData> kDeckIcons = <String, IconData>{
   'layers': Icons.layers_rounded,
   'bolt': Icons.bolt_rounded,
@@ -14,9 +17,28 @@ const Map<String, IconData> kDeckIcons = <String, IconData>{
   'medical': Icons.medical_services_rounded,
   'palette': Icons.palette_rounded,
   'globe': Icons.public_rounded,
+  'psychology': Icons.psychology_rounded,
+  'functions': Icons.functions_rounded,
+  'numbers': Icons.exposure_rounded,
+  'gavel': Icons.gavel_rounded,
+  'business': Icons.business_center_rounded,
+  'music': Icons.music_note_rounded,
+  'computer': Icons.computer_rounded,
+  'architecture': Icons.straighten_rounded,
+  'lightbulb': Icons.lightbulb_rounded,
+  'quiz': Icons.live_help_rounded,
+  'travel': Icons.flight_takeoff_rounded,
+  'law': Icons.account_balance_rounded,
+  'health': Icons.favorite_rounded,
+  'agriculture': Icons.eco_rounded,
+  'astronomy': Icons.wb_sunny_rounded,
+  'sports': Icons.sports_soccer_rounded,
 };
 
 /// Colours offered in the deck editor. The first one is the default.
+///
+/// Every entry is dark enough for the white icon and label used on the deck
+/// hero card, in both light and dark themes.
 const List<Color> kDeckColors = <Color>[
   Color(0xFF163300),
   Color(0xFF054D28),
@@ -26,6 +48,16 @@ const List<Color> kDeckColors = <Color>[
   Color(0xFF8A5A00),
   Color(0xFF1F6F78),
   Color(0xFF9C2F5B),
+  Color(0xFF6B21A8),
+  Color(0xFF0F766E),
+  Color(0xFFB45309),
+  Color(0xFFBE123C),
+  Color(0xFF1E3A8A),
+  Color(0xFF3F6212),
+  Color(0xFF831843),
+  Color(0xFF0C4A6E),
+  Color(0xFF334155),
+  Color(0xFF1F2937),
 ];
 
 const String kDefaultDeckColorHex = '#163300';

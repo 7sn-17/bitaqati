@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/guest_guard.dart';
 import '../../core/widgets/glass_tab_bar.dart';
 import '../../data/content_providers.dart';
 import '../create/create_sheet.dart';
@@ -35,7 +36,12 @@ class AppShell extends ConsumerWidget {
                     initialLocation: index == navigationShell.currentIndex,
                   );
                 },
-                onCreate: () => showCreateSheet(context),
+                onCreate: () {
+                  if (!ensureCanCreate(context, ref)) {
+                    return;
+                  }
+                  showCreateSheet(context);
+                },
               ),
             ),
         ],

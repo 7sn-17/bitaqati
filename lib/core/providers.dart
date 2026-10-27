@@ -65,8 +65,11 @@ class LanguageNotifier extends Notifier<Locale> {
 
   @override
   Locale build() {
-    final String? saved = ref.watch(sharedPreferencesProvider).getString(_key);
-    return Locale(saved == 'en' ? 'en' : 'ar');
+    // The app ships Arabic-only until the full localization pass, and the
+    // language switch is hidden in Settings. Ignore any value persisted by an
+    // earlier build so the UI can never be stuck in English/LTR with Arabic
+    // copy and no way back.
+    return const Locale('ar');
   }
 
   /// Switches the locale and text direction. Full English copy lands with the
