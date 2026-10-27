@@ -336,7 +336,7 @@ class _WriteTopBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      'سؤال ${index + 1} من ${total}',
+                      'سؤال ${index + 1} من $total',
                       style: TextStyle(
                         color: context.ink,
                         fontSize: 13,
@@ -810,7 +810,7 @@ class _WriteResult extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${correct} من ${total}',
+                  '$correct من $total',
                   style: TextStyle(
                     fontFamily: 'ReadexPro',
                     fontSize: 12,
