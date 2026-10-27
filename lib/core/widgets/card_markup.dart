@@ -73,13 +73,8 @@ List<InlineSpan> markupSpans(
   bool highlightCloze = true,
 }) {
   final RegExp combined = RegExp(
-    kClozeRegex.pattern +
-        '|' +
-        kImageRegex.pattern +
-        '|' +
-        kAudioRegex.pattern +
-        '|' +
-        kInlineRegex.pattern,
+    '${kClozeRegex.pattern}|${kImageRegex.pattern}'
+    '|${kAudioRegex.pattern}|${kInlineRegex.pattern}',
   );
   final List<InlineSpan> spans = <InlineSpan>[];
   int cursor = 0;
@@ -120,7 +115,7 @@ List<InlineSpan> markupSpans(
       final String label = image.group(1) ?? '';
       spans.add(
         TextSpan(
-          text: label.isEmpty ? ' 🖼 صورة ' : ' 🖼 ' + label + ' ',
+          text: label.isEmpty ? ' 🖼 صورة ' : ' 🖼 $label ',
           style: TextStyle(
             color: context.brandInk,
             fontWeight: FontWeight.w600,

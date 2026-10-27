@@ -237,7 +237,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       final String prefix = at > 0 && !text.substring(0, at).endsWith('\n')
           ? '\n'
           : '';
-      final String inserted = prefix + media.markup + '\n';
+      final String inserted = '$prefix${media.markup}\n';
       controller.value = TextEditingValue(
         text: text.replaceRange(at, at, inserted),
         selection: TextSelection.collapsed(offset: at + inserted.length),
@@ -305,7 +305,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
   String _resolvedFront() {
     if (_kind == _CardKind.occlusion) {
-      return '![تغطية](' + (_imageUrl ?? '') + ')';
+      return '![تغطية](${_imageUrl ?? ''})';
     }
     return _front.text.trim();
   }
@@ -979,7 +979,7 @@ class _DeckBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'في: ' + deck.title,
+              'في: ${deck.title}',
               style: context.texts.titleSmall,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1319,7 +1319,7 @@ class _ClozeHelper extends StatelessWidget {
               Text(
                 count == 0
                     ? 'لا يوجد فراغ بعد'
-                    : 'عدد الفراغات: ' + count.toString(),
+                    : 'عدد الفراغات: $count',
                 style: context.texts.labelSmall?.copyWith(
                   color: context.brandInk,
                   fontWeight: FontWeight.w600,

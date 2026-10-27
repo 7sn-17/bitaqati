@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../data/content_providers.dart';
@@ -193,7 +194,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
       return;
     }
     final String? message = await context.push<String>(
-      '/edit-card/' + card.id + '?deckId=' + card.deckId,
+      '/edit-card/${card.id}?deckId=${card.deckId}',
     );
     if (message == null || !mounted) {
       return;

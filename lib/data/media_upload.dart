@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -67,7 +66,7 @@ class MediaUploadService {
   }
 
   Future<PickedMedia?> pickAudio() async {
-    final List<PlatformFile> files = await FilePicker.platform.pickFiles(
+    final List<PlatformFile> files = await FilePicker.pickFiles(
       type: FileType.audio,
       allowMultiple: false,
       dialogTitle: 'اختر ملفاً صوتياً',
@@ -111,7 +110,7 @@ class MediaUploadService {
     }
     final String fallback = localPath == null || localPath.isEmpty
         ? ''
-        : 'file://' + localPath;
+        : 'file://$localPath';
     return PickedMedia(
       url: fallback,
       name: fileName,
@@ -136,8 +135,7 @@ class MediaUploadService {
       if (user == null) {
         return null;
       }
-      final String path =
-          user.id + '/' + _uuid.v4() + '.' + extension;
+      final String path = '${user.id}/${_uuid.v4()}.$extension';
       await client.storage
           .from(kCardMediaBucket)
           .uploadBinary(
@@ -207,7 +205,7 @@ class MediaUploadService {
       return;
     }
     try {
-      final int index = url.indexOf(kCardMediaBucket + '/');
+      final int index = url.indexOf('$kCardMediaBucket/');
       if (index == -1) {
         return;
       }

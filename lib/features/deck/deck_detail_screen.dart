@@ -816,7 +816,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     final String? message = await context.push<String>(
-      '/create-card?deckId=' + deck.id,
+      '/create-card?deckId=${deck.id}',
     );
     if (message != null && context.mounted) {
       showAppMessage(context, message);
@@ -833,7 +833,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     final String? message = await context.push<String>(
-      '/edit-card/' + card.id + '?deckId=' + card.deckId,
+      '/edit-card/${card.id}?deckId=${card.deckId}',
     );
     if (message != null && context.mounted) {
       showAppMessage(context, message);
@@ -2045,7 +2045,7 @@ class _DeckStatisticsTab extends ConsumerWidget {
                         return;
                       }
                       final String? message = await context.push<String>(
-                        '/create-card?deckId=' + deck.id,
+                        '/create-card?deckId=${deck.id}',
                       );
                       if (message != null && context.mounted) {
                         showAppMessage(context, message);

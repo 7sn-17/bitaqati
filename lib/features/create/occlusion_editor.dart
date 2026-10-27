@@ -212,7 +212,7 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
               ),
             ),
             Text(
-              '\u200E' + widget.boxes.length.toString() + ' تغطية',
+              '\u200E${widget.boxes.length} تغطية',
               style: context.texts.labelSmall?.copyWith(
                 color: context.brandInk,
                 fontWeight: FontWeight.w700,

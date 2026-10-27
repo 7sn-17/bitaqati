@@ -23,11 +23,11 @@ abstract final class AppConfig {
   /// Universal share link. Opens the app when it is installed (Android App
   /// Links / iOS Universal Links) and the web preview otherwise.
   static String deckShareLink(String deckId) =>
-      'https://' + shareHost + '/deck/' + deckId;
+      'https://$shareHost/deck/$deckId';
 
   /// Legacy custom-scheme link, still recognised when opened.
   static String legacyDeckShareLink(String deckId) =>
-      shareScheme + '://deck/' + deckId;
+      '$shareScheme://deck/$deckId';
 
   /// Extracts a deck id from a share link, or null for unrelated links.
   ///
@@ -43,7 +43,7 @@ abstract final class AppConfig {
     }
     final bool web =
         (uri.scheme == 'https' || uri.scheme == 'http') &&
-        (uri.host == shareHost || uri.host == 'www.' + shareHost);
+        (uri.host == shareHost || uri.host == 'www.$shareHost');
     if (!web) {
       return null;
     }
