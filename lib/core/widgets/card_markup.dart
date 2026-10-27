@@ -23,9 +23,7 @@ final RegExp kAudioRegex = RegExp(
 final RegExp kInlineRegex = RegExp(
   r'(\*\*[^*]+\*\*|(?<![A-Za-z0-9])_[^_]+_(?![A-Za-z0-9])|\$[^$]+\$)',
 );
-final RegExp kSingleImageRegex = RegExp(
-  r'^!\[([^\]]*)\]\(([^)]+)\)$',
-);
+final RegExp kSingleImageRegex = RegExp(r'^!\[([^\]]*)\]\(([^)]+)\)$');
 
 /// True when [text] is one image attachment and nothing else.
 bool isImageOnly(String text) => kSingleImageRegex.hasMatch(text.trim());
@@ -227,9 +225,13 @@ class CardMarkup extends StatelessWidget {
         final String token = match.group(0)!;
         final RegExpMatch? image = kImageRegex.firstMatch(token);
         if (image != null) {
-          leading.add(CardImage(url: image.group(2) ?? '', height: mediaHeight));
+          leading.add(
+            CardImage(url: image.group(2) ?? '', height: mediaHeight),
+          );
         } else {
-          leading.add(AudioAttachment(url: kAudioRegex.firstMatch(token)?.group(2) ?? ''));
+          leading.add(
+            AudioAttachment(url: kAudioRegex.firstMatch(token)?.group(2) ?? ''),
+          );
         }
         leading.add(const SizedBox(height: 10));
       }
@@ -436,10 +438,22 @@ class AudioAttachment extends StatelessWidget {
   }
 }
 
-/// Live editor controller: keeps the stored text untouched but paints the
-/// markers, so bold, italic and maths are visible while typing.
+/// Live editor controller: keeps the stored text untouched but paints it the
+/// way it will be read.
+///
+/// Bold is bold, italic is italic, maths is monospace, and a cloze deletion is
+/// a highlighted box rather than a pair of braces. The markers themselves are
+/// drawn at 30% opacity, so they are still selectable and editable but stop
+/// competing with the words. This is what makes the editor WYSIWYG without
+/// moving the card body to a rich-text document format — the stored string is
+/// still the same markup every other screen already renders.
 class MarkupTextController extends TextEditingController {
   MarkupTextController({super.text});
+
+  /// Cloze, inline formatting, in one pass, left to right.
+  static final RegExp _token = RegExp(
+    '${kClozeRegex.pattern}|${kInlineRegex.pattern}',
+  );
 
   @override
   TextSpan buildTextSpan({
@@ -449,23 +463,39 @@ class MarkupTextController extends TextEditingController {
   }) {
     final TextStyle base = style ?? const TextStyle();
     final TextStyle marker = base.copyWith(
-      color: base.color?.withValues(alpha: 0.35),
+      color: base.color?.withValues(alpha: 0.3),
       fontWeight: FontWeight.w400,
       fontStyle: FontStyle.normal,
+      backgroundColor: null,
     );
     final List<InlineSpan> spans = <InlineSpan>[];
     int cursor = 0;
-    for (final RegExpMatch match in kInlineRegex.allMatches(text)) {
+    for (final RegExpMatch match in _token.allMatches(text)) {
       if (match.start > cursor) {
         spans.add(TextSpan(text: text.substring(cursor, match.start)));
       }
       final String token = match.group(0)!;
-      if (token.startsWith('**')) {
+      final RegExpMatch? cloze = kClozeRegex.firstMatch(token);
+      if (cloze != null) {
+        final int bodyAt = token.indexOf('::') + 2;
+        spans.add(TextSpan(text: token.substring(0, bodyAt), style: marker));
+        spans.add(
+          TextSpan(
+            text: cloze.group(1) ?? '',
+            style: base.copyWith(
+              fontWeight: FontWeight.w700,
+              color: context.brandInk,
+              backgroundColor: context.softAccent,
+            ),
+          ),
+        );
+        spans.add(TextSpan(text: '}}', style: marker));
+      } else if (token.startsWith('**')) {
         spans.add(TextSpan(text: '**', style: marker));
         spans.add(
           TextSpan(
             text: token.substring(2, token.length - 2),
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: base.copyWith(fontWeight: FontWeight.w700),
           ),
         );
         spans.add(TextSpan(text: '**', style: marker));
@@ -474,7 +504,7 @@ class MarkupTextController extends TextEditingController {
         spans.add(
           TextSpan(
             text: token.substring(1, token.length - 1),
-            style: const TextStyle(fontStyle: FontStyle.italic),
+            style: base.copyWith(fontStyle: FontStyle.italic),
           ),
         );
         spans.add(TextSpan(text: '_', style: marker));
@@ -483,7 +513,7 @@ class MarkupTextController extends TextEditingController {
         spans.add(
           TextSpan(
             text: token.substring(1, token.length - 1),
-            style: TextStyle(
+            style: base.copyWith(
               fontFamily: 'monospace',
               fontWeight: FontWeight.w600,
               color: context.brandInk,
@@ -658,11 +688,7 @@ class _OcclusionViewState extends State<OcclusionView> {
                   final Size size = Size(constraints.maxWidth, widget.height);
                   return Stack(
                     children: <Widget>[
-                      for (
-                        int index = 0;
-                        index < widget.boxes.length;
-                        index++
-                      )
+                      for (int index = 0; index < widget.boxes.length; index++)
                         Positioned.fromRect(
                           rect: widget.boxes[index].toRect(size),
                           child: _OcclusionMask(

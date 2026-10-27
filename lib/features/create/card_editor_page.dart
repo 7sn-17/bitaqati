@@ -65,6 +65,31 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
   String? _imageUrl;
   List<OcclusionBox> _boxes = <OcclusionBox>[];
 
+  /// Attachments, kept beside the text rather than inside it.
+  ///
+  /// The stored format is still inline markup — the review screen, the card
+  /// list and the public library all render it — but the editor never shows a
+  /// URL: a picture is a thumbnail and a recording is a chip, and the markup is
+  /// assembled only on save.
+  final List<_Attachment> _frontMedia = <_Attachment>[];
+  final List<_Attachment> _backMedia = <_Attachment>[];
+
+  /// Which field the toolbar formats.
+  ///
+  /// Tapping a toolbar button moves focus off the text field, so asking "which
+  /// field has focus" at that moment answers "neither" — and the old code then
+  /// formatted the front field while the user was writing the back one. The
+  /// last field the writer actually touched is remembered instead.
+  bool _frontActive = true;
+
+  /// The last real selection in each field.
+  ///
+  /// Tapping a toolbar button can collapse the caret before the button's
+  /// callback runs. Remembering the highlighted range is what makes «عريض» act
+  /// on the word the writer selected instead of on an empty cursor.
+  TextSelection? _frontSelection;
+  TextSelection? _backSelection;
+
   /// One controller per box, kept in step with [_boxes] so the answer fields
   /// survive a rebuild when a box is added, moved or deleted.
   final List<TextEditingController> _boxControllers = <TextEditingController>[];
@@ -105,12 +130,25 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
   }
 
   void _refresh() {
+    final TextSelection front = _front.selection;
+    if (front.isValid && !front.isCollapsed) {
+      _frontSelection = front;
+    }
+    final TextSelection back = _back.selection;
+    if (back.isValid && !back.isCollapsed) {
+      _backSelection = back;
+    }
     if (mounted) {
       setState(() {});
     }
   }
 
   void _onFocusChange() {
+    if (_frontFocus.hasFocus) {
+      _frontActive = true;
+    } else if (_backFocus.hasFocus) {
+      _frontActive = false;
+    }
     if (mounted) {
       setState(() {});
     }
@@ -146,8 +184,16 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     }
     _hydrated = true;
     _deckId = found.deckId;
-    _front.text = found.front;
-    _back.text = found.back;
+    _frontMedia.clear();
+    _backMedia.clear();
+    if (found.type == 'occlusion') {
+      // An occlusion front *is* its image, so it stays in _imageUrl.
+      _front.text = '';
+      _back.text = found.back;
+    } else {
+      _front.text = _splitMedia(found.front, _frontMedia);
+      _back.text = _splitMedia(found.back, _backMedia);
+    }
     _hint.text = found.hint ?? '';
     _note.text = found.note ?? '';
     _tags = List<String>.of(found.tags);
@@ -174,8 +220,15 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
   /// Copies a draft into the controllers. Mirrors [_hydrate], but the content
   /// comes from memory instead of the database.
   void _applyDraft(CardDraft draft) {
-    _front.text = draft.front;
-    _back.text = draft.back;
+    _frontMedia.clear();
+    _backMedia.clear();
+    if (draft.type == 'occlusion') {
+      _front.text = '';
+      _back.text = draft.back;
+    } else {
+      _front.text = _splitMedia(draft.front, _frontMedia);
+      _back.text = _splitMedia(draft.back, _backMedia);
+    }
     _hint.text = draft.hint;
     _note.text = draft.note;
     _tags = List<String>.of(draft.tags);
@@ -206,7 +259,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     );
   }
 
-  MarkupTextController get _activeField => _backFocus.hasFocus ? _back : _front;
+  MarkupTextController get _activeField => _frontActive ? _front : _back;
 
   String get _typeName {
     switch (_kind) {
@@ -221,14 +274,48 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
   // --------------------------------------------------------------- editing --
 
+  /// Turns the selection into a cloze deletion, and makes the card a cloze
+  /// card if it was not one already.
+  ///
+  /// This is the whole flow the writer sees: select a word, tap «فراغ», and the
+  /// word becomes a blank. The `{{c1::…}}` form is an implementation detail
+  /// that stays visible only as a highlighted box in the field.
+  void _makeCloze() {
+    if (_kind == _CardKind.occlusion) {
+      return;
+    }
+    setState(() {
+      _kind = _CardKind.cloze;
+      _frontActive = true;
+    });
+    _toggleWrap('{{c1::', '}}', 'الإجابة', controller: _front);
+    _frontFocus.requestFocus();
+  }
+
   /// Wraps or unwraps the selection with [open]/[close].
-  void _toggleWrap(String open, String close, String placeholder) {
-    final MarkupTextController controller = _activeField;
-    final TextEditingValue value = controller.value;
+  void _toggleWrap(
+    String open,
+    String close,
+    String placeholder, {
+    MarkupTextController? controller,
+  }) {
+    final MarkupTextController target = controller ?? _activeField;
+    final TextEditingValue value = target.value;
     final String text = value.text;
     final TextSelection selection = value.selection;
-    final int start = selection.isValid ? selection.start : text.length;
-    final int end = selection.isValid ? selection.end : text.length;
+    final TextSelection? remembered = target == _front
+        ? _frontSelection
+        : _backSelection;
+    final bool reuse =
+        (!selection.isValid || selection.isCollapsed) &&
+        remembered != null &&
+        remembered.end <= text.length;
+    final int start = reuse
+        ? remembered.start
+        : (selection.isValid ? selection.start : text.length);
+    final int end = reuse
+        ? remembered.end
+        : (selection.isValid ? selection.end : text.length);
     final String selected = text.substring(start, end);
     final String before = text.substring(0, start);
     final String after = text.substring(end);
@@ -238,7 +325,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
           before.substring(0, before.length - open.length) +
           selected +
           after.substring(close.length);
-      controller.value = TextEditingValue(
+      target.value = TextEditingValue(
         text: next,
         selection: TextSelection(
           baseOffset: start - open.length,
@@ -254,7 +341,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         open.length,
         selected.length - close.length,
       );
-      controller.value = TextEditingValue(
+      target.value = TextEditingValue(
         text: text.replaceRange(start, end, inner),
         selection: TextSelection(
           baseOffset: start,
@@ -265,7 +352,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     }
     final String body = selected.isEmpty ? placeholder : selected;
     final String inserted = open + body + close;
-    controller.value = TextEditingValue(
+    target.value = TextEditingValue(
       text: text.replaceRange(start, end, inserted),
       selection: selected.isEmpty
           ? TextSelection(
@@ -307,24 +394,19 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         });
         return;
       }
-      final MarkupTextController controller = _activeField;
-      final TextSelection selection = controller.selection;
-      final int at = selection.isValid ? selection.end : controller.text.length;
-      final String text = controller.text;
-      final String prefix = at > 0 && !text.substring(0, at).endsWith('\n')
-          ? '\n'
-          : '';
-      final String inserted = '$prefix${media.markup}\n';
-      controller.value = TextEditingValue(
-        text: text.replaceRange(at, at, inserted),
-        selection: TextSelection.collapsed(offset: at + inserted.length),
-      );
-      if (!media.uploaded) {
-        setState(
-          () => _error =
-              'تم إرفاق الملف محلياً. سيُرفع إلى السحابة عند توفر الاتصال.',
+      setState(() {
+        (_frontActive ? _frontMedia : _backMedia).add(
+          _Attachment(
+            markup: media.markup,
+            url: media.url,
+            image: media.isImage,
+            name: media.name,
+          ),
         );
-      }
+        _error = media.uploaded
+            ? null
+            : 'تم إرفاق الملف محلياً. سيُرفع إلى السحابة عند توفر الاتصال.';
+      });
     } catch (_) {
       if (mounted) {
         setState(() => _error = 'تعذّر إرفاق الملف. حاول مرة أخرى.');
@@ -352,15 +434,99 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     }
   }
 
-  /// Drops one `![..](..)` or `[صوت](..)` token from whichever field holds it.
-  void _removeMedia(String markup) {
+  /// Detaches one attachment. The markup only exists on save, so there is no
+  /// token to hunt for in the text any more.
+  void _removeMedia(_Attachment item) {
     setState(() {
-      if (_front.text.contains(markup)) {
-        _front.text = _front.text.replaceFirst(markup, '').trimRight();
-      } else if (_back.text.contains(markup)) {
-        _back.text = _back.text.replaceFirst(markup, '').trimRight();
-      }
+      _frontMedia.remove(item);
+      _backMedia.remove(item);
     });
+  }
+
+  /// Pulls every `![..](..)` and `[صوت](..)` token out of [text].
+  ///
+  /// Used when a stored card is loaded: the field must show prose, not URLs.
+  static String _splitMedia(String text, List<_Attachment> target) {
+    String rest = text;
+    for (final RegExpMatch match in kImageRegex.allMatches(text)) {
+      target.add(
+        _Attachment(
+          markup: match.group(0)!,
+          url: match.group(2) ?? '',
+          image: true,
+          name: match.group(1) ?? '',
+        ),
+      );
+      rest = rest.replaceFirst(match.group(0)!, '');
+    }
+    for (final RegExpMatch match in kAudioRegex.allMatches(text)) {
+      target.add(
+        _Attachment(
+          markup: match.group(0)!,
+          url: match.group(2) ?? '',
+          image: false,
+        ),
+      );
+      rest = rest.replaceFirst(match.group(0)!, '');
+    }
+    return rest.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+  }
+
+  /// Puts the attachments back into the stored markup, after the prose.
+  static String _joinMedia(String text, List<_Attachment> media) {
+    final String body = text.trim();
+    if (media.isEmpty) {
+      return body;
+    }
+    final StringBuffer buffer = StringBuffer(body);
+    for (final _Attachment item in media) {
+      if (buffer.isNotEmpty) {
+        buffer.write('\n');
+      }
+      buffer.write(item.markup);
+    }
+    return buffer.toString().trim();
+  }
+
+  /// Adds a tag without scrolling to the tag section at the bottom.
+  Future<void> _openTagSheet(BuildContext context) async {
+    final TextEditingController input = TextEditingController();
+    final String? value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext sheet) => EditorSheetFrame(
+        title: 'وسم جديد',
+        subtitle: 'الوسوم تُستخدم للتصفية والبحث. افصل بينها بفاصلة.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            TextField(
+              controller: input,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (String text) => Navigator.of(sheet).pop(text),
+              decoration: editorDecoration(
+                context,
+                hint: 'مثال: فيزياء، الفصل الأول',
+              ),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(sheet).pop(input.text),
+                child: const Text('إضافة الوسم'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    input.dispose();
+    if (value != null && value.trim().isNotEmpty) {
+      _addTag(value);
+    }
   }
 
   void _addTag(String raw) {
@@ -411,11 +577,11 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     if (_kind == _CardKind.occlusion) {
       return '![تغطية](${_imageUrl ?? ''})';
     }
-    return _front.text.trim();
+    return _joinMedia(_front.text, _frontMedia);
   }
 
   String _resolvedBack() {
-    final String back = _back.text.trim();
+    final String back = _joinMedia(_back.text, _backMedia);
     if (back.isNotEmpty) {
       return back;
     }
@@ -508,6 +674,8 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     setState(() {
       _front.clear();
       _back.clear();
+      _frontMedia.clear();
+      _backMedia.clear();
       _hint.clear();
       _note.clear();
       _tagInput.clear();
@@ -515,6 +683,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       _imageUrl = null;
       _boxes = <OcclusionBox>[];
       _error = null;
+      _frontActive = true;
     });
     _frontFocus.requestFocus();
   }
@@ -735,9 +904,8 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               onBold: () => _toggleWrap('**', '**', 'نص عريض'),
               onItalic: () => _toggleWrap('_', '_', 'نص مائل'),
               onMath: () => _toggleWrap(r'$', r'$', 'x^2'),
-              onCloze: cloze
-                  ? () => _toggleWrap('{{c1::', '}}', 'الإجابة')
-                  : null,
+              onCloze: _kind == _CardKind.occlusion ? null : _makeCloze,
+              onTags: () => _openTagSheet(context),
               onImage: _uploading ? null : () => _attach(image: true),
               onAudio: _uploading ? null : () => _attach(image: false),
               uploading: _uploading,
@@ -754,17 +922,17 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               decoration: editorDecoration(
                 context,
                 hint: cloze
-                    ? 'مثال: عاصمة فرنسا هي {{c1::باريس}}.'
+                    ? 'اكتب النص، ثم حدّد الكلمة التي تريد حجبها واضغط «فراغ».'
                     : 'اكتب السؤال أو المفهوم…',
                 multiline: true,
               ),
             ),
-            _MediaStrip(text: _front.text, onRemove: _removeMedia),
+            _MediaStrip(items: _frontMedia, onRemove: _removeMedia),
             if (cloze) ...<Widget>[
               const SizedBox(height: 10),
               _ClozeHelper(
                 count: clozeCount(_front.text),
-                onInsert: () => _toggleWrap('{{c1::', '}}', 'الإجابة'),
+                onInsert: _makeCloze,
               ),
             ],
           ],
@@ -786,6 +954,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               onItalic: () => _toggleWrap('_', '_', 'نص مائل'),
               onMath: () => _toggleWrap(r'$', r'$', 'x^2'),
               onCloze: null,
+              onTags: () => _openTagSheet(context),
               onImage: _uploading ? null : () => _attach(image: true),
               onAudio: _uploading ? null : () => _attach(image: false),
               uploading: _uploading,
@@ -804,7 +973,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                 multiline: true,
               ),
             ),
-            _MediaStrip(text: _back.text, onRemove: _removeMedia),
+            _MediaStrip(items: _backMedia, onRemove: _removeMedia),
           ],
         ),
       ),
@@ -1134,28 +1303,32 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
 // ------------------------------------------------------------------ widgets --
 
-class _MediaStrip extends StatelessWidget {
-  const _MediaStrip({required this.text, required this.onRemove});
+/// One attachment, kept beside the text instead of inside it.
+@immutable
+class _Attachment {
+  const _Attachment({
+    required this.markup,
+    required this.url,
+    required this.image,
+    this.name = '',
+  });
 
-  final String text;
-  final ValueChanged<String> onRemove;
+  /// The `![alt](url)` or `[صوت](url)` form written to the database.
+  final String markup;
+
+  final String url;
+  final bool image;
+  final String name;
+}
+
+class _MediaStrip extends StatelessWidget {
+  const _MediaStrip({required this.items, required this.onRemove});
+
+  final List<_Attachment> items;
+  final ValueChanged<_Attachment> onRemove;
 
   @override
   Widget build(BuildContext context) {
-    final List<_MediaChipData> items = <_MediaChipData>[
-      for (final RegExpMatch match in kImageRegex.allMatches(text))
-        _MediaChipData(
-          markup: match.group(0)!,
-          url: match.group(2)!,
-          image: true,
-        ),
-      for (final RegExpMatch match in kAudioRegex.allMatches(text))
-        _MediaChipData(
-          markup: match.group(0)!,
-          url: match.group(2)!,
-          image: false,
-        ),
-    ];
     if (items.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -1165,31 +1338,22 @@ class _MediaStrip extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: <Widget>[
-          for (final _MediaChipData item in items)
-            _MediaChip(item: item, onRemove: () => onRemove(item.markup)),
+          for (final _Attachment item in items)
+            _MediaChip(item: item, onRemove: () => onRemove(item)),
         ],
       ),
     );
   }
 }
 
-class _MediaChipData {
-  const _MediaChipData({
-    required this.markup,
-    required this.url,
-    required this.image,
-  });
-
-  final String markup;
-  final String url;
-  final bool image;
-}
-
-/// A thumbnail plus a remove button, so the writer never sees a raw URL.
+/// A thumbnail plus a remove button.
+///
+/// The URL never reaches the field: the writer sees a 46 px preview and an X,
+/// and the markup is only assembled when the card is saved.
 class _MediaChip extends StatelessWidget {
   const _MediaChip({required this.item, required this.onRemove});
 
-  final _MediaChipData item;
+  final _Attachment item;
   final VoidCallback onRemove;
 
   @override
@@ -1223,7 +1387,17 @@ class _MediaChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(item.image ? 'صورة' : 'صوت', style: context.texts.labelSmall),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 96),
+            child: Text(
+              item.image
+                  ? (item.name.isEmpty ? 'صورة' : item.name)
+                  : 'مقطع صوتي',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.texts.labelSmall,
+            ),
+          ),
           IconButton(
             onPressed: onRemove,
             icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
@@ -1466,6 +1640,7 @@ class _Toolbar extends StatelessWidget {
     required this.onMath,
     required this.onImage,
     required this.onAudio,
+    required this.onTags,
     required this.uploading,
     this.onCloze,
   });
@@ -1476,56 +1651,72 @@ class _Toolbar extends StatelessWidget {
   final VoidCallback? onCloze;
   final VoidCallback? onImage;
   final VoidCallback? onAudio;
+  final VoidCallback onTags;
   final bool uploading;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-      decoration: BoxDecoration(
-        color: context.raisedSurface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: <Widget>[
-          _ToolButton(
-            icon: CupertinoIcons.bold,
-            tooltip: 'عريض',
-            onTap: onBold,
-          ),
-          _ToolButton(
-            icon: CupertinoIcons.italic,
-            tooltip: 'مائل',
-            onTap: onItalic,
-          ),
-          _ToolButton(
-            icon: CupertinoIcons.function,
-            tooltip: 'معادلة',
-            onTap: onMath,
-          ),
-          if (onCloze != null)
+    // A button that takes focus would steal the selection's field, so the
+    // whole row is kept out of the focus tree. Taps still work; focus stays
+    // exactly where the writer left it.
+    return Focus(
+      canRequestFocus: false,
+      descendantsAreFocusable: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        decoration: BoxDecoration(
+          color: context.raisedSurface,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: <Widget>[
             _ToolButton(
-              icon: Icons.data_object,
+              icon: CupertinoIcons.bold,
+              tooltip: 'عريض',
+              onTap: onBold,
+            ),
+            _ToolButton(
+              icon: CupertinoIcons.italic,
+              tooltip: 'مائل',
+              onTap: onItalic,
+            ),
+            _ToolButton(
+              icon: CupertinoIcons.function,
+              tooltip: 'معادلة',
+              onTap: onMath,
+            ),
+            _ToolButton(
+              icon: Icons.rectangle_outlined,
               tooltip: 'فراغ',
-              onTap: onCloze!,
+              onTap: onCloze,
             ),
-          const Spacer(),
-          if (uploading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+            _ToolButton(
+              icon: CupertinoIcons.tag,
+              tooltip: 'وسوم',
+              onTap: onTags,
+            ),
+            const Spacer(),
+            if (uploading)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               ),
+            _ToolButton(
+              icon: CupertinoIcons.photo,
+              tooltip: 'صورة',
+              onTap: onImage,
             ),
-          _ToolButton(
-            icon: CupertinoIcons.photo,
-            tooltip: 'صورة',
-            onTap: onImage,
-          ),
-          _ToolButton(icon: CupertinoIcons.mic, tooltip: 'صوت', onTap: onAudio),
-        ],
+            _ToolButton(
+              icon: CupertinoIcons.mic,
+              tooltip: 'صوت',
+              onTap: onAudio,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1591,7 +1782,8 @@ class _ClozeHelper extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'الصيغة: {{c1::الإجابة}} — الرقم c1 يجمع الفراغات المتشابهة.',
+                  'حدّد كلمة في النص ثم اضغط «فراغ» لتحويلها إلى فراغ. '
+                  'تظهر الكلمة المفرغة مظللة داخل النص.',
                   style: context.texts.bodySmall?.copyWith(
                     color: context.brandInk,
                     height: 1.6,
