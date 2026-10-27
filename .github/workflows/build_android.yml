@@ -53,6 +53,46 @@ jobs:
       - name: Generate launcher icons
         run: dart run flutter_launcher_icons
 
+      - name: Prepare release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          # KEYSTORE_BASE64 is the authoritative keystore whose SHA-1 is
+          # registered in Google Cloud. The committed bitaqati.p12 is only a
+          # fallback for environments where the secret is unavailable.
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/bitaqati.p12
+            echo "Decoded keystore from KEYSTORE_BASE64."
+          elif [ -f bitaqati.p12 ]; then
+            cp bitaqati.p12 android/app/bitaqati.p12
+            echo "Using repository keystore bitaqati.p12."
+          fi
+
+          if [ -f android/app/bitaqati.p12 ] \
+            && [ -n "${KEYSTORE_PASSWORD:-}" ] \
+            && [ -n "${KEY_ALIAS:-}" ] \
+            && [ -n "${KEY_PASSWORD:-}" ]; then
+            chmod 600 android/app/bitaqati.p12
+            {
+              echo "storePassword=${KEYSTORE_PASSWORD}"
+              echo "keyPassword=${KEY_PASSWORD}"
+              echo "keyAlias=${KEY_ALIAS}"
+              echo "storeFile=bitaqati.p12"
+            } > android/key.properties
+            chmod 600 android/key.properties
+            echo "Release signing enabled."
+          else
+            echo "::warning::Release signing secrets are missing; this APK will be debug-signed."
+            if [ "$EVENT_NAME" != "pull_request" ]; then
+              echo "::error::Refusing to publish a debug-signed APK. Set KEYSTORE_PASSWORD, KEY_ALIAS, and KEY_PASSWORD."
+              exit 1
+            fi
+          fi
+
       - name: Check formatting
         continue-on-error: true
         run: dart format --output=none --set-exit-if-changed $(git ls-files 'lib/*.dart')
@@ -79,6 +119,29 @@ jobs:
               "dist/bitaqati-${TAG}-${abi}.apk"
           done
           ls -lh dist
+
+      - name: Verify APK signer
+        env:
+          EXPECTED_SHA1: ${{ vars.ANDROID_CERT_SHA1 }}
+        run: |
+          APK="dist/bitaqati-${{ steps.release.outputs.tag }}-arm64-v8a.apk"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          APKSIGNER=$(find "$SDK/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::warning::apksigner not found; cannot print the APK SHA-1."
+            exit 0
+          fi
+          CERT_LINE=$("$APKSIGNER" verify --print-certs "$APK" | grep -m1 "SHA-1 digest" || true)
+          if [ -z "$CERT_LINE" ]; then
+            echo "::warning::Could not read the APK certificate."
+            exit 0
+          fi
+          echo "APK signer: $CERT_LINE"
+          SHA1=$(echo "$CERT_LINE" | awk '{print $NF}')
+          if [ -n "${EXPECTED_SHA1:-}" ] && [ "$SHA1" != "$EXPECTED_SHA1" ]; then
+            echo "::error::APK SHA-1 ($SHA1) does not match ANDROID_CERT_SHA1 ($EXPECTED_SHA1)."
+            exit 1
+          fi
 
       - name: Upload APKs as workflow artifacts
         uses: actions/upload-artifact@v7

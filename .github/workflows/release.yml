@@ -39,6 +39,44 @@ jobs:
       - name: Generate launcher icons
         run: dart run flutter_launcher_icons
 
+      - name: Prepare release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # KEYSTORE_BASE64 is the authoritative keystore whose SHA-1 is
+          # registered in Google Cloud. The committed bitaqati.p12 is only a
+          # fallback for environments where the secret is unavailable.
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/app/bitaqati.p12
+            echo "Decoded keystore from KEYSTORE_BASE64."
+          elif [ -f bitaqati.p12 ]; then
+            cp bitaqati.p12 android/app/bitaqati.p12
+            echo "Using repository keystore bitaqati.p12."
+          else
+            echo "::error::No release keystore available (bitaqati.p12 / KEYSTORE_BASE64)."
+            exit 1
+          fi
+
+          if [ -z "${KEYSTORE_PASSWORD:-}" ] \
+            || [ -z "${KEY_ALIAS:-}" ] \
+            || [ -z "${KEY_PASSWORD:-}" ]; then
+            echo "::error::Missing KEYSTORE_PASSWORD, KEY_ALIAS, or KEY_PASSWORD secrets."
+            exit 1
+          fi
+
+          chmod 600 android/app/bitaqati.p12
+          {
+            echo "storePassword=${KEYSTORE_PASSWORD}"
+            echo "keyPassword=${KEY_PASSWORD}"
+            echo "keyAlias=${KEY_ALIAS}"
+            echo "storeFile=bitaqati.p12"
+          } > android/key.properties
+          chmod 600 android/key.properties
+          echo "Release signing enabled."
+
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed $(git ls-files 'lib/*.dart')
 
@@ -56,6 +94,24 @@ jobs:
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk bitaqati-phase0.apk
           ls -lh bitaqati-phase0.apk
+
+      - name: Verify APK signer
+        env:
+          EXPECTED_SHA1: ${{ vars.ANDROID_CERT_SHA1 }}
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          APKSIGNER=$(find "$SDK/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::warning::apksigner not found; cannot print the APK SHA-1."
+            exit 0
+          fi
+          CERT_LINE=$("$APKSIGNER" verify --print-certs bitaqati-phase0.apk | grep -m1 "SHA-1 digest" || true)
+          echo "APK signer: $CERT_LINE"
+          SHA1=$(echo "$CERT_LINE" | awk '{print $NF}')
+          if [ -n "${EXPECTED_SHA1:-}" ] && [ "$SHA1" != "$EXPECTED_SHA1" ]; then
+            echo "::error::APK SHA-1 ($SHA1) does not match ANDROID_CERT_SHA1 ($EXPECTED_SHA1)."
+            exit 1
+          fi
 
       - name: Publish prerelease
         uses: softprops/action-gh-release@v3

@@ -127,14 +127,16 @@ The AI never writes directly to a user's study deck without confirmation.
 - [x] Public library requires explicit `privacy = 'public'`.
 - [ ] Storage bucket policies (Phase 2).
 - [ ] Rate limiting on AI jobs and auth (Phase 2).
-- [ ] Signed release keystore in GitHub Secrets (Phase 2).
+- [x] Release signing with `bitaqati.p12`; passwords live in GitHub Secrets.
+- [ ] Remove the committed keystore from the repository and rotate it (with a
+  new Google Cloud SHA-1) before a public release.
 
 ## Deployment
 
-- Android package: `app.bitaqati.cards`.
+- Android package: `com.bitaqati.app`.
 - Supabase project ref: `mftghnvtdryxzochquee` (region `eu-central-1`).
-- APK artifacts are produced by GitHub Actions; release signing is added once a
-  keystore is provisioned.
+- APK artifacts are produced by GitHub Actions and signed with `bitaqati.p12`;
+  see `docs/CONFIGURATION.md` for the Google/Supabase client setup.
 
 ## Roadmap
 

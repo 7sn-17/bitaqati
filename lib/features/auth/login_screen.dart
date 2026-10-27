@@ -7,6 +7,7 @@ import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/app_message.dart';
 import '../../data/auth_service.dart';
 
 /// Entry screen shown after onboarding: native Google sign-in or guest mode.
@@ -32,7 +33,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await guestMode.exit();
       // The router redirects to /home once the session is visible.
     } on AuthFailure catch (error) {
-      if (mounted) {
+      if (!mounted) {
+        return;
+      }
+      final bool canceled =
+          error.code == 'canceled' ||
+          error.code == 'sign_in_canceled' ||
+          error.code == '16' ||
+          error.code == '12501';
+      if (canceled) {
+        // A real cancellation is not an error state: no red box, just a short
+        // polite note.
+        showAppMessage(context, error.message, kind: AppMessageKind.info);
+      } else {
         setState(() => _error = error.message);
       }
     } catch (_) {

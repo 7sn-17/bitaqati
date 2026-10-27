@@ -4,7 +4,7 @@
 
 - GitHub repository: <https://github.com/7sn-17/bitaqati> (private, `main`).
 - Supabase project: `bitaqati` / `mftghnvtdryxzochquee` / `eu-central-1` / Free.
-- Flutter Android package: `app.bitaqati.cards`.
+- Flutter Android package: `com.bitaqati.app`.
 - First installable APK: <https://github.com/7sn-17/bitaqati/releases/tag/v0.1.0-phase0>.
 - CI: `Build Android APK` on every push to `main`; `Release APK` on `v*` tags.
 
@@ -52,8 +52,7 @@ empty.
 - Supabase Auth, sync, and storage.
 - AI generation.
 - Real starter card content beyond demo cards.
-- Release keystore (APK currently uses the debug key, installable but not
-  Play-ready).
+- Release keystore (added after Phase 0; CI now signs with `bitaqati.p12`).
 
 ## Next phase (Phase 1)
 

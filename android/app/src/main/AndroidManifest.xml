@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Android application ID: com.bitaqati.app (set by Gradle). It must match
+         the Android OAuth client registered for Google Sign-In. -->
     <!-- Supabase Auth and Google sign-in need network access in release builds. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application

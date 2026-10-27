@@ -17,12 +17,24 @@ abstract final class AppConfig {
     defaultValue: '',
   );
 
-  /// Web OAuth client id. Required on Android: it is the `serverClientId` that
-  /// makes Google return an ID token for Supabase to verify.
-  static const String googleWebClientId = String.fromEnvironment(
+  /// The public Web OAuth client id. This is the `serverClientId` that makes
+  /// Google return an ID token whose audience Supabase can verify.
+  ///
+  /// Client IDs are public identifiers, not secrets. The **Android** client id
+  /// is never used here: it only authorizes the package name and signing
+  /// certificate in Google Cloud.
+  static const String _defaultGoogleWebClientId =
+      '610940162017-ohe2ei9dkkj96cai8gqu0i2jmgbspd8b.apps.googleusercontent.com';
+
+  /// Optional build-time override. An empty `--dart-define` (the usual result
+  /// of a missing CI secret) must not erase the safe default.
+  static const String _googleWebClientIdOverride = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '',
   );
+
+  static String get googleWebClientId => _googleWebClientIdOverride.isEmpty
+      ? _defaultGoogleWebClientId
+      : _googleWebClientIdOverride;
 
   /// iOS OAuth client id. Only used on iOS builds.
   static const String googleIosClientId = String.fromEnvironment(
