@@ -1805,23 +1805,26 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The badge is a wash of its own colour, so a deep tone would be dark on
+    // dark. The lifted tone drives the wash, the icon and the label together.
+    final Color ink = context.legible(info.color);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: info.color.withValues(alpha: context.isDark ? 0.2 : 0.12),
+        color: ink.withValues(alpha: context.isDark ? 0.18 : 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(info.icon, size: 10, color: info.color),
+          Icon(info.icon, size: 10, color: ink),
           const SizedBox(width: 3),
           Text(
             info.label,
             style: TextStyle(
               fontSize: 9.5,
               fontWeight: FontWeight.w600,
-              color: info.color,
+              color: ink,
             ),
           ),
         ],
@@ -2381,13 +2384,13 @@ class _PrivacyCard extends StatelessWidget {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
+                  color: context.softAccent,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   CupertinoIcons.square_arrow_up,
                   size: 18,
-                  color: AppColors.primary,
+                  color: context.onSoftAccent,
                 ),
               ),
               const SizedBox(width: 10),

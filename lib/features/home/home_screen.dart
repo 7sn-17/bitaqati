@@ -430,9 +430,15 @@ class _LibraryBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color background = context.isDark
+    // The brand green is a hole in a dark banner, so in dark mode the pair
+    // flips: a lime mark with green ink on it, which is the same contrast
+    // the light theme gets from green on lime.
+    final bool dark = context.isDark;
+    final Color background = dark
         ? AppColors.darkSurfaceHigh
         : AppColors.accentSoft;
+    final Color markFill = dark ? AppColors.accent : AppColors.primary;
+    final Color markInk = dark ? AppColors.primary : AppColors.accent;
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -444,15 +450,8 @@ class _LibraryBanner extends StatelessWidget {
           Container(
             width: 46,
             height: 46,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              CupertinoIcons.book,
-              color: AppColors.accent,
-              size: 22,
-            ),
+            decoration: BoxDecoration(color: markFill, shape: BoxShape.circle),
+            child: Icon(CupertinoIcons.book, color: markInk, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -474,8 +473,8 @@ class _LibraryBanner extends StatelessWidget {
             style: FilledButton.styleFrom(
               minimumSize: const Size(0, 40),
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
+              backgroundColor: markFill,
+              foregroundColor: markInk,
               textStyle: const TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
                 fontSize: 13,

@@ -76,8 +76,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             child: const Text('إلغاء'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.of(dialog).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(dialog).pop(controller.text.trim()),
             child: const Text('فتح'),
           ),
         ],
@@ -151,9 +150,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<List<DeckNode>> catalog = ref.watch(
-      libraryDecksProvider,
-    );
+    final AsyncValue<List<DeckNode>> catalog = ref.watch(libraryDecksProvider);
     final List<DeckNode> all = catalog.valueOrNull ?? const <DeckNode>[];
     final String? selected = ref.watch(libraryTagProvider);
     final List<LibraryTag> tags = buildLibraryTags(all);
@@ -200,10 +197,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ],
                     ),
                   ),
-                  _RefreshButton(
-                    busy: catalog.isLoading,
-                    onTap: _refresh,
-                  ),
+                  _RefreshButton(busy: catalog.isLoading, onTap: _refresh),
                 ],
               ),
             ),
@@ -310,10 +304,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         style: context.texts.titleLarge,
                       ),
                     ),
-                    Text(
-                      '${decks.length}',
-                      style: context.texts.bodySmall,
-                    ),
+                    Text('${decks.length}', style: context.texts.bodySmall),
                   ],
                 ),
               ),
@@ -381,9 +372,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   child: DeckCard(
                     deck: deck,
                     showAuthor: true,
-                    onTap: () => context.push(
-                      '/deck/${installed[deck.id] ?? deck.id}',
-                    ),
+                    onTap: () =>
+                        context.push('/deck/${installed[deck.id] ?? deck.id}'),
                     trailing: installed.containsKey(deck.id)
                         ? _InstalledButton(
                             onTap: () =>
@@ -419,16 +409,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           deck.title.toLowerCase().contains(needle) ||
           deck.description.toLowerCase().contains(needle) ||
           (deck.author ?? '').toLowerCase().contains(needle) ||
-          deck.tags.any(
-            (String tag) => tag.toLowerCase().contains(needle),
-          );
+          deck.tags.any((String tag) => tag.toLowerCase().contains(needle));
       return tagMatches && queryMatches;
     }).toList();
     switch (_sort) {
       case 1:
         filtered.sort(
-          (DeckNode a, DeckNode b) =>
-              (b.rating ?? 0).compareTo(a.rating ?? 0),
+          (DeckNode a, DeckNode b) => (b.rating ?? 0).compareTo(a.rating ?? 0),
         );
       case 2:
         filtered.sort(
@@ -436,8 +423,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         );
       case 3:
         filtered.sort(
-          (DeckNode a, DeckNode b) =>
-              b.installCount.compareTo(a.installCount),
+          (DeckNode a, DeckNode b) => b.installCount.compareTo(a.installCount),
         );
       default:
         break;
@@ -483,6 +469,13 @@ class _SubjectTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A subject tile is filled with its own colour when it is selected and
+    // tinted with 10% of it when it is not. White type works on the deep
+    // tones and disappears on the pastels, so the foreground is derived.
+    final Color ink = selected
+        ? onDeckColor(subject.color)
+        : context.legible(subject.color);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -505,11 +498,7 @@ class _SubjectTile extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Icon(
-                  subject.icon,
-                  size: 17,
-                  color: selected ? Colors.white : subject.color,
-                ),
+                Icon(subject.icon, size: 17, color: ink),
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(
@@ -520,7 +509,7 @@ class _SubjectTile extends StatelessWidget {
                       fontFamily: 'ReadexPro',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: selected ? Colors.white : subject.color,
+                      color: ink,
                     ),
                   ),
                 ),
@@ -530,9 +519,7 @@ class _SubjectTile extends StatelessWidget {
               '$count مجموعات',
               style: TextStyle(
                 fontSize: 11,
-                color: selected
-                    ? Colors.white.withValues(alpha: 0.7)
-                    : subject.color.withValues(alpha: 0.7),
+                color: ink.withValues(alpha: 0.72),
               ),
             ),
           ],
@@ -648,9 +635,12 @@ class _InstalledButton extends StatelessWidget {
         style: FilledButton.styleFrom(
           padding: EdgeInsets.zero,
           minimumSize: const Size(58, 30),
-          backgroundColor: AppColors.accentSoft,
-          foregroundColor: AppColors.primary,
-          textStyle: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700),
+          backgroundColor: context.softAccent,
+          foregroundColor: context.onSoftAccent,
+          textStyle: const TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,

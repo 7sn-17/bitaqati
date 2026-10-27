@@ -498,15 +498,21 @@ class _HeatCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // In dark mode the ramp runs from a dim wash up to the lime accent:
+    // stepping toward the brand ink, as the light theme does, would walk the
+    // busiest days straight into the near-black page.
+    final bool dark = context.isDark;
     final Color color;
     if (count == 0) {
       color = empty;
     } else if (count <= maxCount / 3) {
-      color = AppColors.accentSoft;
+      color = dark
+          ? AppColors.accent.withValues(alpha: 0.22)
+          : AppColors.accentSoft;
     } else if (count <= maxCount * 2 / 3) {
-      color = AppColors.accent.withValues(alpha: 0.65);
+      color = AppColors.accent.withValues(alpha: dark ? 0.5 : 0.65);
     } else {
-      color = AppColors.primary;
+      color = dark ? AppColors.accent : AppColors.primary;
     }
     return Tooltip(
       message: '${_shortDate(date)} · $count مراجعة',

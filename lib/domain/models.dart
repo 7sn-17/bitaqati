@@ -164,11 +164,20 @@ Color onDeckColor(Color color) {
 
 /// A version of a deck colour that works as *text or an icon on a surface*.
 ///
-/// Pale decks are darkened in the light theme, where a pastel foreground on a
-/// near-white background would be invisible. The dark theme keeps the colour
-/// as-is, because a pale tone on a dark surface is already high contrast.
+/// The palette is wide enough that both directions break: a pastel tone is
+/// invisible on the light canvas, and a near-black forest is invisible on the
+/// dark one. So each theme pulls toward its own pole — light darkens anything
+/// brighter than the crossover, dark lifts anything deeper — and leaves the
+/// tones that already work untouched.
 Color deckInk(Color color, {required bool dark}) {
-  if (dark || color.computeLuminance() <= 0.35) {
+  final double luminance = color.computeLuminance();
+  if (dark) {
+    if (luminance >= 0.24) {
+      return color;
+    }
+    return Color.lerp(color, Colors.white, 0.62)!;
+  }
+  if (luminance <= 0.35) {
     return color;
   }
   return Color.lerp(color, const Color(0xFF0E0F0C), 0.55)!;

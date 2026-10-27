@@ -33,11 +33,14 @@ class MatchGameScreen extends ConsumerWidget {
         .watch(deckCardsProvider(deckId))
         .valueOrNull;
     if (cards == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.canvas,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+      // A white flash while the cards load is the most jarring thing a dark-
+      // mode user can hit on this screen, so the loading state follows the
+      // theme like everything else.
+      return Scaffold(
+        backgroundColor: context.isDark
+            ? AppColors.darkCanvas
+            : AppColors.canvas,
+        body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
     final List<ReviewCard> usable = <ReviewCard>[
@@ -1010,14 +1013,14 @@ class _NotEnough extends StatelessWidget {
             Container(
               width: 84,
               height: 84,
-              decoration: const BoxDecoration(
-                color: AppColors.accentSoft,
+              decoration: BoxDecoration(
+                color: context.softAccent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 CupertinoIcons.square_grid_2x2,
                 size: 32,
-                color: AppColors.primary,
+                color: context.onSoftAccent,
               ),
             ),
             const SizedBox(height: 18),

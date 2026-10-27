@@ -31,11 +31,14 @@ class TestModeScreen extends ConsumerWidget {
         .watch(deckCardsProvider(deckId))
         .valueOrNull;
     if (cards == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.canvas,
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+      // A white flash while the cards load is the most jarring thing a dark-
+      // mode user can hit on this screen, so the loading state follows the
+      // theme like everything else.
+      return Scaffold(
+        backgroundColor: context.isDark
+            ? AppColors.darkCanvas
+            : AppColors.canvas,
+        body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
     final List<ReviewCard> usable = <ReviewCard>[
@@ -666,7 +669,9 @@ class _OptionTileState extends State<_OptionTile>
                             ? CupertinoIcons.checkmark_circle_fill
                             : CupertinoIcons.xmark_circle_fill,
                         size: 20,
-                        color: correct ? context.onSoftAccent : AppColors.danger,
+                        color: correct
+                            ? context.onSoftAccent
+                            : AppColors.danger,
                       ).animate().scale(
                         begin: const Offset(0.4, 0.4),
                         end: const Offset(1, 1),
@@ -1040,14 +1045,14 @@ class _NotEnough extends StatelessWidget {
             Container(
               width: 84,
               height: 84,
-              decoration: const BoxDecoration(
-                color: AppColors.accentSoft,
+              decoration: BoxDecoration(
+                color: context.softAccent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 CupertinoIcons.checkmark_seal,
                 size: 34,
-                color: AppColors.primary,
+                color: context.onSoftAccent,
               ),
             ),
             const SizedBox(height: 18),

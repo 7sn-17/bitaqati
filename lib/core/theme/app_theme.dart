@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../domain/models.dart';
 import 'app_colors.dart';
 
 abstract final class AppTheme {
@@ -355,18 +356,13 @@ extension AppThemeContext on BuildContext {
   /// Danger colour that stays legible on both themes.
   Color get dangerInk => isDark ? AppColors.darkDanger : AppColors.danger;
 
-  /// Lifts a fixed colour until it is readable as *text* on this surface.
+  /// A fixed colour made readable as *text* on this theme's surface.
   ///
-  /// Stat tiles take a brand colour per number — deep green, blue, amber — and
-  /// those are right on a white card and nearly invisible on a dark one. Dark
-  /// mode keeps the hue and raises it toward white; anything already bright
-  /// (lime, pale tints) is left alone.
-  Color legible(Color color) {
-    if (!isDark || color.computeLuminance() > 0.5) {
-      return color;
-    }
-    return Color.lerp(color, Colors.white, 0.6)!;
-  }
+  /// Stat tiles and subject chips take a brand colour each — deep green, blue,
+  /// amber, pastel — and the deep ones vanish on a dark card while the pastels
+  /// vanish on a light one. This is the single rule for that, shared with
+  /// [deckInk] so a deck colour behaves the same everywhere it is drawn.
+  Color legible(Color color) => deckInk(color, dark: isDark);
 
   /// Hairline colour for borders.
   Color get hairline => isDark ? AppColors.darkLine : AppColors.line;

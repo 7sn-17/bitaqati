@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,10 +33,24 @@ class SmartImportScreen extends ConsumerStatefulWidget {
 class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
   final TextEditingController _input = TextEditingController();
 
+  /// Parsing on every keystroke is wasteful on a two-thousand-line paste, so
+  /// the live count trails the caret by a frame or two instead of blocking it.
+  static const Duration _parseDelay = Duration(milliseconds: 130);
+
+  Timer? _timer;
+  CardImportResult _live = const CardImportResult(
+    drafts: <CardDraft>[],
+    skipped: 0,
+  );
+
   List<CardDraft> _drafts = <CardDraft>[];
   int _skipped = 0;
   bool _previewing = false;
   bool _saving = false;
+
+  /// Which way the two panes move. Forward when entering the preview, back
+  /// when returning to the text, so the screen reads as a stack.
+  bool _forward = true;
 
   @override
   void initState() {
@@ -44,20 +60,21 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
 
   @override
   void dispose() {
+    _timer?.cancel();
     _input.removeListener(_onTextChanged);
     _input.dispose();
     super.dispose();
   }
 
   void _onTextChanged() {
-    if (mounted) {
-      setState(() {});
-    }
+    _timer?.cancel();
+    _timer = Timer(_parseDelay, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _live = parseCardImport(_input.text));
+    });
   }
-
-  /// Live count shown under the field, so the user sees the shape of the
-  /// paste before committing to a preview.
-  CardImportResult get _live => parseCardImport(_input.text);
 
   void _preview() {
     final CardImportResult result = parseCardImport(_input.text);
@@ -70,15 +87,52 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
       return;
     }
     FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
     setState(() {
+      _live = result;
       _drafts = result.drafts;
       _skipped = result.skipped;
       _previewing = true;
+      _forward = true;
     });
   }
 
   void _backToText() {
-    setState(() => _previewing = false);
+    HapticFeedback.selectionClick();
+    setState(() {
+      _previewing = false;
+      _forward = false;
+    });
+  }
+
+  /// Pulls the clipboard into the field, appended after whatever is there.
+  ///
+  /// The whole point of this screen is moving text from somewhere else, and
+  /// long-press-and-paste on a large text area is fiddly on a phone.
+  Future<void> _paste() async {
+    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (!mounted) {
+      return;
+    }
+    final String text = data?.text ?? '';
+    if (text.trim().isEmpty) {
+      showAppMessage(context, 'الحافظة فارغة.', kind: AppMessageKind.error);
+      return;
+    }
+    final String current = _input.text;
+    final String joined = current.trim().isEmpty ? text : '$current\n$text';
+    _input.value = TextEditingValue(
+      text: joined,
+      selection: TextSelection.collapsed(offset: joined.length),
+    );
+    HapticFeedback.selectionClick();
+  }
+
+  void _clear() {
+    _input.clear();
+    setState(
+      () => _live = const CardImportResult(drafts: <CardDraft>[], skipped: 0),
+    );
   }
 
   /// Opens the real editor on one draft and swaps in whatever comes back.
@@ -94,12 +148,14 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
   }
 
   void _removeDraft(int index) {
+    HapticFeedback.selectionClick();
     setState(() {
       _drafts = List<CardDraft>.of(_drafts)..removeAt(index);
       if (_drafts.isEmpty) {
         // Nothing left to preview, so fall back to the paste view instead of
         // showing an empty list.
         _previewing = false;
+        _forward = false;
       }
     });
   }
@@ -157,7 +213,13 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
           icon: const Icon(CupertinoIcons.xmark),
           tooltip: 'إغلاق',
         ),
-        title: Text(_previewing ? 'مراجعة البطاقات' : 'الاستيراد الذكي'),
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          child: Text(
+            _previewing ? 'مراجعة البطاقات' : 'الاستيراد الذكي',
+            key: ValueKey<bool>(_previewing),
+          ),
+        ),
         actions: <Widget>[
           IconButton(
             onPressed: _showHelp,
@@ -168,7 +230,25 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
         ],
       ),
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          final bool incoming = child.key == ValueKey<bool>(_previewing);
+          final double travel = incoming
+              ? (_forward ? 0.055 : -0.055)
+              : (_forward ? -0.03 : 0.03);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: Offset(0, travel),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
         child: _previewing
             ? _previewBody(context)
             : _composeBody(context, deck),
@@ -178,91 +258,46 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
   }
 
   Widget _composeBody(BuildContext context, DeckNode? deck) {
-    final CardImportResult live = _live;
     return ListView(
-      key: const ValueKey<String>('compose'),
+      key: const ValueKey<bool>(false),
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
       children: <Widget>[
         _FormatCard(deckTitle: deck?.title),
-        const SizedBox(height: 16),
-        Container(
-          decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurface : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.colors.outlineVariant),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: TextField(
-            controller: _input,
-            minLines: 12,
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
-            textAlignVertical: TextAlignVertical.top,
-            style: const TextStyle(
-              fontFamily: 'IBMPlexSansArabic',
-              fontSize: 14,
-              height: 1.95,
-            ),
-            decoration: const InputDecoration(
-              hintText:
-                  'الصق هنا…\n\n'
-                  'ما عاصمة اليابان؟ | طوكيو | تقع على المحيط الهادئ',
-              border: InputBorder.none,
-              isDense: true,
-            ),
-          ),
+        const SizedBox(height: 14),
+        _EditorBox(
+          controller: _input,
+          onPaste: _paste,
+          onClear: _input.text.isEmpty ? null : _clear,
         ),
         const SizedBox(height: 10),
-        Row(
-          children: <Widget>[
-            Icon(
-              live.isEmpty
-                  ? CupertinoIcons.doc_text
-                  : CupertinoIcons.checkmark_circle_fill,
-              size: 14,
-              color: live.isEmpty
-                  ? context.texts.bodySmall?.color
-                  : AppColors.primary,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                live.isEmpty
-                    ? 'لا توجد بطاقات بعد.'
-                    : '${live.drafts.length} بطاقة جاهزة'
-                          '${live.skipped > 0 ? ' · ${live.skipped} سطر متجاهل' : ''}',
-                style: context.texts.bodySmall,
-              ),
-            ),
-          ],
-        ),
+        _LiveStatus(ready: _live.drafts.length, skipped: _live.skipped),
       ],
     );
   }
 
   Widget _previewBody(BuildContext context) {
     return ListView.builder(
-      key: const ValueKey<String>('preview'),
+      key: const ValueKey<bool>(true),
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
       itemCount: _drafts.length + 1,
       itemBuilder: (BuildContext context, int index) {
         if (index == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: _PreviewHeader(
-              count: _drafts.length,
-              skipped: _skipped,
-            ),
+            child: _PreviewHeader(count: _drafts.length, skipped: _skipped),
           );
         }
         final int position = index - 1;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _DraftTile(
-            index: index,
-            draft: _drafts[position],
-            onTap: () => _editDraft(position),
-            onRemove: () => _removeDraft(position),
+        return _Appear(
+          index: position,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _DraftTile(
+              index: index,
+              draft: _drafts[position],
+              onTap: () => _editDraft(position),
+              onRemove: () => _removeDraft(position),
+            ),
           ),
         );
       },
@@ -300,17 +335,238 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
                   : _previewing
                   ? _saveAll
                   : (ready == 0 ? null : _preview),
-              child: Text(
-                _saving
-                    ? 'جارٍ الحفظ…'
-                    : _previewing
-                    ? 'حفظ الكل (${_drafts.length})'
-                    : 'معاينة',
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (_saving) ...<Widget>[
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Text(
+                      _saving
+                          ? 'جارٍ الحفظ…'
+                          : _previewing
+                          ? 'حفظ الكل (${_drafts.length})'
+                          : 'معاينة',
+                      key: ValueKey<String>(
+                        '$_saving-${_previewing ? _drafts.length : 0}',
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The text field with the chrome around it: a header with paste and clear,
+/// then the writing surface itself.
+class _EditorBox extends StatelessWidget {
+  const _EditorBox({
+    required this.controller,
+    required this.onPaste,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onPaste;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: context.colors.outlineVariant),
+      ),
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  CupertinoIcons.doc_text,
+                  size: 14,
+                  color: context.texts.bodySmall?.color,
+                ),
+                const SizedBox(width: 6),
+                Text('النص', style: context.texts.labelMedium),
+                const Spacer(),
+                _BoxAction(
+                  icon: CupertinoIcons.doc_on_clipboard,
+                  label: 'لصق',
+                  onTap: onPaste,
+                ),
+                const SizedBox(width: 4),
+                _BoxAction(
+                  icon: CupertinoIcons.xmark_circle,
+                  label: 'مسح',
+                  onTap: onClear,
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 0.7, thickness: 0.7, color: context.hairline),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: TextField(
+              controller: controller,
+              minLines: 12,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              textAlignVertical: TextAlignVertical.top,
+              style: const TextStyle(
+                fontFamily: 'IBMPlexSansArabic',
+                fontSize: 14,
+                height: 1.95,
+              ),
+              decoration: const InputDecoration(
+                hintText:
+                    'الصق هنا…\n\n'
+                    'ما عاصمة اليابان؟ | طوكيو | تقع على المحيط الهادئ',
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A small text-and-icon button used in the editor header.
+class _BoxAction extends StatelessWidget {
+  const _BoxAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color muted = context.texts.bodySmall?.color ?? AppColors.muted;
+    final Color color = onTap == null
+        ? muted.withValues(alpha: 0.4)
+        : context.brandInk;
+    return Semantics(
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'IBMPlexSansArabic',
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The running count under the field. It swaps in place so the line never
+/// jumps as digits change.
+class _LiveStatus extends StatelessWidget {
+  const _LiveStatus({required this.ready, required this.skipped});
+
+  final int ready;
+  final int skipped;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool empty = ready == 0;
+    final Color tint = empty ? context.muted : context.brandInk;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: Row(
+        key: ValueKey<String>('$ready-${skipped}'),
+        children: <Widget>[
+          Icon(
+            empty
+                ? CupertinoIcons.doc_text
+                : CupertinoIcons.checkmark_circle_fill,
+            size: 14,
+            color: tint,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              empty
+                  ? 'لا توجد بطاقات بعد.'
+                  : '$ready بطاقة جاهزة'
+                        '${skipped > 0 ? ' · $skipped سطر متجاهل' : ''}',
+              style: context.texts.bodySmall?.copyWith(
+                color: empty ? null : tint,
+                fontWeight: empty ? null : FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Fades and lifts its child in, a beat after the one before it.
+///
+/// The delay is capped so a hundred-card paste still finishes arriving in
+/// under half a second instead of trickling in for three.
+class _Appear extends StatelessWidget {
+  const _Appear({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final int step = index > 8 ? 8 : index;
+    final int total = 260 + step * 34;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: total),
+      curve: Interval(step * 34 / total, 1, curve: Curves.easeOutCubic),
+      builder: (BuildContext context, double value, Widget? built) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - value)),
+            child: built,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }
@@ -349,10 +605,7 @@ class _FormatCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      'سطر واحد لكل بطاقة',
-                      style: context.texts.titleSmall,
-                    ),
+                    Text('سطر واحد لكل بطاقة', style: context.texts.titleSmall),
                     if (deckTitle != null)
                       Text(
                         'إلى مجموعة: $deckTitle',
@@ -394,9 +647,7 @@ class _FormatRow extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: context.isDark
-              ? AppColors.darkSurfaceHigh
-              : AppColors.canvas,
+          color: context.isDark ? AppColors.darkSurfaceHigh : AppColors.canvas,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -424,10 +675,7 @@ class _PreviewHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          '$count بطاقة جاهزة للإضافة',
-          style: context.texts.titleMedium,
-        ),
+        Text('$count بطاقة جاهزة للإضافة', style: context.texts.titleMedium),
         const SizedBox(height: 3),
         Text(
           'اضغط أي بطاقة لتعديلها في المحرّر الكامل قبل الحفظ.',
@@ -436,10 +684,7 @@ class _PreviewHeader extends StatelessWidget {
         if (skipped > 0) ...<Widget>[
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 9,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: AppColors.warning,
               borderRadius: BorderRadius.circular(12),
