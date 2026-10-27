@@ -362,17 +362,26 @@ class SyncService {
 
   Future<void> _recordFailure(List<SyncQueueRow> items, Object error) async {
     final String message = _describe(error);
-    await (_db.update(_db.syncQueue)..where(
-          (SyncQueue q) => q.id.isIn(<int>{
-            for (final SyncQueueRow row in items) row.id,
-          }),
-        ))
-        .write(
-          SyncQueueCompanion(
-            attempts: Value<int>(items.first.attempts + 1),
-            lastError: Value<String?>(message),
-          ),
-        );
+    final Set<int> ids = <int>{
+      for (final SyncQueueRow row in items) row.id,
+    };
+    final int attempts = items.first.attempts + 1;
+    await (_db.update(
+      _db.syncQueue,
+    )..where((SyncQueue q) => q.id.isIn(ids))).write(
+      SyncQueueCompanion(
+        attempts: Value<int>(attempts),
+        lastError: Value<String?>(message),
+      ),
+    );
+    // After five failures the row will not succeed on its own (a missing
+    // parent, a value the server rejects). Dropping it keeps one bad row from
+    // blocking every later sync.
+    if (attempts >= 5) {
+      await (_db.delete(
+        _db.syncQueue,
+      )..where((SyncQueue q) => q.id.isIn(ids))).go();
+    }
   }
 
   // ---------------------------------------------------------------------------
