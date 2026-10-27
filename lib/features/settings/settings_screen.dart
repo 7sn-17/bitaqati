@@ -14,12 +14,15 @@ import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/updates/update_providers.dart';
+import '../../core/updates/update_service.dart';
 import '../../core/user_display.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/auth_service.dart';
 import '../../data/profile_providers.dart';
 import '../../data/profile_repository.dart';
+import '../updates/update_dialog.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -42,6 +45,9 @@ class SettingsScreen extends ConsumerWidget {
     final ReminderAccess access =
         ref.watch(reminderAccessProvider).valueOrNull ?? ReminderAccess.denied;
     final bool exactAlarms = ref.watch(exactAlarmProvider).valueOrNull ?? false;
+    final UpdateInfo? update = ref.watch(updateInfoProvider).valueOrNull;
+    final String version =
+        ref.watch(appVersionProvider).valueOrNull ?? AppConfig.appVersion;
     final int newLimit = ref.watch(dailyNewLimitProvider);
     final int reviewLimit = ref.watch(dailyReviewLimitProvider);
 
@@ -270,10 +276,19 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: 'قواعد استخدام التطبيق والمحتوى',
                   onTap: () => context.push('/terms'),
                 ),
+                if (update != null && update.hasUpdate)
+                  _Row(
+                    icon: Icons.rocket_launch_rounded,
+                    title: 'تحديث متوفر',
+                    subtitle:
+                        'الإصدار ${update.latestVersion} جاهز للتنزيل — اضغط للتحديث.',
+                    onTap: () => showUpdateDialog(context, update),
+                  ),
                 _Row(
                   icon: CupertinoIcons.info_circle,
                   title: 'الإصدار',
-                  subtitle: AppConfig.appVersion,
+                  subtitle: version,
+                  onTap: () => _checkForUpdate(context, ref),
                 ),
               ],
             ),
@@ -370,6 +385,34 @@ class SettingsScreen extends ConsumerWidget {
       case ReminderAccess.unsupported:
         return 'هذا الجهاز لا يدعم الإشعارات.';
     }
+  }
+
+  /// Re-asks GitHub when the version row is tapped.
+  ///
+  /// A failed check is reported as a failure, never as "you are up to date":
+  /// claiming that on a timeout is the one answer that could leave someone on
+  /// an old build for months.
+  Future<void> _checkForUpdate(BuildContext context, WidgetRef ref) async {
+    final UpdateInfo? info = await ref
+        .read(updateServiceProvider)
+        .check(force: true);
+    ref.invalidate(updateInfoProvider);
+    if (!context.mounted) {
+      return;
+    }
+    if (info == null) {
+      showAppMessage(
+        context,
+        'تعذّر التحقق من التحديثات. تحقّق من اتصالك وحاول مرة أخرى.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    if (!info.hasUpdate) {
+      showAppMessage(context, 'أنت على أحدث إصدار (v${info.currentVersion}).');
+      return;
+    }
+    await showUpdateDialog(context, info);
   }
 
   Future<void> _askForPermission(BuildContext context, WidgetRef ref) async {

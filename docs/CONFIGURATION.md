@@ -229,23 +229,43 @@ de-duplicated by the database. Two things are worth knowing:
 
 | Package | Used by |
 |---|---|
-| `url_launcher` | Developer info screen: mail, WhatsApp, Telegram, Instagram |
+| `url_launcher` | Developer info screen: mail, WhatsApp, Telegram, Instagram. Update dialog: opening the APK download. |
+| `package_info_plus` | Update service: reading the installed version from the APK |
+| `http` | Update service: `GET /repos/7sn-17/bitaqati/releases/latest` |
 
-No keys or platform configuration are needed for `url_launcher` on Android.
-On iOS it requires the `LSApplicationQueriesSchemes` entries for `mailto`,
-`https` and `tg`.
+No keys or platform configuration are needed for any of them on Android. On
+iOS `url_launcher` requires the `LSApplicationQueriesSchemes` entries for
+`mailto`, `https` and `tg`.
 
 ## APK
 
-Download the latest `bitaqati-apks` artifact from the **Actions** tab, or run:
+Every push to `main` that touches `lib/`, `assets/`, `android/` or
+`pubspec.yaml` builds, signs and publishes a GitHub Release. The release tag is
+read from `pubspec.yaml`, so `version: 1.0.0+1` produces the tag `v1.0.0`.
 
-```bash
-gh run download --repo 7sn-17/bitaqati \
-  -n bitaqati-apks -D ./dist
+The arm64 build is attached under a fixed name, which is the URL the in-app
+updater uses and the one to hand to users:
+
+```
+https://github.com/7sn-17/bitaqati/releases/latest/download/bitaqati.apk
 ```
 
-Install on a connected Android device (choose the ABI that matches it):
+The same release also carries the per-ABI files
+`bitaqati-v<version>-arm64-v8a.apk`, `-armeabi-v7a.apk` and `-x86_64.apk`,
+plus a `bitaqati-apks` workflow artifact for 30 days:
 
 ```bash
-adb install -r ./dist/bitaqati-<tag>-arm64-v8a.apk
+gh release download --repo 7sn-17/bitaqati --pattern 'bitaqati.apk' -D ./dist
 ```
+
+Install on a connected Android device:
+
+```bash
+adb install -r ./dist/bitaqati.apk
+```
+
+Bumping the version publishes a new release, and because `make_latest: true`
+is set, `/releases/latest` moves with it. Nothing else in the pipeline has to
+change; the release notes in the workflow body are the one thing a maintainer
+should rewrite for each version, since the app shows them verbatim in the
+update dialog.

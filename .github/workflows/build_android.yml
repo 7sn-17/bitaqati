@@ -19,8 +19,10 @@ on:
       - 'pubspec.yaml'
       - 'pubspec.lock'
 
-permissions:
-  contents: write
+# Required by softprops/action-gh-release to create the tag and attach the
+# APK. Without it the release step fails with "Resource not accessible by
+# integration", which is exactly what makes the download URL 404.
+permissions: { contents: write }
 
 jobs:
   build:
@@ -110,10 +112,24 @@ jobs:
       - name: Name the release and rename the APKs
         id: release
         run: |
-          BRANCH="${GITHUB_REF_NAME//[^A-Za-z0-9._-]/-}"
-          TAG="build-${BRANCH}-${GITHUB_RUN_NUMBER}"
+          # The tag comes from pubspec so the in-app updater can compare
+          # `tag_name` with the installed version. A per-run tag would make
+          # /releases/latest unpredictable and the version check meaningless.
+          VERSION=$(sed -n 's/^version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' pubspec.yaml | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read the version from pubspec.yaml."
+            exit 1
+          fi
+          TAG="v${VERSION}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           mkdir -p dist
+
+          # A fixed asset name is what makes the download URL stable:
+          # https://github.com/7sn-17/bitaqati/releases/latest/download/bitaqati.apk
+          cp "build/app/outputs/flutter-apk/app-arm64-v8a-release.apk" \
+            "dist/bitaqati.apk"
+
           for abi in arm64-v8a armeabi-v7a x86_64; do
             cp "build/app/outputs/flutter-apk/app-${abi}-release.apk" \
               "dist/bitaqati-${TAG}-${abi}.apk"
@@ -151,21 +167,37 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Attaches the APK to a real GitHub Release (not just a workflow
+      # artifact) so /releases/latest/download/bitaqati.apk always resolves to
+      # the newest build. The in-app updater reads this release's tag and body.
       - name: Publish to GitHub Releases
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: "بطاقاتي ${{ steps.release.outputs.tag }}"
+          name: "بطاقاتي ${{ steps.release.outputs.version }}"
           body: |
-            نسخة تجريبية مبنية تلقائياً من الفرع `${{ github.ref_name }}`
-            (تشغيل رقم ${{ github.run_number }}).
+            الإصدار ${{ steps.release.outputs.version }} — الإطلاق الأول
 
-            ### أي ملف أنزّل؟
-            - `arm64-v8a`: الأنسب لمعظم هواتف أندرويد الحديثة.
-            - `armeabi-v7a`: للهواتف القديمة ذات 32 بت.
-            - `x86_64`: للمحاكيات فقط.
-          files: dist/*.apk
-          prerelease: true
+            أول إصدار مستقر من بطاقاتي، وأول إصدار يصل عبر التحديث التلقائي.
+
+            - محرّك المراجعة المتباعدة FSRS-6 مع فترات محسوبة لكل بطاقة.
+            - تذكيرات يومية ذكية تتوقف تلقائياً عندما لا يبقى شيء للمراجعة.
+            - أوضاع دراسة متعددة: المراجعة، الاختبار، ولعبة المطابقة.
+            - مكتبة عامة يمكن تثبيت المجموعات منها مع حفظ حق المؤلف.
+            - عمل كامل دون اتصال، ومزامنة تلقائية عند عودة الشبكة.
+
+            أي ملف أنزّل؟
+            - bitaqati.apk: الأنسب لمعظم الهواتف الحديثة (arm64).
+            - bitaqati-${{ steps.release.outputs.tag }}-arm64-v8a.apk: نسخة مطابقة باسم تقليدي.
+            - bitaqati-${{ steps.release.outputs.tag }}-armeabi-v7a.apk: للهواتف القديمة ذات 32 بت.
+            - bitaqati-${{ steps.release.outputs.tag }}-x86_64.apk: للمحاكيات فقط.
+          files: |
+            dist/bitaqati.apk
+            dist/bitaqati-${{ steps.release.outputs.tag }}-arm64-v8a.apk
+            dist/bitaqati-${{ steps.release.outputs.tag }}-armeabi-v7a.apk
+            dist/bitaqati-${{ steps.release.outputs.tag }}-x86_64.apk
+          prerelease: false
+          make_latest: true
           fail_on_unmatched_files: true

@@ -4,19 +4,64 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/guest_guard.dart';
 import '../../core/notifications/reminder_providers.dart';
+import '../../core/updates/update_providers.dart';
+import '../../core/updates/update_service.dart';
 import '../../core/widgets/glass_tab_bar.dart';
 import '../../core/widgets/offline_banner.dart';
 import '../../data/content_providers.dart';
 import '../../data/sync_providers.dart';
 import '../create/create_sheet.dart';
+import '../updates/update_dialog.dart';
 
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  /// One check per launch. The provider caches the answer for three hours, so
+  /// this never turns into a request on every rebuild.
+  bool _prompted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+      _promptForUpdate();
+    });
+  }
+
+  /// Looks for a newer release in the background and offers it once.
+  ///
+  /// Deliberately late: the first frame, the first sync and the reminder
+  /// refresh all matter more than a dialog, and a user who taps through in the
+  /// first second should not have the screen covered.
+  Future<void> _promptForUpdate() async {
+    if (_prompted) {
+      return;
+    }
+    _prompted = true;
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (!mounted) {
+      return;
+    }
+    final UpdateInfo? info = await ref.read(updateInfoProvider.future);
+    if (!mounted || info == null || !info.hasUpdate) {
+      return;
+    }
+    if (ref.read(updateDismissedProvider) == info.latestVersion) {
+      return;
+    }
+    await showUpdateDialog(context, info);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final StatefulNavigationShell navigationShell = widget.navigationShell;
     // The floating bar would ride above the keyboard, so hide it while typing.
     final bool keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final int due = ref.watch(totalDueProvider);
