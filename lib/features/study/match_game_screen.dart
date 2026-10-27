@@ -515,20 +515,43 @@ class _Board extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        const double gap = 10;
-        final double columnWidth =
-            (constraints.maxWidth - gap * (columns.length - 1)) /
-            columns.length;
+        // A board, not a table. The tiles used to divide the whole screen, so
+        // two columns on a phone produced 180x270 cards glued to each other.
+        // They now cap at a size a thumb can hit and a game board reads as,
+        // and the whole grid is centred in whatever space is left.
+        const double gap = 12;
+        const double maxTileWidth = 152;
+        const double maxTileHeight = 116;
+
+        final int columnCount = columns.length;
+        final double columnWidth = math.min(
+          (constraints.maxWidth - gap * (columnCount - 1)) / columnCount,
+          maxTileWidth,
+        );
         final double tileHeight = math.min(
-          (constraints.maxHeight - gap * (rows - 1)) / rows,
-          columnWidth * 1.5,
+          math.min(
+            (constraints.maxHeight - gap * (rows - 1)) / rows,
+            maxTileHeight,
+          ),
+          columnWidth * 0.86,
+        );
+        final double boardWidth =
+            columnWidth * columnCount + gap * (columnCount - 1);
+        final double boardHeight = tileHeight * rows + gap * (rows - 1);
+        final double originX = math.max(
+          0,
+          (constraints.maxWidth - boardWidth) / 2,
+        );
+        final double originY = math.max(
+          0,
+          (constraints.maxHeight - boardHeight) / 2,
         );
 
         final List<Widget> tiles = <Widget>[];
         for (int column = 0; column < columns.length; column++) {
           final List<_MatchTile> stack = columns[column];
           final double left =
-              (columns.length - 1 - column) * (columnWidth + gap);
+              originX + (columns.length - 1 - column) * (columnWidth + gap);
           for (int index = 0; index < stack.length; index++) {
             final _MatchTile tile = stack[index];
             final int row = rows - stack.length + index;
@@ -538,7 +561,7 @@ class _Board extends StatelessWidget {
                 duration: const Duration(milliseconds: 430),
                 curve: Curves.easeOutCubic,
                 left: left,
-                top: row * (tileHeight + gap),
+                top: originY + row * (tileHeight + gap),
                 width: columnWidth,
                 height: tileHeight,
                 child: _TileView(

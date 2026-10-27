@@ -239,9 +239,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
       }
     });
     try {
-      await ref
-          .read(contentRepositoryProvider)
-          .setCardFavorite(card.id, next);
+      await ref.read(contentRepositoryProvider).setCardFavorite(card.id, next);
     } catch (_) {
       if (!mounted) {
         return;
@@ -614,8 +612,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                     _SoftAction(
                       icon: CupertinoIcons.lightbulb,
                       label: _hintVisible ? 'إخفاء التلميح' : 'تلميح',
-                      onTap: () =>
-                          setState(() => _hintVisible = !_hintVisible),
+                      onTap: () => setState(() => _hintVisible = !_hintVisible),
                     ),
                     const SizedBox(width: 8),
                   ],
@@ -661,6 +658,43 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   }
 }
 
+/// The row that names a side of the card and carries its speaker button.
+class _SideLabel extends StatelessWidget {
+  const _SideLabel({
+    required this.label,
+    required this.text,
+    required this.tint,
+    required this.color,
+  });
+
+  final String label;
+
+  /// What the speaker button reads. The button strips the markup itself.
+  final String text;
+
+  final Color tint;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+          ),
+        ),
+        const Spacer(),
+        SpeakButton(text: text, size: 34, tint: tint),
+      ],
+    );
+  }
+}
+
 class _CardBody extends StatelessWidget {
   const _CardBody({
     required this.card,
@@ -702,7 +736,9 @@ class _CardBody extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: revealed ? AppColors.primaryDeep : AppColors.accentSoft,
+                  color: revealed
+                      ? AppColors.primaryDeep
+                      : AppColors.accentSoft,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
@@ -734,58 +770,10 @@ class _CardBody extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           if (!revealed) ...<Widget>[
-            Container(
-              height: 150,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.accentSoft,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: <Widget>[
-                  Icon(
-                    deck.icon,
-                    size: 74,
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                  ),
-                  Positioned(
-                    bottom: 10,
-                    right: 14,
-                    child: Text(
-                      deck.title,
-                      style: TextStyle(
-                        color: AppColors.primaryDeep,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: <Widget>[
-                Text(
-                  'السؤال',
-                  style: TextStyle(
-                    color: muted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const Spacer(),
-                SpeakButton(
-                  text: card.front,
-                  size: 34,
-                  tint: AppColors.primary,
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
+            // Picture first, then the label row, then the words. The speaker
+            // sits in that row, right beside the text it reads.
             if (card.type == 'occlusion')
               OcclusionView(
                 imageUrl: occlusionImageUrl(card.front),
@@ -798,6 +786,12 @@ class _CardBody extends StatelessWidget {
                 text: card.front,
                 revealCloze: false,
                 mediaFirst: true,
+                textHeader: _SideLabel(
+                  label: 'السؤال',
+                  text: card.front,
+                  tint: AppColors.primary,
+                  color: muted,
+                ),
                 style: TextStyle(
                   fontFamily: 'ReadexPro',
                   fontSize: 24,
@@ -805,7 +799,7 @@ class _CardBody extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: ink,
                 ),
-                mediaHeight: 190,
+                mediaHeight: 220,
               ),
             if (card.hint != null && hintVisible) ...<Widget>[
               const SizedBox(height: 14),
@@ -837,18 +831,9 @@ class _CardBody extends StatelessWidget {
               ),
             ],
           ] else ...<Widget>[
-            CardMarkup(
-              text: card.front,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.62),
-                fontSize: 13,
-                height: 1.6,
-              ),
-              mediaHeight: 140,
-            ),
-            const SizedBox(height: 12),
-            Container(height: 0.7, color: AppColors.primaryDeep),
-            const SizedBox(height: 12),
+            // The answer side shows the answer and nothing else: repeating the
+            // question here made the reader scan two blocks to find the one
+            // they turned the card over for.
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -870,26 +855,6 @@ class _CardBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      const Text(
-                        'الإجابة',
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const Spacer(),
-                      SpeakButton(
-                        text: card.back,
-                        size: 34,
-                        tint: AppColors.accent,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
                   if (card.type == 'occlusion') ...<Widget>[
                     OcclusionView(
                       imageUrl: occlusionImageUrl(card.front),
@@ -901,6 +866,13 @@ class _CardBody extends StatelessWidget {
                   ],
                   CardMarkup(
                     text: card.back,
+                    mediaFirst: true,
+                    textHeader: _SideLabel(
+                      label: 'الإجابة',
+                      text: card.back,
+                      tint: AppColors.accent,
+                      color: AppColors.accent,
+                    ),
                     style: const TextStyle(
                       fontFamily: 'ReadexPro',
                       color: AppColors.accent,
@@ -908,7 +880,7 @@ class _CardBody extends StatelessWidget {
                       height: 1.5,
                       fontWeight: FontWeight.w700,
                     ),
-                    mediaHeight: 190,
+                    mediaHeight: 220,
                   ),
                 ],
               ),
@@ -1124,9 +1096,7 @@ class _Summary extends ConsumerWidget {
     final int tomorrow = forecast.length > 1 ? forecast[1].count : 0;
     final int correct = hard + good + easy;
     final int answered = again + hard + good + easy;
-    final int accuracy = answered == 0
-        ? 0
-        : (correct / answered * 100).round();
+    final int accuracy = answered == 0 ? 0 : (correct / answered * 100).round();
     final String streakLabel = streak == 2
         ? 'يومان'
         : '$streak ${_dayWord(streak)}';
@@ -1180,10 +1150,7 @@ class _Summary extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: _SummaryStat(
-                    value: '$correct',
-                    label: 'إجابات صحيحة',
-                  ),
+                  child: _SummaryStat(value: '$correct', label: 'إجابات صحيحة'),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1338,10 +1305,7 @@ class _SummaryStat extends StatelessWidget {
               color: context.ink,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(color: context.muted, fontSize: 9.5),
-          ),
+          Text(label, style: TextStyle(color: context.muted, fontSize: 9.5)),
         ],
       ),
     );

@@ -177,6 +177,7 @@ class CardMarkup extends StatelessWidget {
     this.alignment = CrossAxisAlignment.start,
     this.mediaHeight = 180,
     this.mediaFirst = false,
+    this.textHeader,
     super.key,
   });
 
@@ -191,6 +192,13 @@ class CardMarkup extends StatelessWidget {
   /// screen uses this so a picture is the first thing the learner sees.
   final bool mediaFirst;
 
+  /// Rendered between the attachments and the body.
+  ///
+  /// The review screen needs exactly that order — picture, then the row that
+  /// names the side and carries the speaker button, then the words — without
+  /// the label sitting above the picture.
+  final Widget? textHeader;
+
   @override
   Widget build(BuildContext context) {
     final String value = text.trim();
@@ -204,7 +212,7 @@ class CardMarkup extends StatelessWidget {
     ]..sort((RegExpMatch a, RegExpMatch b) => a.start.compareTo(b.start));
 
     if (media.isEmpty) {
-      return Text.rich(
+      final Widget body = Text.rich(
         TextSpan(
           children: markupSpans(
             context,
@@ -216,6 +224,15 @@ class CardMarkup extends StatelessWidget {
         ),
         maxLines: maxLines,
         overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      );
+      final Widget? header = textHeader;
+      if (header == null) {
+        return body;
+      }
+      return Column(
+        crossAxisAlignment: alignment,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[header, const SizedBox(height: 10), body],
       );
     }
 
@@ -244,6 +261,10 @@ class CardMarkup extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           ...leading,
+          if (textHeader != null) ...<Widget>[
+            textHeader!,
+            const SizedBox(height: 10),
+          ],
           if (rest.isNotEmpty)
             Text.rich(
               TextSpan(

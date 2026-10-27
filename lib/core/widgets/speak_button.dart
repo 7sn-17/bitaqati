@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../tts/tts_service.dart';
+import 'card_markup.dart';
 
 /// A round speaker button that reads [text] out loud.
 ///
@@ -42,7 +43,11 @@ class _SpeakButtonState extends State<SpeakButton>
     super.dispose();
   }
 
-  bool get _hasText => widget.text.trim().isNotEmpty;
+  /// Markup is for the eye, not the voice: `**bold**`, `{{c1::…}}` and image
+  /// tokens are stripped so the engine reads the sentence, not the syntax.
+  String get _spoken => plainMarkup(widget.text);
+
+  bool get _hasText => _spoken.trim().isNotEmpty;
 
   Future<void> _toggle() async {
     if (!_hasText) {
@@ -57,7 +62,7 @@ class _SpeakButtonState extends State<SpeakButton>
     }
     setState(() => _speaking = true);
     _pulse.repeat(reverse: true);
-    await TtsService.instance.speak(widget.text);
+    await TtsService.instance.speak(_spoken);
     if (!mounted) {
       return;
     }

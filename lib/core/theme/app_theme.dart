@@ -23,7 +23,9 @@ abstract final class AppTheme {
         ).copyWith(
           primary: isDark ? AppColors.darkAccent : AppColors.primary,
           onPrimary: isDark ? AppColors.primary : Colors.white,
-          primaryContainer: isDark ? AppColors.darkSurfaceHigh : AppColors.accentSoft,
+          primaryContainer: isDark
+              ? AppColors.darkSurfaceHigh
+              : AppColors.accentSoft,
           onPrimaryContainer: isDark ? AppColors.darkAccent : AppColors.primary,
           secondary: isDark ? AppColors.darkAccent : AppColors.primaryDeep,
           onSecondary: isDark ? AppColors.primary : Colors.white,
@@ -143,9 +145,7 @@ abstract final class AppTheme {
         surfaceTintColor: Colors.transparent,
         titleTextStyle: textTheme.headlineSmall,
         contentTextStyle: textTheme.bodyMedium,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(26),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: Colors.transparent,
@@ -161,15 +161,9 @@ abstract final class AppTheme {
           fontSize: 13,
         ),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      dividerTheme: DividerThemeData(
-        color: hairline,
-        thickness: 0.7,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: hairline, thickness: 0.7, space: 1),
       listTileTheme: ListTileThemeData(
         iconColor: isDark ? AppColors.darkMuted : AppColors.muted,
         textColor: ink,
@@ -341,9 +335,8 @@ extension AppThemeContext on BuildContext {
       isDark ? AppColors.darkSurfaceHigh : AppColors.surface;
 
   /// Soft brand wash used behind icons and highlights.
-  Color get softAccent => isDark
-      ? AppColors.accent.withValues(alpha: 0.16)
-      : AppColors.accentSoft;
+  Color get softAccent =>
+      isDark ? AppColors.accent.withValues(alpha: 0.16) : AppColors.accentSoft;
 
   /// Foreground for anything drawn on [softAccent].
   ///
@@ -361,6 +354,19 @@ extension AppThemeContext on BuildContext {
 
   /// Danger colour that stays legible on both themes.
   Color get dangerInk => isDark ? AppColors.darkDanger : AppColors.danger;
+
+  /// Lifts a fixed colour until it is readable as *text* on this surface.
+  ///
+  /// Stat tiles take a brand colour per number — deep green, blue, amber — and
+  /// those are right on a white card and nearly invisible on a dark one. Dark
+  /// mode keeps the hue and raises it toward white; anything already bright
+  /// (lime, pale tints) is left alone.
+  Color legible(Color color) {
+    if (!isDark || color.computeLuminance() > 0.5) {
+      return color;
+    }
+    return Color.lerp(color, Colors.white, 0.6)!;
+  }
 
   /// Hairline colour for borders.
   Color get hairline => isDark ? AppColors.darkLine : AppColors.line;

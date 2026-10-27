@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_providers.dart';
+import '../../core/config/app_config.dart';
 import '../../core/guest_guard.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -112,12 +113,20 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     },
                   ),
                   const Spacer(),
-                  if (!isPreview)
+                  if (!isPreview) ...<Widget>[
+                    if (deck.isShareable)
+                      _RoundButton(
+                        icon: CupertinoIcons.number,
+                        label: 'رمز المشاركة',
+                        onTap: () => _showShareCode(context, deck),
+                      ),
+                    if (deck.isShareable) const SizedBox(width: 8),
                     _RoundButton(
                       icon: CupertinoIcons.ellipsis,
                       label: 'المزيد',
                       onTap: () => _showActions(context, deck),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -829,10 +838,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               if (deck.isPublished && deck.isShareable)
                 ListTile(
                   leading: const Icon(CupertinoIcons.number),
-                  title: Text('نسخ رمز المشاركة · ${deck.shareCode}'),
+                  title: const Text('رمز المشاركة'),
+                  subtitle: Text(deck.shareCode ?? ''),
                   onTap: () {
                     Navigator.of(context).pop();
-                    _copyCode(screenContext, deck);
+                    _showShareCode(screenContext, deck);
                   },
                 ),
             ],
@@ -944,14 +954,90 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     }
   }
 
-  Future<void> _copyCode(BuildContext context, DeckNode deck) async {
+  /// The share code, reachable from the top bar.
+  ///
+  /// It used to live as a card at the bottom of the settings tab, which meant
+  /// scrolling past three privacy rows to reach the one thing a person opens
+  /// this screen to send to a friend.
+  void _showShareCode(BuildContext screenContext, DeckNode deck) {
     final String? code = deck.shareCode;
     if (code == null || code.isEmpty) {
       return;
     }
-    await Clipboard.setData(ClipboardData(text: code));
+    final String link = AppConfig.deckShareLink(deck.id);
+    showModalBottomSheet<void>(
+      context: screenContext,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) => SafeArea(
+        top: false,
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+          decoration: BoxDecoration(
+            color: context.isDark ? AppColors.darkSurface : Colors.white,
+            borderRadius: BorderRadius.circular(26),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('رمز المشاركة', style: context.texts.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                'أرسله لمن تريد، أو أرسل الرابط مباشرة.',
+                style: context.texts.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: context.softAccent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Text(
+                  code,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'ReadexPro',
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 8,
+                    color: context.onSoftAccent,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _copy(context, code, 'تم نسخ الرمز.'),
+                      icon: const Icon(CupertinoIcons.doc_on_doc, size: 15),
+                      label: const Text('نسخ الرمز'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _copy(context, link, 'تم نسخ الرابط.'),
+                      icon: const Icon(CupertinoIcons.link, size: 15),
+                      label: const Text('نسخ الرابط'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copy(BuildContext context, String value, String message) async {
+    await Clipboard.setData(ClipboardData(text: value));
     if (context.mounted) {
-      showAppMessage(context, 'تم نسخ الرمز $code.');
+      showAppMessage(context, message);
     }
   }
 
@@ -1070,7 +1156,6 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           publishing: _publishing,
           onSelect: (DeckPrivacy privacy) =>
               _setPrivacy(context, deck, privacy),
-          onCopyCode: () => _copyCode(context, deck),
         ),
       ),
       if (deck.isRemix) ...<Widget>[
@@ -1217,7 +1302,7 @@ class _MiniStat extends StatelessWidget {
               fontFamily: 'ReadexPro',
               fontSize: 24,
               fontWeight: FontWeight.w700,
-              color: color,
+              color: context.legible(color),
             ),
           ),
           Text(label, style: context.texts.bodySmall),
@@ -2260,7 +2345,7 @@ class _StatBox extends StatelessWidget {
               fontFamily: 'ReadexPro',
               fontSize: 24,
               fontWeight: FontWeight.w700,
-              color: color,
+              color: context.legible(color),
             ),
           ),
           const SizedBox(height: 2),
@@ -2277,14 +2362,12 @@ class _PrivacyCard extends StatelessWidget {
     required this.signedIn,
     required this.publishing,
     required this.onSelect,
-    required this.onCopyCode,
   });
 
   final DeckNode deck;
   final bool signedIn;
   final bool publishing;
   final ValueChanged<DeckPrivacy> onSelect;
-  final VoidCallback onCopyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -2366,55 +2449,20 @@ class _PrivacyCard extends StatelessWidget {
               enabled: signedIn && !publishing,
               onTap: () => onSelect(privacy),
             ),
-          if (deck.isPublished) ...<Widget>[
-            if (deck.isShareable) ...<Widget>[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-                decoration: BoxDecoration(
-                  color: context.softAccent,
-                  borderRadius: BorderRadius.circular(16),
+          if (deck.isPublished && deck.isShareable) ...<Widget>[
+            const SizedBox(height: 10),
+            Row(
+              children: <Widget>[
+                Icon(CupertinoIcons.number, size: 14, color: context.muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'رمز المشاركة ${deck.shareCode} — من أيقونة الرمز في الأعلى.',
+                    style: context.texts.bodySmall,
+                  ),
                 ),
-                child: Row(
-                  children: <Widget>[
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'رمز المشاركة',
-                          style: context.texts.labelSmall?.copyWith(
-                            color: context.isDark
-                                ? AppColors.darkMuted
-                                : AppColors.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          deck.shareCode!,
-                          style: const TextStyle(
-                            fontFamily: 'ReadexPro',
-                            fontSize: 21,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 4.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: onCopyCode,
-                      icon: const Icon(CupertinoIcons.doc_on_doc, size: 14),
-                      label: const Text('نسخ'),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 34),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        textStyle: const TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ],
         ],
       ),

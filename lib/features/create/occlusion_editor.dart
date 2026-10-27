@@ -173,12 +173,11 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                           canvas: size,
                           box: widget.boxes[index],
                           index: index,
-                          onChanged: (OcclusionBox box) =>
-                              _replace(index, box),
+                          onChanged: (OcclusionBox box) => _replace(index, box),
                           onRemove: () {
-                            final List<OcclusionBox> next =
-                                <OcclusionBox>[...widget.boxes]
-                                  ..removeAt(index);
+                            final List<OcclusionBox> next = <OcclusionBox>[
+                              ...widget.boxes,
+                            ]..removeAt(index);
                             widget.onChanged(next);
                           },
                         ),
@@ -255,75 +254,113 @@ class _BoxOverlay extends StatefulWidget {
   State<_BoxOverlay> createState() => _BoxOverlayState();
 }
 
-class _BoxOverlayState extends State<_BoxOverlay> {
-  /// Half the corner handle, in logical pixels. A drag that starts inside this
-  /// square resizes; anywhere else moves the whole box.
-  static const double _handle = 24;
+/// Which corner a drag grabbed, or [move] for the body.
+enum _Grip { move, topLeft, topRight, bottomLeft, bottomRight }
 
-  bool _resizing = false;
-  bool _moving = false;
+class _BoxOverlayState extends State<_BoxOverlay> {
+  /// How close to a corner a touch has to start to resize from it.
+  static const double _touch = 32;
+
+  /// The smallest a box may be dragged down to, in normalised units.
+  static const double _min = 0.04;
+
+  _Grip _grip = _Grip.move;
+
+  _Grip _gripAt(Offset position) {
+    final Size size = widget.rect.size;
+    final bool left = position.dx <= _touch;
+    final bool right = position.dx >= size.width - _touch;
+    final bool top = position.dy <= _touch;
+    final bool bottom = position.dy >= size.height - _touch;
+    if (top && left) {
+      return _Grip.topLeft;
+    }
+    if (top && right) {
+      return _Grip.topRight;
+    }
+    if (bottom && left) {
+      return _Grip.bottomLeft;
+    }
+    if (bottom && right) {
+      return _Grip.bottomRight;
+    }
+    return _Grip.move;
+  }
+
+  void _drag(DragUpdateDetails details) {
+    final OcclusionBox box = widget.box;
+    final double dx = details.delta.dx / widget.canvas.width;
+    final double dy = details.delta.dy / widget.canvas.height;
+    if (_grip == _Grip.move) {
+      widget.onChanged(
+        box.copyWith(
+          left: (box.left + dx).clamp(0.0, 1 - box.width),
+          top: (box.top + dy).clamp(0.0, 1 - box.height),
+        ),
+      );
+      return;
+    }
+
+    double left = box.left;
+    double top = box.top;
+    double right = box.left + box.width;
+    double bottom = box.top + box.height;
+
+    // Each corner moves its own two edges, and never past the opposite edge:
+    // the clamp is against the far side of the box, not against the image, so
+    // a box can never invert or collapse.
+    switch (_grip) {
+      case _Grip.move:
+        break;
+      case _Grip.topLeft:
+        left = (left + dx).clamp(0.0, right - _min);
+        top = (top + dy).clamp(0.0, bottom - _min);
+      case _Grip.topRight:
+        right = (right + dx).clamp(left + _min, 1.0);
+        top = (top + dy).clamp(0.0, bottom - _min);
+      case _Grip.bottomLeft:
+        left = (left + dx).clamp(0.0, right - _min);
+        bottom = (bottom + dy).clamp(top + _min, 1.0);
+      case _Grip.bottomRight:
+        right = (right + dx).clamp(left + _min, 1.0);
+        bottom = (bottom + dy).clamp(top + _min, 1.0);
+    }
+
+    widget.onChanged(
+      box.copyWith(
+        left: left,
+        top: top,
+        width: right - left,
+        height: bottom - top,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bool active = _grip != _Grip.move;
     return Positioned.fromRect(
       rect: widget.rect,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onPanStart: (DragStartDetails details) {
-          final Offset corner = Offset(
-            widget.rect.width - details.localPosition.dx,
-            widget.rect.height - details.localPosition.dy,
-          );
-          setState(() {
-            _resizing = corner.dx < _handle && corner.dy < _handle;
-            _moving = !_resizing;
-          });
-        },
-        onPanUpdate: (DragUpdateDetails details) {
-          final Size canvas = widget.canvas;
-          final OcclusionBox box = widget.box;
-          if (_resizing) {
-            final double width =
-                (box.width + details.delta.dx / canvas.width).clamp(
-                  0.04,
-                  1 - box.left,
-                );
-            final double height =
-                (box.height + details.delta.dy / canvas.height).clamp(
-                  0.04,
-                  1 - box.top,
-                );
-            widget.onChanged(box.copyWith(width: width, height: height));
-            return;
-          }
-          if (!_moving) {
-            return;
-          }
-          final double left = (box.left + details.delta.dx / canvas.width)
-              .clamp(0.0, 1 - box.width);
-          final double top = (box.top + details.delta.dy / canvas.height)
-              .clamp(0.0, 1 - box.height);
-          widget.onChanged(box.copyWith(left: left, top: top));
-        },
-        onPanEnd: (DragEndDetails details) => setState(() {
-          _resizing = false;
-          _moving = false;
-        }),
-        onPanCancel: () => setState(() {
-          _resizing = false;
-          _moving = false;
-        }),
-        child: Stack(
-          children: <Widget>[
-            Positioned.fill(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (DragStartDetails details) =>
+                  setState(() => _grip = _gripAt(details.localPosition)),
+              onPanUpdate: _drag,
+              onPanEnd: (DragEndDetails details) =>
+                  setState(() => _grip = _Grip.move),
+              onPanCancel: () => setState(() => _grip = _Grip.move),
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.78),
                   border: Border.all(
-                    color: _moving || _resizing
+                    color: active
                         ? AppColors.accent
                         : AppColors.accent.withValues(alpha: 0.7),
-                    width: _moving || _resizing ? 2.2 : 1.6,
+                    width: active ? 2.2 : 1.6,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -338,50 +375,63 @@ class _BoxOverlayState extends State<_BoxOverlay> {
                 ),
               ),
             ),
+          ),
+          // Four visible grips: a single corner was easy to miss and made
+          // resizing a guess.
+          for (final _Grip grip in <_Grip>[
+            _Grip.topLeft,
+            _Grip.topRight,
+            _Grip.bottomLeft,
+            _Grip.bottomRight,
+          ])
             Positioned(
-              top: 2,
-              left: 2,
-              child: GestureDetector(
-                onTap: widget.onRemove,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: AppColors.danger,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    size: 13,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: 0,
+              left: grip == _Grip.topLeft || grip == _Grip.bottomLeft
+                  ? 0
+                  : null,
+              right: grip == _Grip.topRight || grip == _Grip.bottomRight
+                  ? 0
+                  : null,
+              top: grip == _Grip.topLeft || grip == _Grip.topRight ? 0 : null,
+              bottom: grip == _Grip.bottomLeft || grip == _Grip.bottomRight
+                  ? 0
+                  : null,
               child: IgnorePointer(
                 child: Container(
-                  width: 16,
-                  height: 16,
+                  width: 12,
+                  height: 12,
+                  margin: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
                     color: AppColors.accent,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(6),
-                      bottomRight: Radius.circular(6),
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.open_in_full_rounded,
-                    size: 10,
-                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 1.2),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          // Floating outside the box so it never covers the region it deletes.
+          Positioned(
+            right: -10,
+            top: -10,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onRemove,
+              child: Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: AppColors.danger,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.6),
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

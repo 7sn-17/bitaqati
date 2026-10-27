@@ -44,9 +44,7 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
     final int retention = reviews == 0 ? 0 : (correct / reviews * 100).round();
     final int longest = _longestStreak(activity);
     final int activeDays = activity.where((day) => day.reviews > 0).length;
-    final String streakValue = currentStreak == 2
-        ? 'يومان'
-        : '$currentStreak';
+    final String streakValue = currentStreak == 2 ? 'يومان' : '$currentStreak';
     final String? streakSuffix = currentStreak == 2
         ? null
         : _dayWord(currentStreak);
@@ -128,24 +126,15 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
               child: Row(
                 children: <Widget>[
                   Expanded(
-                    child: _SmallStat(
-                      label: 'مراجعات',
-                      value: '$reviews',
-                    ),
+                    child: _SmallStat(label: 'مراجعات', value: '$reviews'),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _SmallStat(
-                      label: 'أيام نشطة',
-                      value: '$activeDays',
-                    ),
+                    child: _SmallStat(label: 'أيام نشطة', value: '$activeDays'),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: _SmallStat(
-                      label: 'أطول سلسلة',
-                      value: '$longest',
-                    ),
+                    child: _SmallStat(label: 'أطول سلسلة', value: '$longest'),
                   ),
                 ],
               ),
@@ -195,12 +184,13 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
     if (activity.isEmpty) {
       return 0;
     }
-    final List<DateTime> days = activity
-        .where((ReviewActivityDay day) => day.reviews > 0)
-        .map((ReviewActivityDay day) => _dateOnly(day.day))
-        .toSet()
-        .toList()
-      ..sort();
+    final List<DateTime> days =
+        activity
+            .where((ReviewActivityDay day) => day.reviews > 0)
+            .map((ReviewActivityDay day) => _dateOnly(day.day))
+            .toSet()
+            .toList()
+          ..sort();
     if (days.isEmpty) {
       return 0;
     }
@@ -405,11 +395,11 @@ class _SmallStat extends StatelessWidget {
         children: <Widget>[
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'ReadexPro',
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppColors.primary,
+              color: context.legible(AppColors.primary),
             ),
           ),
           Text(label, style: context.texts.bodySmall?.copyWith(fontSize: 10)),
@@ -459,9 +449,7 @@ class _Heatmap extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.only(left: 2, right: 2),
                         child: _HeatCell(
-                          date: start.add(
-                            Duration(days: week * 7 + weekday),
-                          ),
+                          date: start.add(Duration(days: week * 7 + weekday)),
                           count:
                               counts[_dayKey(
                                 start.add(Duration(days: week * 7 + weekday)),
@@ -546,9 +534,9 @@ class _ForecastChart extends StatelessWidget {
       return SurfaceCard(
         child: Row(
           children: <Widget>[
-            const Icon(
+            Icon(
               CupertinoIcons.checkmark_seal,
-              color: AppColors.primary,
+              color: context.brandInk,
               size: 22,
             ),
             const SizedBox(width: 8),
@@ -599,8 +587,7 @@ class _ForecastChart extends StatelessWidget {
                         child: Align(
                           alignment: Alignment.bottomCenter,
                           child: FractionallySizedBox(
-                            heightFactor:
-                                forecast[index].count == 0
+                            heightFactor: forecast[index].count == 0
                                 ? 0.03
                                 : forecast[index].count / max,
                             child: Container(
@@ -608,9 +595,7 @@ class _ForecastChart extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: index == 0
                                     ? AppColors.accent
-                                    : AppColors.primary.withValues(
-                                        alpha: 0.25,
-                                      ),
+                                    : AppColors.primary.withValues(alpha: 0.25),
                                 borderRadius: const BorderRadius.vertical(
                                   top: Radius.circular(7),
                                 ),
@@ -646,12 +631,10 @@ class _DeckRetention extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<DeckNode> reviewed = decks
-        .where((DeckNode deck) => deck.reviewCount > 0)
-        .toList()
-      ..sort(
-        (DeckNode a, DeckNode b) => b.retention.compareTo(a.retention),
-      );
+    final List<DeckNode> reviewed =
+        decks.where((DeckNode deck) => deck.reviewCount > 0).toList()..sort(
+          (DeckNode a, DeckNode b) => b.retention.compareTo(a.retention),
+        );
     if (reviewed.isEmpty) {
       return SurfaceCard(
         child: Text(
@@ -753,9 +736,7 @@ class _ReviewNowCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              empty
-                  ? CupertinoIcons.checkmark_seal
-                  : CupertinoIcons.clock_fill,
+              empty ? CupertinoIcons.checkmark_seal : CupertinoIcons.clock_fill,
               color: empty ? context.onSoftAccent : AppColors.warningInk,
               size: 22,
             ),
@@ -796,7 +777,8 @@ class _ReviewNowCard extends StatelessWidget {
   }
 }
 
-DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
+DateTime _dateOnly(DateTime value) =>
+    DateTime(value.year, value.month, value.day);
 
 String _dayKey(DateTime value) => _dateOnly(value).toIso8601String();
 
