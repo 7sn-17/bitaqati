@@ -16,7 +16,18 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 RES=android/app/src/main/res
+MANIFEST="$(dirname "$RES")/AndroidManifest.xml"
 DENSITIES="mdpi hdpi xhdpi xxhdpi xxxhdpi"
+
+# flutter_launcher_icons rewrites *every* line that carries android:icon, not
+# only the one on <application>. The three activity-alias entries carry it too,
+# so each run retargeted all of them at its own icon — and the default set runs
+# last, which left every alias pointing at ic_launcher. The aliases still
+# switched, they just all looked identical, so the home screen never changed no
+# matter which icon was picked. The manifest is restored on the way out, on
+# failure as well as success.
+cp "$MANIFEST" "$MANIFEST.iconbak"
+trap 'mv -f "$MANIFEST.iconbak" "$MANIFEST"' EXIT
 
 generate() {
   local config="$1" name="$2" colour="$3"
