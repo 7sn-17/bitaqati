@@ -813,6 +813,23 @@ stacks the plan's months onto `greatest(now(), pro_expiry_date)`, marks it used
 and upserts the profile — one transaction, so a dropped connection cannot burn a
 paid code.
 
+**Deploying it.** The migration is applied with the Supabase CLI or the
+Management API's `database/query` endpoint, and the function with
+`supabase functions deploy activate-code` (or `POST
+/v1/projects/{ref}/functions`). Both are recorded here because the client
+silently degrades without them: the guards stop rejecting and the code field
+starts answering "check your connection".
+
+**Issuing codes.** Rows are inserted by hand after a manual payment:
+
+```sql
+insert into public.activation_codes (code, plan_type, note)
+values ('BTAQ-7K2M-9QX4', 'yearly', 'paid by sham cash, 2026-10-28');
+```
+
+`plan_type` is `monthly`, `quarterly` or `yearly`; `expiry_date` is optional
+and only limits how long the code may be redeemed, not how long Pro lasts.
+
 **Launcher icons.** Three `activity-alias` entries (`.DEFAULT`, `.CrownIcon`,
 `.BlueIcon`) all point at `MainActivity`, which no longer carries the
 MAIN/LAUNCHER filter itself. That is deliberate: the plugin swaps icons by

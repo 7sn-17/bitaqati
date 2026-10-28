@@ -233,9 +233,14 @@ class ProService {
           ? decoded
           : const <String, dynamic>{};
       if (response.statusCode != 200 || body['ok'] != true) {
+        // Only trust the message when the function itself wrote it. The
+        // gateway answers a rejected or expired session with its own English
+        // payload, and showing "Invalid JWT" to an Arabic reader is worse than
+        // the generic sentence below.
         final Object? message = body['message'];
+        final bool fromFunction = body['ok'] == false;
         return ActivationResult.failure(
-          message is String && message.isNotEmpty
+          fromFunction && message is String && message.isNotEmpty
               ? message
               : 'تعذّر التحقق من الكود. تحقق من اتصالك وحاول مرة أخرى.',
         );

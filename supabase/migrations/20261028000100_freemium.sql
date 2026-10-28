@@ -65,13 +65,22 @@ returns trigger
 language plpgsql
 set search_path = public, pg_temp
 as $function$
-declare
-  actor text := coalesce(
-    nullif(current_setting('request.jwt.claim.role', true), ''),
-    current_user
-  );
 begin
-  if actor = 'service_role' then
+  -- auth.uid() is null for every context that is not a signed-in client: the
+  -- service key, the SQL editor, migrations, and the handle_new_user trigger
+  -- that runs before a session exists. Those are the only callers allowed to
+  -- write the paid columns.
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- profiles_insert_own lets a client create its own row, so without this a
+    -- hand-written POST could arrive already Pro.
+    if new.is_pro or new.pro_expiry_date is not null then
+      raise exception 'The subscription can only be changed by the server'
+        using errcode = 'insufficient_privilege';
+    end if;
     return new;
   end if;
 
@@ -87,7 +96,7 @@ $function$;
 
 drop trigger if exists profiles_guard_entitlement on public.profiles;
 create trigger profiles_guard_entitlement
-  before update on public.profiles
+  before insert or update on public.profiles
   for each row execute function public.profiles_guard_entitlement();
 
 comment on function public.profiles_guard_entitlement() is
@@ -373,12 +382,20 @@ begin
   set is_used = true, used_by = p_user, used_at = now()
   where code = v_code.code;
 
-  insert into public.profiles (id, is_pro, pro_expiry_date, updated_at)
-  values (p_user, true, v_expiry, now())
-  on conflict (id) do update
-    set is_pro = true,
-        pro_expiry_date = v_expiry,
-        updated_at = now();
+  -- Update first, then insert only when the row is missing. An insert with
+  -- ON CONFLICT would still have to satisfy profiles.display_name NOT NULL,
+  -- and a code redeemed by an account whose profile row never got created
+  -- would fail at the worst possible moment.
+  update public.profiles
+  set is_pro = true,
+      pro_expiry_date = v_expiry,
+      updated_at = now()
+  where id = p_user;
+
+  if not found then
+    insert into public.profiles (id, display_name, is_pro, pro_expiry_date, updated_at)
+    values (p_user, '', true, v_expiry, now());
+  end if;
 
   return query select true, 'تم تفعيل Pro على هذا الحساب.'::text,
     v_code.plan_type, v_expiry;
@@ -390,3 +407,9 @@ comment on function public.redeem_activation_code(text, uuid) is
 
 revoke all on function public.redeem_activation_code(text, uuid)
   from public, anon, authenticated;
+
+-- The Edge Function calls this with the service key. Revoking from public
+-- removes the implicit grant that every role inherits, so it has to be given
+-- back explicitly to the only role that should have it.
+grant execute on function public.redeem_activation_code(text, uuid)
+  to service_role;
