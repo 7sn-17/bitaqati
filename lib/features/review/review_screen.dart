@@ -877,7 +877,7 @@ class _CardBody extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'اضغط على أي تغطية لكشف إجابتها.',
+            'الإجابات مخفية. اضغط «أظهر الإجابة» لعرضها.',
             textAlign: TextAlign.center,
             style: TextStyle(color: muted, fontSize: 11),
           ),
@@ -949,6 +949,42 @@ class _CardBody extends StatelessWidget {
             onOpenImage: () =>
                 showImageViewer(context, occlusionImageUrl(card.front)),
           ),
+          if (_numberedBoxes(card).isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            _NumberedAnswers(entries: _numberedBoxes(card)),
+          ],
+        ] else if (card.type == 'cloze') ...<Widget>[
+          // The sentence with its blanks filled in, then the same words again
+          // as a list: the sentence shows where each answer belongs, the list
+          // shows what has to be recalled, in order.
+          CardMarkup(
+            text: card.front,
+            revealCloze: true,
+            mediaFirst: true,
+            alignment: CrossAxisAlignment.center,
+            textAlign: TextAlign.center,
+            onTapImage: (String url) => showImageViewer(context, url),
+            style: TextStyle(
+              fontFamily: 'ReadexPro',
+              color: context.onAnswer,
+              fontSize: 27,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+            ),
+            mediaHeight: 220,
+          ),
+          if (clozeAnswers(card.front).isNotEmpty) ...<Widget>[
+            const SizedBox(height: 14),
+            _NumberedAnswers(
+              entries: <_NumberedEntry>[
+                for (int i = 0; i < clozeAnswers(card.front).length; i++)
+                  _NumberedEntry(
+                    number: i + 1,
+                    text: clozeAnswers(card.front)[i],
+                  ),
+              ],
+            ),
+          ],
         ] else
           CardMarkup(
             text: card.back,
@@ -1642,4 +1678,90 @@ String _dayWord(int days) {
     return 'أيام';
   }
   return 'يوماً';
+}
+
+/// One answer in a numbered list, keyed to the plate or blank it belongs to.
+class _NumberedEntry {
+  const _NumberedEntry({required this.number, required this.text});
+
+  final int number;
+  final String text;
+}
+
+/// The answers of an occlusion card, in plate order.
+///
+/// Empty answers are skipped but their numbers are not renumbered: the number
+/// on a plate is what the learner looks for, so the list has to speak the same
+/// numbers as the picture.
+List<_NumberedEntry> _numberedBoxes(ReviewCard card) {
+  final List<OcclusionBox> boxes = occlusionBoxes(card.occlusion);
+  return <_NumberedEntry>[
+    for (int i = 0; i < boxes.length; i++)
+      if (boxes[i].answer.trim().isNotEmpty)
+        _NumberedEntry(number: i + 1, text: boxes[i].answer.trim()),
+  ];
+}
+
+/// The answers under the picture or the filled sentence.
+class _NumberedAnswers extends StatelessWidget {
+  const _NumberedAnswers({required this.entries});
+
+  final List<_NumberedEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (int i = 0; i < entries.length; i++)
+            Padding(
+              padding: EdgeInsets.only(top: i == 0 ? 0 : 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: 19,
+                    height: 19,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: context.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${entries[i].number}',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 10.5,
+                        height: 1.1,
+                        fontWeight: FontWeight.w800,
+                        color: context.onAccent,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      entries[i].text,
+                      style: TextStyle(
+                        fontFamily: 'ReadexPro',
+                        color: context.onAnswer,
+                        fontSize: 16,
+                        height: 1.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

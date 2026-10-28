@@ -650,6 +650,13 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
   }
 
   String _resolvedBack() {
+    if (_kind == _CardKind.cloze) {
+      // Derived, never typed: the first blank is the answer the card is asking
+      // for, and the review lists all of them from the same text.
+      final RegExpMatch? first = kClozeRegex.firstMatch(_front.text);
+      final String answer = first?.group(1)?.trim() ?? '';
+      return answer.isEmpty ? 'بطاقة ملء فراغ' : answer;
+    }
     final String back = _joinMedia(_back.text, _backMedia);
     if (back.isNotEmpty) {
       return back;
@@ -1050,6 +1057,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               const SizedBox(height: 10),
               _ClozeHelper(
                 count: clozeCount(_front.text),
+                answers: clozeAnswers(_front.text),
                 onInsert: _makeCloze,
               ),
             ],
@@ -1057,48 +1065,55 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         ),
       ),
       const SizedBox(height: 16),
-      _FieldCard(
-        label: cloze ? 'شرح إضافي (اختياري)' : 'الإجابة',
-        trailing: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: _back,
-          builder: (BuildContext context, TextEditingValue value, Widget? _) =>
-              SpeakButton(text: value.text, size: 32),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _Toolbar(
-              onBold: () => _toggleWrap('**', '**', 'نص عريض'),
-              onItalic: () => _toggleWrap('_', '_', 'نص مائل'),
-              onMath: () => _toggleWrap(r'$', r'$', 'x^2'),
-              onCloze: null,
-              onTags: () => _openTagSheet(context),
-              onImage: _uploading
-                  ? null
-                  : () => _attach(image: true, toFront: false),
-              onAudio: _uploading
-                  ? null
-                  : () => _attach(image: false, toFront: false),
-              uploading: _uploading,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _back,
-              focusNode: _backFocus,
-              minLines: 3,
-              maxLines: 10,
-              keyboardType: TextInputType.multiline,
-              style: context.texts.bodyLarge?.copyWith(height: 1.75),
-              decoration: editorDecoration(
-                context,
-                hint: cloze ? 'سياق أو تفصيل يظهر بعد الكشف…' : 'اكتب الإجابة…',
-                multiline: true,
+      // A cloze card has no second face: the answers are the words inside its
+      // blanks, and the old "extra explanation" box was a third thing to write
+      // that the card never needed.
+      if (!cloze)
+        _FieldCard(
+          label: 'الإجابة',
+          trailing: ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _back,
+            builder: (
+              BuildContext context,
+              TextEditingValue value,
+              Widget? _,
+            ) => SpeakButton(text: value.text, size: 32),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              _Toolbar(
+                onBold: () => _toggleWrap('**', '**', 'نص عريض'),
+                onItalic: () => _toggleWrap('_', '_', 'نص مائل'),
+                onMath: () => _toggleWrap(r'$', r'$', 'x^2'),
+                onCloze: null,
+                onTags: () => _openTagSheet(context),
+                onImage: _uploading
+                    ? null
+                    : () => _attach(image: true, toFront: false),
+                onAudio: _uploading
+                    ? null
+                    : () => _attach(image: false, toFront: false),
+                uploading: _uploading,
               ),
-            ),
-            _MediaStrip(items: _backMedia, onRemove: _removeMedia),
-          ],
+              const SizedBox(height: 8),
+              TextField(
+                controller: _back,
+                focusNode: _backFocus,
+                minLines: 3,
+                maxLines: 10,
+                keyboardType: TextInputType.multiline,
+                style: context.texts.bodyLarge?.copyWith(height: 1.75),
+                decoration: editorDecoration(
+                  context,
+                  hint: 'اكتب الإجابة…',
+                  multiline: true,
+                ),
+              ),
+              _MediaStrip(items: _backMedia, onRemove: _removeMedia),
+            ],
+          ),
         ),
-      ),
     ];
   }
 
@@ -1935,9 +1950,18 @@ class _ToolButton extends StatelessWidget {
 }
 
 class _ClozeHelper extends StatelessWidget {
-  const _ClozeHelper({required this.count, required this.onInsert});
+  const _ClozeHelper({
+    required this.count,
+    required this.answers,
+    required this.onInsert,
+  });
 
   final int count;
+
+  /// The words currently hidden, read back out of the text. Shown as they are
+  /// written so the author sees the answer list the learner will see.
+  final List<String> answers;
+
   final VoidCallback onInsert;
 
   @override
@@ -1992,6 +2016,30 @@ class _ClozeHelper extends StatelessWidget {
               ),
             ],
           ),
+          if (answers.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: <Widget>[
+                for (int i = 0; i < answers.length; i++)
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(7, 3, 7, 4),
+                    decoration: BoxDecoration(
+                      color: context.cardSurface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${i + 1}. ${answers[i]}',
+                      style: context.texts.labelSmall?.copyWith(
+                        color: context.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );

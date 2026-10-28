@@ -67,6 +67,22 @@ String plainMarkup(String markup) {
 /// Number of cloze deletions in [text].
 int clozeCount(String text) => kClozeRegex.allMatches(text).length;
 
+/// The words hidden in [text], in the order they appear.
+///
+/// The list is derived, never stored: a cloze card's answers are whatever is
+/// inside its blanks, so editing the sentence edits the answers and the two can
+/// never disagree.
+List<String> clozeAnswers(String text) {
+  final List<String> answers = <String>[];
+  for (final RegExpMatch match in kClozeRegex.allMatches(text)) {
+    final String answer = (match.group(1) ?? '').trim();
+    if (answer.isNotEmpty) {
+      answers.add(answer);
+    }
+  }
+  return answers;
+}
+
 /// Replaces every cloze answer with a blank run, for the question side.
 String maskCloze(String text) {
   return text.replaceAllMapped(
@@ -784,13 +800,6 @@ class OcclusionView extends StatefulWidget {
 }
 
 class _OcclusionViewState extends State<OcclusionView> {
-  /// Boxes the learner has tapped open, by index.
-  final Set<int> _revealed = <int>{};
-
-  /// The box whose label is currently called out. One at a time: two pills on
-  /// a small picture would cover the very region they describe.
-  int? _active;
-
   double _aspect = 4 / 3;
 
   @override
@@ -802,11 +811,6 @@ class _OcclusionViewState extends State<OcclusionView> {
   @override
   void didUpdateWidget(covariant OcclusionView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl ||
-        oldWidget.boxes.length != widget.boxes.length) {
-      _revealed.clear();
-      _active = null;
-    }
     if (oldWidget.imageUrl != widget.imageUrl) {
       _resolveAspect();
     }
@@ -816,21 +820,6 @@ class _OcclusionViewState extends State<OcclusionView> {
     resolveImageAspect(widget.imageUrl, (double ratio) {
       if (mounted && ratio != _aspect) {
         setState(() => _aspect = ratio);
-      }
-    });
-  }
-
-  void _tap(int index) {
-    if (!widget.masked) {
-      return;
-    }
-    setState(() {
-      if (_active == index) {
-        _revealed.remove(index);
-        _active = null;
-      } else {
-        _revealed.add(index);
-        _active = index;
       }
     });
   }
@@ -857,12 +846,8 @@ class _OcclusionViewState extends State<OcclusionView> {
                 Positioned.fromRect(
                   rect: rect,
                   child: _OcclusionMask(
-                    box: box,
-                    rect: rect,
-                    frame: frame,
-                    revealed: !widget.masked || _revealed.contains(index),
-                    callout: widget.masked && _active == index,
-                    onTap: () => _tap(index),
+                    number: index + 1,
+                    revealed: !widget.masked,
                   ),
                 ),
               );
@@ -887,145 +872,60 @@ class _OcclusionViewState extends State<OcclusionView> {
   }
 }
 
+/// A numbered plate over one hidden region.
+///
+/// It reveals nothing on tap: an occlusion card behaves like any other card, so
+/// the only thing that opens the answers is the answer side. The number is the
+/// key that ties the plate to the numbered list shown there.
 class _OcclusionMask extends StatelessWidget {
-  const _OcclusionMask({
-    required this.box,
-    required this.rect,
-    required this.frame,
-    required this.revealed,
-    required this.callout,
-    required this.onTap,
-  });
+  const _OcclusionMask({required this.number, required this.revealed});
 
-  final OcclusionBox box;
+  final int number;
 
-  /// Where the mask sits on screen, in pixels.
-  final Rect rect;
-
-  /// The rectangle the picture itself covers. The callout flips below a box
-  /// that sits too close to the top edge to hold a bubble above it.
-  final Rect frame;
-
+  /// True on the answer side, where the picture is shown clean and only a
+  /// hairline marks where the region was.
   final bool revealed;
-
-  /// True for the one box whose label is being called out.
-  final bool callout;
-
-  final VoidCallback onTap;
-
-  /// How tall the label bubble is, including its gap. Used to decide whether
-  /// there is room for it above the box.
-  static const double _calloutRoom = 34;
 
   @override
   Widget build(BuildContext context) {
-    if (!revealed) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
+    if (revealed) {
+      return IgnorePointer(
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: context.isDark ? context.raisedSurface : context.primary,
             border: Border.all(
-              color: context.brandInk.withValues(alpha: 0.55),
-              width: 1.4,
+              color: context.accent.withValues(alpha: 0.6),
+              width: 1.2,
             ),
             borderRadius: BorderRadius.circular(6),
-          ),
-          child: Center(
-            child: Icon(
-              Icons.question_mark_rounded,
-              size: 18,
-              color: context.isDark ? context.brandInk : context.accent,
-            ),
           ),
         ),
       );
     }
-
-    final bool hasAnswer = box.answer.trim().isNotEmpty;
-    final Widget face = Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: context.accent, width: 1.8),
-        borderRadius: BorderRadius.circular(6),
-        color: context.accent.withValues(alpha: 0.12),
-      ),
-      padding: const EdgeInsets.all(3),
-      alignment: Alignment.center,
-      // The bubble carries the label whenever there is one, so the box itself
-      // stays a clean outline instead of squeezing text into a few pixels.
-      child: hasAnswer && !callout
-          ? FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: context.isDark ? context.answerSurface : Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  box.answer,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: context.isDark ? context.ink : context.primary,
-                  ),
-                ),
+    return IgnorePointer(
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.isDark ? context.raisedSurface : context.primary,
+          border: Border.all(
+            color: context.brandInk.withValues(alpha: 0.55),
+            width: 1.4,
+          ),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        alignment: Alignment.center,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: Text(
+              '$number',
+              style: TextStyle(
+                color: context.isDark ? context.brandInk : context.accent,
+                fontSize: 15,
+                height: 1.1,
+                fontWeight: FontWeight.w800,
               ),
-            )
-          : const SizedBox.shrink(),
-    );
-
-    if (!callout || !hasAnswer) {
-      return GestureDetector(onTap: onTap, child: face);
-    }
-
-    final bool above = rect.top - _calloutRoom >= frame.top;
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: <Widget>[
-          Positioned.fill(child: face),
-          Positioned(
-            left: -120,
-            right: -120,
-            top: above ? null : rect.height + 6,
-            bottom: above ? rect.height + 6 : null,
-            child: Center(child: _bubble(context)),
+            ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bubble(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 230),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: context.isDark ? context.answerSurface : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.accent, width: 1.2),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Text(
-        box.answer,
-        textAlign: TextAlign.center,
-        maxLines: 4,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontFamily: 'ReadexPro',
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-          height: 1.5,
-          color: context.isDark ? context.ink : context.primary,
         ),
       ),
     );

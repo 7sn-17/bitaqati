@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -128,6 +130,12 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
     widget.onChanged(next);
   }
 
+  void _remove(int index) {
+    final List<OcclusionBox> next = <OcclusionBox>[...widget.boxes]
+      ..removeAt(index);
+    widget.onChanged(next);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -200,6 +208,7 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                           box: widget.boxes[index],
                           index: index,
                           onChanged: (OcclusionBox box) => _replace(index, box),
+                          onDelete: () => _remove(index),
                         ),
                       if (_start != null && _current != null)
                         Positioned.fromRect(
@@ -283,6 +292,7 @@ class _BoxOverlay extends StatefulWidget {
     required this.box,
     required this.index,
     required this.onChanged,
+    required this.onDelete,
     super.key,
   });
 
@@ -291,6 +301,9 @@ class _BoxOverlay extends StatefulWidget {
   final OcclusionBox box;
   final int index;
   final ValueChanged<OcclusionBox> onChanged;
+
+  /// Removes this box. Wired to the corner badge and to a long press.
+  final VoidCallback onDelete;
 
   @override
   State<_BoxOverlay> createState() => _BoxOverlayState();
@@ -303,14 +316,22 @@ class _BoxOverlayState extends State<_BoxOverlay> {
   /// The smallest a box may be dragged down to, in normalised units.
   static const double _min = 0.04;
 
-  /// Below this the four grips would cover the whole box, so the box only
-  /// moves and resizing is left to drawing a new one.
-  static const double _resizeFloor = 56;
+  /// A fingertip is about this wide. A plate smaller than it gets an invisible
+  /// margin, so a 20 pixel box can still be grabbed and moved.
+  static const double _touchSize = 44;
 
   _Grip? _grip;
 
-  bool get _canResize =>
-      widget.rect.width >= _resizeFloor && widget.rect.height >= _resizeFloor;
+  /// Extra room around the plate, in pixels, so the touch area is never
+  /// smaller than a finger. The plate itself keeps its exact geometry.
+  double get _pad {
+    final double smallest = math.min(widget.rect.width, widget.rect.height);
+    return smallest >= _touchSize ? 0 : (_touchSize - smallest) / 2;
+  }
+
+  /// Small plates get one grip instead of four: four handles on a 20 pixel box
+  /// would cover it completely and leave nowhere to drag it from.
+  bool get _compact => math.min(widget.rect.width, widget.rect.height) < 48;
 
   void _drag(DragUpdateDetails details) {
     final _Grip? grip = _grip;
@@ -380,12 +401,19 @@ class _BoxOverlayState extends State<_BoxOverlay> {
     }
   }
 
-  Widget _handle(_Grip grip) {
+  Widget _handle(_Grip grip, double pad) {
+    // The 26 pixel target is centred on the plate's corner: half of it sits
+    // outside the box, which is what makes a corner reachable on a plate too
+    // small to hold it.
     return Positioned(
-      left: grip == _Grip.topLeft || grip == _Grip.bottomLeft ? 0 : null,
-      right: grip == _Grip.topRight || grip == _Grip.bottomRight ? 0 : null,
-      top: grip == _Grip.topLeft || grip == _Grip.topRight ? 0 : null,
-      bottom: grip == _Grip.bottomLeft || grip == _Grip.bottomRight ? 0 : null,
+      left: grip == _Grip.topLeft || grip == _Grip.bottomLeft ? pad - 13 : null,
+      right: grip == _Grip.topRight || grip == _Grip.bottomRight
+          ? pad - 13
+          : null,
+      top: grip == _Grip.topLeft || grip == _Grip.topRight ? pad - 13 : null,
+      bottom: grip == _Grip.bottomLeft || grip == _Grip.bottomRight
+          ? pad - 13
+          : null,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         dragStartBehavior: DragStartBehavior.down,
@@ -417,11 +445,15 @@ class _BoxOverlayState extends State<_BoxOverlay> {
   @override
   Widget build(BuildContext context) {
     final bool active = _grip != null;
+    final double pad = _pad;
     return Positioned.fromRect(
-      rect: widget.rect,
+      rect: widget.rect.inflate(pad),
       child: Stack(
         clipBehavior: Clip.none,
         children: <Widget>[
+          // The gesture surface is the inflated rect; the plate is drawn at
+          // its true size by the margin, so nothing moves when the touch area
+          // grows.
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
@@ -432,7 +464,11 @@ class _BoxOverlayState extends State<_BoxOverlay> {
               onPanEnd: (DragEndDetails details) =>
                   setState(() => _grip = null),
               onPanCancel: () => setState(() => _grip = null),
+              // A long press is the second way out of a box that is too small
+              // to aim at its corner badge.
+              onLongPress: widget.onDelete,
               child: Container(
+                margin: EdgeInsets.all(pad),
                 decoration: BoxDecoration(
                   color: context.primary.withValues(alpha: 0.72),
                   border: Border.all(
@@ -444,23 +480,56 @@ class _BoxOverlayState extends State<_BoxOverlay> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  (widget.index + 1).toString(),
-                  style: TextStyle(
-                    color: context.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Padding(
+                    padding: const EdgeInsets.all(1),
+                    child: Text(
+                      (widget.index + 1).toString(),
+                      style: TextStyle(
+                        color: context.accent,
+                        fontSize: 13,
+                        height: 1.1,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-          if (_canResize) ...<Widget>[
-            _handle(_Grip.topLeft),
-            _handle(_Grip.topRight),
-            _handle(_Grip.bottomLeft),
-            _handle(_Grip.bottomRight),
+          if (_compact)
+            _handle(_Grip.bottomRight, pad)
+          else ...<Widget>[
+            _handle(_Grip.topLeft, pad),
+            _handle(_Grip.topRight, pad),
+            _handle(_Grip.bottomLeft, pad),
+            _handle(_Grip.bottomRight, pad),
           ],
+          // The delete badge sits on the plate's top-right corner, outside it,
+          // so it never covers the number or the image the box is marking.
+          Positioned(
+            right: pad - 9,
+            top: pad - 9,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: widget.onDelete,
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: context.danger,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.6),
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 13,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
