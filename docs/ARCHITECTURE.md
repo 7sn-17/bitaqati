@@ -837,6 +837,22 @@ disabling every alias but one, and disabling the alias *target* would leave the
 app with no launcher entry at all. CI runs `flutter_launcher_icons` three times,
 once per icon set.
 
+Each set is two files, and the split matters. `default.png` is the full-bleed
+artwork and is what the legacy mipmap ships; `default_adaptive.png` is the same
+artwork scaled to 70 % and composited on the icon's own corner colour, and it is
+what `adaptive_icon_foreground` points at with `adaptive_icon_foreground_inset:
+0`. The scale has to live in the PNG rather than in the inset: an inset leaves
+the foreground layer's transparent centre resting on the background, which
+shows as a pale ring at every edge. The launcher masks the foreground to a
+72/108 circle, so artwork that fills the canvas loses its corners — which is
+exactly what the first release of the icons did. The settings preview draws the
+same composed file at the same 70 % inside a `ClipOval`, so the tile and the
+home screen cannot disagree.
+
+`values-v31/styles.xml` and `values-night-v31/styles.xml` pin the Android 12
+splash to `@mipmap/ic_launcher` with the same background colour, so the splash,
+the default alias and the login logo are one image.
+
 ## Cloud schema
 
 Migrations live in `supabase/migrations/` and are applied in filename order:

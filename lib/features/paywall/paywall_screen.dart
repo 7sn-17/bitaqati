@@ -288,11 +288,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 fillColor: context.pay.greenSoft,
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: const BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(color: context.pay.border, width: 2),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: const BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide(color: context.pay.green, width: 2),
                 ),
               ),
@@ -395,7 +395,7 @@ class _Header extends StatelessWidget {
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: context.pay.chip,
-              borderRadius: const BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: <Widget>[
@@ -437,7 +437,7 @@ class _Segment extends StatelessWidget {
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
         child: ClipRRect(
-          borderRadius: const BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
             height: 40,
             alignment: Alignment.center,
@@ -485,7 +485,7 @@ class _ReasonStrip extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.pay.yellowSoft,
         border: Border.all(color: context.pay.yellow, width: 2),
-        borderRadius: const BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
         children: <Widget>[
@@ -582,7 +582,7 @@ class _Title extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(10, 0, 10, 2),
                     decoration: BoxDecoration(
                       color: context.pay.yellow,
-                      borderRadius: const BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       'Pro',
@@ -721,7 +721,7 @@ class _PlanCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: context.pay.yellow,
-                    borderRadius: const BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     'الأكثر اختياراً · وفر 50%',
@@ -788,7 +788,7 @@ class _SupportBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.pay.yellowSoft,
         border: Border.all(color: context.pay.yellow, width: 2),
-        borderRadius: const BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -914,7 +914,7 @@ class _MethodTile extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: artBackground,
-                    borderRadius: const BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: SizedBox(
                     width: 72,
@@ -1102,7 +1102,7 @@ class _PrimaryButton extends StatelessWidget {
           height: 58,
           decoration: BoxDecoration(
             color: enabled ? context.pay.green : context.pay.radioEmpty,
-            borderRadius: const BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: <BoxShadow>[
               BoxShadow(
                 color: enabled ? context.pay.greenDark : context.pay.border,
@@ -1154,7 +1154,7 @@ class _Feedback extends StatelessWidget {
           color: ok ? context.pay.green : context.pay.heart,
           width: 2,
         ),
-        borderRadius: const BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
         text,
@@ -1262,7 +1262,7 @@ class _Comparison extends StatelessWidget {
           decoration: BoxDecoration(
             color: context.pay.white,
             border: Border.all(color: context.pay.border, width: 2),
-            borderRadius: const BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(20),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(

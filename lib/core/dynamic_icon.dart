@@ -13,6 +13,7 @@ class AppIconOption {
     required this.label,
     required this.note,
     required this.asset,
+    required this.adaptiveAsset,
     required this.background,
     this.pro = false,
   });

@@ -82,7 +82,7 @@ Future<void> _showUpgrade({
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: context.pay.green,
-                      borderRadius: const BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(16),
                       boxShadow: <BoxShadow>[
                         BoxShadow(
                           color: context.pay.greenDark,

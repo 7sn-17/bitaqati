@@ -206,7 +206,7 @@ class _LockedMascot extends StatelessWidget {
               lip: 5,
             ),
             child: const Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16),
               child: CustomPaint(painter: MascotPainter()),
             ),
           ),
@@ -251,16 +251,16 @@ class _Primary extends StatelessWidget {
       height: 58,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: const BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(18),
           boxShadow: <BoxShadow>[
             BoxShadow(color: context.pay.greenDark, offset: const Offset(0, 5)),
           ],
         ),
         child: Material(
           color: context.pay.green,
-          borderRadius: const BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(18),
           child: InkWell(
-            borderRadius: const BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(18),
             onTap: onPressed,
             child: Center(child: child),
           ),
