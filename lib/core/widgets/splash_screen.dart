@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -20,12 +20,11 @@ const Color _launchField = Color(0xFF0B0F0C);
 
 /// The animated launch screen.
 ///
-/// Sits above the router for the first moment of the process: the field takes
-/// the colour of the icon this install is wearing, the icon lands with a short
-/// overshoot under a glow, the name slides in from the right while it sharpens,
-/// and the tagline follows. It is a cover, not a route, so nothing in the
-/// navigation stack knows it happened and a deep link that arrives during it
-/// still lands on the right screen.
+/// Three things and nothing else: a field that takes the colour of the icon
+/// this install is wearing, the icon itself under a breathing halo with a band
+/// of light crossing it, and the name. There is no rule, no divider and no
+/// border anywhere on this screen — every edge is a gradient, so nothing can
+/// read as a line.
 class AnimatedSplash extends ConsumerStatefulWidget {
   const AnimatedSplash({required this.child, required this.arabic, super.key});
 
@@ -40,7 +39,7 @@ class AnimatedSplash extends ConsumerStatefulWidget {
 
 class _AnimatedSplashState extends ConsumerState<AnimatedSplash> {
   /// When the entrance is over and the sheet starts to fade.
-  static const Duration _hold = Duration(milliseconds: 1500);
+  static const Duration _hold = Duration(milliseconds: 1650);
 
   static const Duration _fade = Duration(milliseconds: 420);
 
@@ -110,7 +109,7 @@ class _SplashSheet extends StatelessWidget {
     // before a single pixel of UI is drawn.
     return TweenAnimationBuilder<Color?>(
       tween: ColorTween(begin: _launchField, end: icon.background),
-      duration: const Duration(milliseconds: 620),
+      duration: const Duration(milliseconds: 700),
       curve: Curves.easeOutCubic,
       builder: (BuildContext context, Color? field, Widget? child) {
         return ColoredBox(color: field ?? _launchField, child: child);
@@ -119,63 +118,40 @@ class _SplashSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Container(
-                  width: 108,
-                  height: 108,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(32),
-                    boxShadow: <BoxShadow>[
-                      // A light bloom of the icon's own field: on the navy icon
-                      // it reads as a cool halo, on the greens as warm light.
-                      BoxShadow(
-                        color: Color.lerp(
-                          icon.background,
-                          Colors.white,
-                          0.55,
-                        )!.withValues(alpha: 0.42),
-                        blurRadius: 46,
-                        spreadRadius: 6,
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Image.asset(icon.asset, fit: BoxFit.cover),
-                )
-                // The overshoot is what makes it feel like the icon was
-                // placed rather than switched on.
-                .animate()
-                .fadeIn(duration: 320.ms, curve: Curves.easeOut)
-                .scale(
-                  begin: const Offset(0.68, 0.68),
-                  end: const Offset(1, 1),
-                  duration: 700.ms,
-                  curve: Curves.easeOutBack,
-                ),
-            const SizedBox(height: 26),
-            _SplashName(
-              text: arabic ? AppConfig.appNameAr : AppConfig.appNameEn,
-            ),
-            const SizedBox(height: 8),
+            _SplashIcon(icon: icon),
+            const SizedBox(height: 38),
             Text(
-                  arabic
-                      ? 'حفظٌ يتجدّد، بطاقةً بعد بطاقة'
-                      : 'Memory that renews, one card at a time',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: 12.5,
-                    height: 1.6,
-                    color: Colors.white.withValues(alpha: 0.66),
-                  ),
-                )
-                .animate()
-                .fadeIn(delay: 620.ms, duration: 460.ms)
-                .slideY(
-                  begin: 0.4,
-                  end: 0,
-                  delay: 620.ms,
-                  duration: 520.ms,
-                  curve: Curves.easeOutCubic,
-                ),
+              arabic ? AppConfig.appNameAr : AppConfig.appNameEn,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 44,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.18,
+              ),
+            ).animate().fadeIn(
+              delay: 220.ms,
+              duration: 820.ms,
+              curve: Curves.easeOut,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              arabic
+                  ? 'حفظٌ يتجدّد، بطاقةً بعد بطاقة'
+                  : 'Memory that renews, one card at a time',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 13,
+                height: 1.6,
+                color: Colors.white.withValues(alpha: 0.58),
+              ),
+            ).animate().fadeIn(
+              delay: 700.ms,
+              duration: 700.ms,
+              curve: Curves.easeOut,
+            ),
           ],
         ),
       ),
@@ -183,49 +159,144 @@ class _SplashSheet extends StatelessWidget {
   }
 }
 
-/// The app name: in from the right, out of focus into sharp.
+/// The icon, lit.
 ///
-/// The blur is a plain [ImageFilter] driven by a tween rather than an
-/// animation package effect — it is the one part of the entrance that has to
-/// resolve over a different span than the slide, and two independent clocks
-/// express that more honestly than one curve with a delay bolted on.
-class _SplashName extends StatelessWidget {
-  const _SplashName({required this.text});
+/// One clock drives both the breath and the sweep, so the light always crosses
+/// the artwork at the same point in the pulse and the two never drift into
+/// looking like separate effects. The sweep is a gradient with soft stops —
+/// no mask, no hard edge, nothing that can render as a line.
+class _SplashIcon extends StatefulWidget {
+  const _SplashIcon({required this.icon});
 
-  final String text;
+  final AppIconOption icon;
+
+  @override
+  State<_SplashIcon> createState() => _SplashIconState();
+}
+
+class _SplashIconState extends State<_SplashIcon>
+    with SingleTickerProviderStateMixin {
+  static const double _size = 148;
+
+  late final AnimationController _clock = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _clock.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 8, end: 0),
-      duration: const Duration(milliseconds: 780),
-      curve: Curves.easeOutCubic,
-      builder: (BuildContext context, double sigma, Widget? child) {
-        return ImageFiltered(
-          imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-          child: child,
-        );
-      },
-      child:
-          Text(
-                text,
-                style: const TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 27,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  height: 1.2,
+    final Color field = widget.icon.background;
+    // A light bloom of the icon's own field: on the navy icon it reads as a
+    // cool halo, on the greens as warm light.
+    final Color glow = Color.lerp(field, Colors.white, 0.58)!;
+
+    return AnimatedBuilder(
+          animation: _clock,
+          builder: (BuildContext context, Widget? child) {
+            final double breath =
+                0.5 + 0.5 * math.sin(_clock.value * 2 * math.pi);
+            return Transform.scale(
+              scale: 1 + 0.022 * breath,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(42),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: glow.withValues(alpha: 0.30 + 0.14 * breath),
+                      blurRadius: 64 + 18 * breath,
+                      spreadRadius: 8,
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.32),
+                      blurRadius: 28,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
                 ),
-              )
-              .animate()
-              .fadeIn(delay: 260.ms, duration: 420.ms)
-              .slideX(
-                begin: 0.32,
-                end: 0,
-                delay: 260.ms,
-                duration: 620.ms,
-                curve: Curves.easeOutCubic,
+                child: child,
               ),
+            );
+          },
+          child: SizedBox(
+            width: _size,
+            height: _size,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(42),
+              child: Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  Image.asset(widget.icon.asset, fit: BoxFit.cover),
+                  _Sweep(clock: _clock, size: _size),
+                ],
+              ),
+            ),
+          ),
+        )
+        .animate()
+        .fadeIn(duration: 320.ms, curve: Curves.easeOut)
+        .scale(
+          begin: const Offset(0.86, 0.86),
+          end: const Offset(1, 1),
+          duration: 760.ms,
+          curve: Curves.easeOutBack,
+        );
+  }
+}
+
+/// The band of light that crosses the artwork.
+///
+/// Built from a gradient whose two ends are fully transparent, so the band has
+/// no edge of its own: what moves is brightness, not a shape. It travels from
+/// beyond one corner to beyond the other, which is what makes it read as a
+/// reflection rather than a wipe.
+class _Sweep extends StatelessWidget {
+  const _Sweep({required this.clock, required this.size});
+
+  final AnimationController clock;
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: clock,
+        builder: (BuildContext context, Widget? child) {
+          final double phase = Curves.easeInOutCubic.transform(
+            (clock.value + 0.15) % 1,
+          );
+          // The band is wider than the icon, so its ends are always off-screen.
+          final double travel = (phase * 2.4 - 0.7) * size;
+          return Transform.translate(
+            offset: Offset(travel, travel * 0.55),
+            child: Transform.rotate(angle: math.pi / 5.2, child: child),
+          );
+        },
+        child: Container(
+          width: size * 0.52,
+          height: size * 2,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: <Color>[
+                Colors.white.withValues(alpha: 0),
+                Colors.white.withValues(alpha: 0.06),
+                Colors.white.withValues(alpha: 0.30),
+                Colors.white.withValues(alpha: 0.06),
+                Colors.white.withValues(alpha: 0),
+              ],
+              stops: const <double>[0.0, 0.32, 0.5, 0.68, 1.0],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
