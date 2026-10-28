@@ -60,7 +60,7 @@ class ReminderCoordinator {
   final Ref _ref;
 
   Timer? _debounce;
-  ({int slots, String? deckId})? _last;
+  ({int slots, String? deckId, bool exact})? _last;
   bool _disposed = false;
 
   /// Call whenever the amount of work changes, or when the app resumes.
