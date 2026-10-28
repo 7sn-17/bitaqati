@@ -5,10 +5,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/arabic_date.dart';
 import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
 import '../../core/notifications/reminder_providers.dart';
@@ -114,16 +116,26 @@ class SettingsScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'ReadexPro',
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
+                          Row(
+                            children: <Widget>[
+                              Flexible(
+                                child: Text(
+                                  displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: 'ReadexPro',
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              if (pro.active) ...<Widget>[
+                                const SizedBox(width: 8),
+                                const _HeaderProBadge(),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -135,6 +147,18 @@ class SettingsScreen extends ConsumerWidget {
                               fontSize: 12,
                             ),
                           ),
+                          if (pro.active && pro.expiry != null) ...<Widget>[
+                            const SizedBox(height: 3),
+                            Text(
+                              'ينتهي في ${formatArabicDate(pro.expiry!)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -168,17 +192,6 @@ class SettingsScreen extends ConsumerWidget {
             ),
             const _SectionLabel('أيقونة التطبيق'),
             const _AppIconPicker(),
-            const _SectionLabel('الحساب'),
-            _Group(
-              children: <Widget>[
-                _Row(
-                  icon: CupertinoIcons.mail,
-                  title: 'البريد الإلكتروني',
-                  subtitle: user?.email ?? 'غير مرتبط بعد',
-                  onTap: user == null ? () => _goToLogin(ref) : null,
-                ),
-              ],
-            ),
             const _SectionLabel('المظهر'),
             _Group(
               children: <Widget>[
@@ -1248,6 +1261,43 @@ String _proSubtitle(ProStatus pro) {
   return '${FreeLimits.decks} مجموعة و${FreeLimits.cards} بطاقة في الخطة المجانية';
 }
 
+/// The crown on the profile card, next to the reader's own name.
+///
+/// The subscription row three sections down says the same thing, but a paid
+/// reader opening Settings wants the answer where they look first. It sits on
+/// the dark card, so it borrows the card's own white rather than a palette
+/// colour that could collide with the background.
+class _HeaderProBadge extends StatelessWidget {
+  const _HeaderProBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const FaIcon(FontAwesomeIcons.crown, size: 9, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(
+            'Pro',
+            style: TextStyle(
+              fontFamily: 'ReadexPro',
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withValues(alpha: 0.95),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The little pill on the subscription row.
 class _ProChip extends StatelessWidget {
   const _ProChip({required this.active});
@@ -1428,7 +1478,7 @@ class _IconTile extends StatelessWidget {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
+                shape: BoxShape.circle,
                 border: Border.all(
                   color: selected ? context.brandInk : context.hairline,
                   width: selected ? 2.2 : 1,
@@ -1437,13 +1487,21 @@ class _IconTile extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: <Widget>[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.asset(
-                      option.asset,
+                  // The launcher's own preview: the composed adaptive layer,
+                  // masked to the same circle Android uses. The 70% inset is
+                  // already baked into the file, so this tile and the home
+                  // screen are drawn from one image, not two guesses.
+                  ClipOval(
+                    child: Container(
                       width: 62,
                       height: 62,
-                      fit: BoxFit.cover,
+                      color: option.background,
+                      child: Image.asset(
+                        option.adaptiveAsset,
+                        width: 62,
+                        height: 62,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   if (locked)
@@ -1451,7 +1509,7 @@ class _IconTile extends StatelessWidget {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.42),
-                          borderRadius: BorderRadius.circular(16),
+                          shape: BoxShape.circle,
                         ),
                         child: const Center(
                           child: Icon(

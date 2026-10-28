@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/arabic_date.dart';
 import '../core/auth/auth_providers.dart';
 import '../core/config/app_config.dart';
 import '../core/providers.dart';
@@ -183,9 +184,16 @@ class ProService {
       final DateTime? expiry = rawExpiry is String
           ? DateTime.tryParse(rawExpiry)?.toLocal()
           : null;
+      // The row can still say Pro after its date has passed: the flag is what
+      // the server wrote when the code was redeemed, not a live clock. Cache
+      // the honest answer, but keep the date, because "has ever paid" is what
+      // grants the freeze bonus once the subscription lapses.
+      final bool paid = row['is_pro'] == true;
+      final bool live =
+          paid && (expiry == null || expiry.isAfter(DateTime.now()));
       await _ref
           .read(profileRepositoryProvider)
-          .cachePro(scope, isPro: row['is_pro'] == true, expiry: expiry);
+          .cachePro(scope, isPro: live, expiry: expiry);
     } catch (_) {
       // Offline, or the row is not visible yet. The cached value stands.
     }
@@ -252,8 +260,13 @@ class ProService {
       await _ref
           .read(profileRepositoryProvider)
           .cachePro(scope, isPro: true, expiry: expiry);
+      // Naming the date answers the only question the reader has after a code
+      // works: how long is this for.
+      final String until = expiry == null
+          ? ''
+          : ' حتى ${formatArabicDate(expiry)}';
       return ActivationResult.success(
-        message: 'تم تفعيل Pro على هذا الحساب.',
+        message: 'تم تفعيل Pro على هذا الحساب$until.',
         plan: ProPlanInfo.fromCloud('${body['plan_type'] ?? ''}'),
         expiry: expiry,
       );

@@ -117,8 +117,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(26),
+            // The launcher icon, not the old brand mark: the first screen
+            // and the home screen should show the same picture.
             child: Image.asset(
-              'assets/branding/icon.png',
+              'assets/app_icons/default.png',
               width: 88,
               height: 88,
               fit: BoxFit.cover,

@@ -13,5 +13,7 @@ flutter_launcher_icons:
   image_path: "assets/app_icons/crown.png"
   min_sdk_android: 21
   adaptive_icon_background: "#14662A"
-  adaptive_icon_foreground: "assets/app_icons/crown.png"
+  # The 70% version on its own background: the launcher masks the adaptive
+  # foreground to a circle, so full-bleed artwork loses its corners.
+  adaptive_icon_foreground: "assets/app_icons/crown_adaptive.png"
   adaptive_icon_foreground_inset: 0

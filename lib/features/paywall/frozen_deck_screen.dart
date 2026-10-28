@@ -78,7 +78,7 @@ class _Wall extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PaywallInk.page,
+      backgroundColor: context.pay.page,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -91,11 +91,11 @@ class _Wall extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'Cairo',
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    color: PaywallInk.ink,
+                    color: context.pay.ink,
                     height: 1.35,
                   ),
                 ),
@@ -104,11 +104,11 @@ class _Wall extends StatelessWidget {
                   Text(
                     subtitle!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: PaywallInk.green,
+                      color: context.pay.green,
                     ),
                   ),
                 ],
@@ -116,19 +116,19 @@ class _Wall extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                   decoration: paywallToyBox(
-                    fill: PaywallInk.white,
-                    border: PaywallInk.border,
+                    fill: context.pay.white,
+                    border: context.pay.border,
                     radius: 18,
                     lip: 4,
                   ),
                   child: Text(
                     message,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 13.5,
                       fontWeight: FontWeight.w500,
-                      color: PaywallInk.muted,
+                      color: context.pay.muted,
                       height: 1.85,
                     ),
                   ),
@@ -139,19 +139,19 @@ class _Wall extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      const FaIcon(
+                      FaIcon(
                         FontAwesomeIcons.crown,
                         size: 15,
-                        color: PaywallInk.white,
+                        color: context.pay.onGreen,
                       ),
                       const SizedBox(width: 10),
                       Text(
                         action,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Cairo',
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: PaywallInk.white,
+                          color: context.pay.onGreen,
                         ),
                       ),
                     ],
@@ -164,13 +164,13 @@ class _Wall extends StatelessWidget {
                       Navigator.of(context).pop();
                     }
                   },
-                  child: const Text(
+                  child: Text(
                     'رجوع',
                     style: TextStyle(
                       fontFamily: 'Cairo',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: PaywallInk.muted,
+                      color: context.pay.muted,
                     ),
                   ),
                 ),
@@ -200,13 +200,13 @@ class _LockedMascot extends StatelessWidget {
             width: 112,
             height: 112,
             decoration: paywallToyBox(
-              fill: PaywallInk.yellowSoft,
-              border: PaywallInk.yellow,
+              fill: context.pay.yellowSoft,
+              border: context.pay.yellow,
               radius: 28,
               lip: 5,
             ),
             child: const Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: CustomPaint(painter: MascotPainter()),
             ),
           ),
@@ -217,15 +217,15 @@ class _LockedMascot extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: paywallToyBox(
-                fill: PaywallInk.green,
-                border: PaywallInk.greenDark,
+                fill: context.pay.green,
+                border: context.pay.greenDark,
                 radius: 15,
                 lip: 4,
               ),
-              child: const FaIcon(
+              child: FaIcon(
                 FontAwesomeIcons.lock,
                 size: 17,
-                color: PaywallInk.white,
+                color: context.pay.onGreen,
               ),
             ),
           ),
@@ -251,16 +251,16 @@ class _Primary extends StatelessWidget {
       height: 58,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(color: PaywallInk.greenDark, offset: Offset(0, 5)),
+          borderRadius: const BorderRadius.circular(18),
+          boxShadow: <BoxShadow>[
+            BoxShadow(color: context.pay.greenDark, offset: const Offset(0, 5)),
           ],
         ),
         child: Material(
-          color: PaywallInk.green,
-          borderRadius: BorderRadius.circular(18),
+          color: context.pay.green,
+          borderRadius: const BorderRadius.circular(18),
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: const BorderRadius.circular(18),
             onTap: onPressed,
             child: Center(child: child),
           ),

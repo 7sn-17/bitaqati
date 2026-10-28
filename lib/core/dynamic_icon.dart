@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 import 'package:flutter_dynamic_icon_plus/flutter_dynamic_icon_plus.dart';
 
 /// One launcher icon the learner can wear.
@@ -11,13 +13,27 @@ class AppIconOption {
     required this.label,
     required this.note,
     required this.asset,
+    required this.background,
     this.pro = false,
   });
 
   final String alias;
   final String label;
   final String note;
+
+  /// The full-bleed artwork, which is what the legacy mipmap ships.
   final String asset;
+
+  /// The composed adaptive layer: the same artwork at 70% on [background].
+  ///
+  /// The launcher masks this file to a circle and draws it edge to edge, so
+  /// the settings preview uses this one at full tile size. Using [asset] and
+  /// scaling it down by hand would show the card smaller than the home screen
+  /// does — the artwork already sits inside the adaptive safe zone.
+  final String adaptiveAsset;
+
+  /// The colour behind the artwork in the adaptive layer.
+  final Color background;
 
   /// True for the icons that are part of the paid tier.
   final bool pro;
@@ -33,12 +49,16 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
     label: 'الافتراضي',
     note: 'الأصفر',
     asset: 'assets/app_icons/default.png',
+    adaptiveAsset: 'assets/app_icons/default_adaptive.png',
+    background: Color(0xFF1A4632),
   ),
   AppIconOption(
     alias: 'CrownIcon',
     label: 'التاج',
     note: 'لمشتركي Pro',
     asset: 'assets/app_icons/crown.png',
+    adaptiveAsset: 'assets/app_icons/crown_adaptive.png',
+    background: Color(0xFF14662A),
     pro: true,
   ),
   AppIconOption(
@@ -46,6 +66,8 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
     label: 'الأزرق',
     note: 'لمشتركي Pro',
     asset: 'assets/app_icons/blue.png',
+    adaptiveAsset: 'assets/app_icons/blue_adaptive.png',
+    background: Color(0xFF0F2C51),
     pro: true,
   ),
 ];

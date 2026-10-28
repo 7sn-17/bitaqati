@@ -2,26 +2,128 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// The fixed ink of the paywall.
+import '../../core/theme/app_theme.dart';
+
+/// The fixed ink of the mascot illustration.
 ///
-/// The paywall is a marketing surface with its own artwork, drawn from the
-/// approved design: it keeps these values whatever identity the rest of the app
-/// is wearing, the same way a printed poster does not change colour because the
-/// room was repainted.
-abstract final class PaywallInk {
-  static const Color page = Color(0xFFF4FAF1);
+/// The mascot is a character rather than a surface: it keeps its own colours
+/// whatever identity the app is wearing, the way a mascot printed on a poster
+/// does not change because the room was repainted. Everything around it comes
+/// from [PaywallInk], which follows the active theme.
+abstract final class PaywallArtInk {
   static const Color ink = Color(0xFF14301F);
-  static const Color muted = Color(0xFF4A6354);
   static const Color green = Color(0xFF1E8A3B);
-  static const Color greenDark = Color(0xFF14672B);
-  static const Color border = Color(0xFFD5E6D3);
-  static const Color chip = Color(0xFFE3F0E0);
   static const Color yellow = Color(0xFFFFC93C);
-  static const Color yellowSoft = Color(0xFFFFF6D6);
-  static const Color greenSoft = Color(0xFFE7F6E4);
-  static const Color radioEmpty = Color(0xFF9DB8A3);
-  static const Color heart = Color(0xFFE5484D);
   static const Color white = Color(0xFFFFFFFF);
+}
+
+/// The paywall's palette, resolved from the active theme.
+///
+/// The design was drawn against one fixed set of greens. Those values survive
+/// as the *relationships* — a page, a card, a deep ink, a bright action colour,
+/// a soft wash of it, a highlight — and every one of them is now read from the
+/// theme, so the screen wears Forest, Ocean, Sunset or Classic and switches
+/// between light and dark without a single hard-coded colour.
+///
+/// The action colour is [accent] rather than [primary]: a primary button in
+/// this app is the bright highlight with deep ink on top, which is what keeps
+/// the call to action loud on a near-white canvas and on a near-black one.
+@immutable
+class PaywallInk {
+  const PaywallInk({
+    required this.page,
+    required this.ink,
+    required this.muted,
+    required this.green,
+    required this.onGreen,
+    required this.greenDark,
+    required this.border,
+    required this.chip,
+    required this.yellow,
+    required this.onYellow,
+    required this.yellowSoft,
+    required this.greenSoft,
+    required this.radioEmpty,
+    required this.heart,
+    required this.dangerSoft,
+    required this.white,
+  });
+
+  factory PaywallInk.of(BuildContext context) {
+    return PaywallInk(
+      page: context.canvas,
+      ink: context.ink,
+      muted: context.muted,
+      green: context.accent,
+      onGreen: context.onAccent,
+      greenDark: context.accentDeep,
+      border: context.hairline,
+      chip: context.softAccent,
+      yellow: context.star,
+      // [star] is the same gold in every palette, so the ink on top of it is
+      // fixed too: it is a badge, not a surface.
+      onYellow: const Color(0xFF231A00),
+      yellowSoft: context.warningSurface,
+      greenSoft: context.accentSoft,
+      radioEmpty: context.muted.withValues(alpha: 0.45),
+      heart: context.danger,
+      dangerSoft: context.danger.withValues(alpha: 0.12),
+      white: context.cardSurface,
+    );
+  }
+
+  /// The page behind everything.
+  final Color page;
+
+  /// Primary text.
+  final Color ink;
+
+  /// Secondary text and captions.
+  final Color muted;
+
+  /// The action colour: buttons, selected radios, prices.
+  final Color green;
+
+  /// Text and glyphs drawn on [green].
+  final Color onGreen;
+
+  /// One step darker than [green], for the lip under a button.
+  final Color greenDark;
+
+  /// Outlines and dividers.
+  final Color border;
+
+  /// Neutral pill behind a label.
+  final Color chip;
+
+  /// The gold badge.
+  final Color yellow;
+
+  /// Ink for anything drawn on [yellow].
+  final Color onYellow;
+
+  /// Soft wash behind a warning or a nudge.
+  final Color yellowSoft;
+
+  /// Soft wash of the action colour.
+  final Color greenSoft;
+
+  /// An unselected control.
+  final Color radioEmpty;
+
+  /// Negative feedback.
+  final Color heart;
+
+  /// Background for negative feedback.
+  final Color dangerSoft;
+
+  /// Card background.
+  final Color white;
+}
+
+extension PaywallColors on BuildContext {
+  /// The paywall palette for this theme.
+  PaywallInk get pay => PaywallInk.of(this);
 }
 
 /// The design's card treatment: a 2px outline plus a thick coloured lip along
@@ -58,8 +160,8 @@ class MascotPainter extends CustomPainter {
     canvas.save();
     canvas.scale(scale, scale);
 
-    final Paint inkPaint = Paint()..color = PaywallInk.ink;
-    final Paint whitePaint = Paint()..color = PaywallInk.white;
+    final Paint inkPaint = Paint()..color = PaywallArtInk.ink;
+    final Paint whitePaint = Paint()..color = PaywallArtInk.white;
 
     // Back card, tilted left and slightly translucent-looking behind the front.
     canvas.save();
@@ -83,7 +185,7 @@ class MascotPainter extends CustomPainter {
         Rect.fromCenter(center: Offset.zero, width: 66, height: 76),
         const Radius.circular(16),
       ),
-      Paint()..color = PaywallInk.yellow,
+      Paint()..color = PaywallArtInk.yellow,
     );
     canvas.restore();
 
@@ -98,7 +200,7 @@ class MascotPainter extends CustomPainter {
         ..moveTo(48, 58)
         ..cubicTo(53, 65, 62, 66, 68, 59),
       Paint()
-        ..color = PaywallInk.ink
+        ..color = PaywallArtInk.ink
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3.5
         ..strokeCap = StrokeCap.round,
@@ -121,7 +223,7 @@ class MascotPainter extends CustomPainter {
         ..lineTo(82, 18)
         ..lineTo(88, 16)
         ..close(),
-      Paint()..color = PaywallInk.green,
+      Paint()..color = PaywallArtInk.green,
     );
 
     canvas.restore();
@@ -214,7 +316,7 @@ class PaymentArtPainter extends CustomPainter {
         const Rect.fromLTWH(32, 2, 32, 60),
         const Radius.circular(7),
       ),
-      Paint()..color = PaywallInk.green,
+      Paint()..color = PaywallArtInk.green,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -226,7 +328,7 @@ class PaymentArtPainter extends CustomPainter {
     canvas.drawCircle(
       const Offset(48, 26),
       7,
-      Paint()..color = PaywallInk.green,
+      Paint()..color = PaywallArtInk.green,
     );
     canvas.drawPath(
       Path()
@@ -245,7 +347,7 @@ class PaymentArtPainter extends CustomPainter {
         const Rect.fromLTWH(40, 38, 16, 4),
         const Radius.circular(2),
       ),
-      Paint()..color = PaywallInk.green.withValues(alpha: 0.5),
+      Paint()..color = PaywallArtInk.green.withValues(alpha: 0.5),
     );
     canvas.drawCircle(
       const Offset(48, 56),
@@ -254,7 +356,7 @@ class PaymentArtPainter extends CustomPainter {
     );
 
     final Paint waves = Paint()
-      ..color = PaywallInk.green.withValues(alpha: 0.6)
+      ..color = PaywallArtInk.green.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;

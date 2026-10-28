@@ -28,8 +28,8 @@ Future<void> _showUpgrade({
         child: Container(
           padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
           decoration: paywallToyBox(
-            fill: PaywallInk.white,
-            border: PaywallInk.border,
+            fill: context.pay.white,
+            border: context.pay.border,
             radius: 26,
             lip: 0,
           ),
@@ -40,21 +40,21 @@ Future<void> _showUpgrade({
                 width: 64,
                 height: 64,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  color: PaywallInk.yellowSoft,
+                decoration: BoxDecoration(
+                  color: context.pay.yellowSoft,
                   shape: BoxShape.circle,
                 ),
-                child: FaIcon(icon, size: 26, color: PaywallInk.green),
+                child: FaIcon(icon, size: 26, color: context.pay.green),
               ),
               const SizedBox(height: 16),
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Cairo',
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: PaywallInk.ink,
+                  color: context.pay.ink,
                   height: 1.4,
                 ),
               ),
@@ -62,11 +62,11 @@ Future<void> _showUpgrade({
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Cairo',
                   fontSize: 13,
                   height: 1.75,
-                  color: PaywallInk.muted,
+                  color: context.pay.muted,
                 ),
               ),
               const SizedBox(height: 20),
@@ -81,23 +81,23 @@ Future<void> _showUpgrade({
                     height: 52,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: PaywallInk.green,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const <BoxShadow>[
+                      color: context.pay.green,
+                      borderRadius: const BorderRadius.circular(16),
+                      boxShadow: <BoxShadow>[
                         BoxShadow(
-                          color: PaywallInk.greenDark,
-                          offset: Offset(0, 4),
+                          color: context.pay.greenDark,
+                          offset: const Offset(0, 4),
                           blurRadius: 0,
                         ),
                       ],
                     ),
                     child: Text(
                       action,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Cairo',
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: PaywallInk.white,
+                        color: context.pay.onGreen,
                       ),
                     ),
                   ),
@@ -106,13 +106,13 @@ Future<void> _showUpgrade({
               const SizedBox(height: 6),
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text(
+                child: Text(
                   'لاحقاً',
                   style: TextStyle(
                     fontFamily: 'Cairo',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: PaywallInk.muted,
+                    color: context.pay.muted,
                   ),
                 ),
               ),

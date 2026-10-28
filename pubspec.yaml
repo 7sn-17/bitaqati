@@ -1,7 +1,7 @@
 name: bitaqati
 description: "بطاقاتي — تطبيق بطاقات تعليمية ذكي للمراجعة المتباعدة."
 publish_to: "none"
-version: 1.9.1+13
+version: 1.9.2+14
 
 environment:
   sdk: ">=3.13.0 <4.0.0"
@@ -101,17 +101,24 @@ flutter:
         - asset: assets/fonts/IBMPlexSansArabic-Bold.ttf
           weight: 700
 
-# The default launcher icon. The artwork is full-bleed on purpose: it becomes
-# both the legacy mipmap and the adaptive foreground, so a device on Android 8+
-# and one on Android 7 see the same picture instead of the adaptive layer
-# quietly falling back to an older logo. The background colour matches the
-# artwork's corner, which is what shows through if a launcher insets the
-# foreground further than this build expects.
+# The default launcher icon.
+#
+# Two files, because the two Android icon systems want different things.
+# `default.png` is the artwork at full bleed and becomes the legacy mipmap,
+# which is what Android 7 and older draw edge to edge. `default_adaptive.png`
+# is the same artwork scaled to 70% on a field of its own background colour, and
+# becomes the adaptive foreground: the launcher masks that layer to a circle of
+# 72dp inside the 108dp canvas, so artwork that filled the canvas lost its
+# corners. At 70% the whole illustration sits inside the mask with a margin,
+# and the field is the artwork's own corner colour, so nothing shows a seam.
+#
+# adaptive_icon_foreground_inset stays 0 because the padding is already baked
+# into the file. Insets here would shrink the artwork a second time.
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/app_icons/default.png"
   min_sdk_android: 21
   adaptive_icon_background: "#1A4632"
-  adaptive_icon_foreground: "assets/app_icons/default.png"
+  adaptive_icon_foreground: "assets/app_icons/default_adaptive.png"
   adaptive_icon_foreground_inset: 0
