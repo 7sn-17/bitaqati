@@ -392,13 +392,6 @@ TextStyle _bodyStyle(BuildContext context) => TextStyle(
   color: context.pay.ink,
 );
 
-TextStyle _noteStyle(BuildContext context) => TextStyle(
-  fontFamily: 'Cairo',
-  fontSize: 11,
-  height: 1.5,
-  color: context.pay.muted,
-);
-
 // -------------------------------------------------------------------- header
 
 class _Header extends StatelessWidget {
