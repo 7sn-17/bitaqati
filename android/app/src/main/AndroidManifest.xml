@@ -38,10 +38,10 @@
               />
             <!-- No MAIN/LAUNCHER filter here on purpose. Every launcher icon,
                  including the default one, is an activity-alias below, because
-                 the dynamic-icon plugin works by disabling every alias except
-                 the chosen one. If MainActivity itself carried the launcher
-                 filter it would have to be disabled too, and disabling the
-                 alias target makes all of the aliases unlaunchable. -->
+                 switching icons works by disabling every alias except the
+                 chosen one. If MainActivity itself carried the launcher filter
+                 it would have to be disabled too, and disabling the alias
+                 target makes all of the aliases unlaunchable. -->
             <!-- Legacy custom scheme, kept so links shared by older builds
                  still open the app. -->
             <intent-filter>

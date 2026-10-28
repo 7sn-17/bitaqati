@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -121,18 +122,47 @@ abstract final class DynamicIconService {
     }
   }
 
-  /// Applies [alias] now and reports whether the launcher took it.
-  static Future<bool> apply(String alias) async {
+  /// Applies [alias] now and reports whether the package manager took it.
+  ///
+  /// [restart] hands the screen to the launcher and drops this process once the
+  /// swap is verified. That is what makes the home screen redraw: a launcher
+  /// with a live task for this package keeps the icon it already has, so the
+  /// change stays invisible until the app has no task left to return to. The
+  /// reconcile pass at startup leaves it false — closing the app the user just
+  /// opened would be worse than a stale icon.
+  static Future<bool> apply(String alias, {bool restart = false}) async {
     try {
       final String? applied = await _channel.invokeMethod<String>(
         'setAlias',
-        <String, Object?>{'alias': alias},
+        <String, Object?>{'alias': alias, 'restart': restart},
       );
       return applied != null;
     } on PlatformException {
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Every alias and the state the package manager reports for it.
+  ///
+  /// Diagnostics only: "enabled" is the one on the home screen, "default"
+  /// follows the manifest, "disabled" was switched off by this app. A read of
+  /// this before and after a change is the difference between "the launcher
+  /// ignored us" and "the swap never happened".
+  static Future<Map<String, String>> state() async {
+    try {
+      final Map<Object?, Object?>? raw = await _channel
+          .invokeMethod<Map<Object?, Object?>>('state');
+      if (raw == null) {
+        return const <String, String>{};
+      }
+      return <String, String>{
+        for (final MapEntry<Object?, Object?> entry in raw.entries)
+          entry.key.toString(): entry.value.toString(),
+      };
+    } catch (_) {
+      return const <String, String>{};
     }
   }
 
@@ -165,6 +195,7 @@ abstract final class DynamicIconService {
     if (live == wanted) {
       return false;
     }
+    debugPrint('[icon] launcher drifted · wanted=$wanted live=$live');
     return apply(wanted);
   }
 }

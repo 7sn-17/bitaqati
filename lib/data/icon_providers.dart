@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/dynamic_icon.dart';
@@ -47,8 +48,13 @@ class ActiveIconController extends Notifier<AppIconOption> {
       option.alias,
     );
     state = option;
-    final bool applied = await DynamicIconService.apply(option.alias);
+    debugPrint('[icon] choosing ${option.alias}');
+    final bool applied = await DynamicIconService.apply(
+      option.alias,
+      restart: true,
+    );
     if (!applied) {
+      debugPrint('[icon] platform refused ${option.alias}');
       await DynamicIconService.remember(
         ref.read(sharedPreferencesProvider),
         previous.alias,
