@@ -141,29 +141,74 @@ occlusion, tags — and returns the edited `CardDraft` instead of persisting it.
 Saving the batch goes through `ContentRepository.addCards`, one transaction and
 one queue row per card, so a failure cannot leave half a deck behind.
 
-## Images: pick, crop, upload
+## Images: pick, crop, compress, upload
 
 Every picture in the app goes through `MediaUploadService.pickImage`, and that
-one function owns the whole path: picker, cropper, upload.
+one function owns the whole path.
 
 ```text
-ImagePicker.pickImage  ->  cropImage(File)  ->  storage.uploadBinary  ->  PickedMedia
+ImagePicker.pickImage
+  -> cropImage(File)        // lib/core/media/image_crop.dart
+  -> compressImage(File)    // lib/core/media/image_compress.dart
+  -> POST /functions/v1/upload-image
+  -> PickedMedia(url)
 ```
 
-Cropping sits between the pick and the upload on purpose. The crop decides both
-how the picture sits on the card and how many bytes reach the bucket; uploading
-first would leave the full frame in storage forever, and cropping after the
-upload would need a second round trip to replace it.
+Each step has to happen before the next one exists. Cropping decides what the
+card shows; compressing decides how many bytes travel; uploading sends exactly
+that. Uploading first would leave the full frame at full resolution in storage
+forever, and fixing it afterwards would need a second round trip to replace it.
 
-`lib/core/media/image_crop.dart` returns null when the learner backs out — a
-cancel means "do not attach this", not "attach it uncropped" — and returns the
-original file when the platform has no cropper or refuses the file, because
-losing the picture is worse than keeping it uncropped. Output is capped at
-2400px on the long edge and re-encoded as JPEG at quality 90, which keeps a
-photographed page readable when zoomed without shipping a twelve-megapixel file.
+`cropImage` returns null when the learner backs out — a cancel means "do not
+attach this", not "attach it uncropped" — and returns the original file when
+the platform has no cropper or refuses the file, because losing the picture is
+worse than keeping it uncropped.
+
+`compressImage` caps the longest edge at `kImageMaxEdge` (1600px) and
+re-encodes as JPEG at `kImageQuality` (85). It reads the encoded width and
+height from the image header with `ui.ImageDescriptor`, so a twelve-megapixel
+photo is never decoded just to learn two integers. The aspect ratio is never
+touched: the picture is scaled as a whole, never cropped and never stretched.
+
+The plugin's own `minWidth` / `minHeight` are a floor on the *shortest* edge,
+not a cap on the longest: 4000x3000 at 1600/1600 comes out 2133x1600. Passing
+the computed target size instead makes the ratio exact, which is what actually
+guarantees 1600.
 
 The occlusion editor uses the same path, so the canvas always draws on the
-cropped picture and the boxes are stored against it.
+cropped, compressed picture and the boxes are stored against it.
+
+## ImageKit uploads
+
+Pictures live in ImageKit, not in Supabase Storage. The private key is a server
+secret held by the `upload-image` Edge Function: a key shipped inside an APK is
+a key anyone can extract and spend.
+
+| Piece | Where |
+|---|---|
+| `imageKitUrlEndpoint`, `imageKitPublicKey` | `lib/core/config/imagekit_config.dart` (public values only) |
+| `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT` | Supabase Edge Function secrets |
+| Upload endpoint | `POST /functions/v1/upload-image` |
+
+The function refuses anything without a valid Supabase JWT (401 before a byte
+is read), caps the body at 8 MB, files uploads under `/cards/<user id>` so one
+account cannot overwrite another's pictures, and returns the ImageKit URL plus
+its `fileId`. The client accepts the response only when the URL starts with
+the account's endpoint, so a misconfigured function cannot write a foreign URL
+into a card.
+
+Deployment:
+
+```bash
+supabase secrets set IMAGEKIT_PRIVATE_KEY=... IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/7sn
+supabase functions deploy upload-image
+```
+
+Deleting a card does not delete its ImageKit file: removal needs the private
+key and therefore a second function. Orphaned files are cheap, and a failed
+delete must never block a card edit.
+
+Audio still uses the `card-media` bucket. Only pictures moved.
 
 ## Image occlusion
 

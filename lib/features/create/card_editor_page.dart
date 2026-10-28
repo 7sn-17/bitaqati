@@ -411,9 +411,13 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
             name: media.name,
           ),
         );
+        // The local fallback is genuinely local: nothing retries the upload
+        // later, so promising a deferred upload would be a lie the learner
+        // only discovers on their second device.
         _error = media.uploaded
             ? null
-            : 'تم إرفاق الملف محلياً. سيُرفع إلى السحابة عند توفر الاتصال.';
+            : 'أُرفق الملف على هذا الجهاز فقط، ولم يُرفع إلى السحابة. '
+                  'أعد المحاولة عند توفر الاتصال إن أردته على أجهزتك الأخرى.';
       });
     } catch (_) {
       if (mounted) {

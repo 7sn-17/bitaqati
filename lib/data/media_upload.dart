@@ -1,15 +1,22 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/config/app_config.dart';
+import '../core/config/imagekit_config.dart';
+import '../core/media/image_compress.dart';
 import '../core/media/image_crop.dart';
 
-/// Public bucket that holds card images and audio.
+/// Public bucket that holds card audio.
+///
+/// Pictures moved to ImageKit: they are served from its CDN and uploaded
+/// through the upload-image Edge Function, so only sound still lives here.
 const String kCardMediaBucket = 'card-media';
 
 /// One attachment the user picked, already uploaded when possible.
@@ -33,23 +40,25 @@ class PickedMedia {
   String get markup => isImage ? '![$name]($url)' : '[صوت]($url)';
 }
 
-/// Picks media from the device and pushes it to Supabase Storage.
+/// Picks media from the device, prepares it, and uploads it.
 ///
-/// When the upload is not possible (guest build, no network, missing bucket)
-/// the local file path is returned instead, so the card still works on this
-/// device and the user is never blocked mid-edit.
+/// Pictures go through crop, compress and then the upload-image Edge Function
+/// (which talks to ImageKit); sound still goes to Supabase Storage. When the
+/// upload is not possible (guest build, no network, no session) the local file
+/// path is returned instead, so the card still works on this device and the
+/// user is never blocked mid-edit.
 class MediaUploadService {
   MediaUploadService();
 
   final ImagePicker _picker = ImagePicker();
   final Uuid _uuid = const Uuid();
 
-  /// Picks a picture, lets the learner crop it, then uploads the crop.
+  /// Picks a picture, lets the learner crop it, compresses it, then uploads.
   ///
-  /// The crop happens here, between the picker and the upload, because it
-  /// decides both how the picture sits on the card and how many bytes reach
-  /// the bucket. Uploading first and cropping later would leave the original
-  /// full-frame file in storage forever.
+  /// The order is the whole point: the crop decides what the card shows, the
+  /// compression decides how many bytes travel, and both have to happen
+  /// before anything is sent. Uploading first would leave the full frame at
+  /// full resolution in storage forever.
   Future<PickedMedia?> pickImage() async {
     final XFile? picked = await _picker.pickImage(
       source: ImageSource.gallery,
@@ -60,22 +69,78 @@ class MediaUploadService {
     if (picked == null) {
       return null;
     }
-    final File original = File(picked.path);
-    final File? cropped = await cropImage(original);
+    final File? cropped = await cropImage(File(picked.path));
     if (cropped == null) {
       // Backed out of the cropper: nothing is attached.
       return null;
     }
-    final Uint8List bytes = await cropped.readAsBytes();
-    final String extension = _extensionOf(cropped.path, fallback: 'jpg');
+    final File source = await compressImage(cropped) ?? cropped;
+    final Uint8List bytes = await source.readAsBytes();
     final String name = _shortName(picked.name, 'صورة');
-    return _upload(
-      bytes: bytes,
-      fileName: name,
-      extension: extension,
+    final String? url = await _uploadToImageKit(bytes: bytes, fileName: name);
+    return PickedMedia(
+      url: url ?? 'file://${source.path}',
+      name: name,
       isImage: true,
-      localPath: cropped.path,
+      uploaded: url != null,
+      localPath: source.path,
     );
+  }
+
+  /// Pushes [bytes] through the upload-image Edge Function, which is the only
+  /// holder of the ImageKit private key.
+  ///
+  /// Returns null when the function is missing, the session expired, the
+  /// device is offline, or ImageKit refused the file. The caller then keeps
+  /// the picture on the device rather than losing it.
+  Future<String?> _uploadToImageKit({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    if (!AppConfig.hasSupabase) {
+      return null;
+    }
+    try {
+      final String? token =
+          Supabase.instance.client.auth.currentSession?.accessToken;
+      if (token == null) {
+        return null;
+      }
+      final http.Response response = await http
+          .post(
+            Uri.parse('${AppConfig.supabaseUrl}/functions/v1/upload-image'),
+            headers: <String, String>{
+              'Authorization': 'Bearer ${token}',
+              'apikey': AppConfig.supabasePublishableKey,
+              'Content-Type': 'application/octet-stream',
+              // HTTP headers are Latin-1: an Arabic file name has to be folded
+              // to ASCII here or the request fails before it leaves the phone.
+              'x-file-name': _asciiName(fileName),
+            },
+            body: bytes,
+          )
+          .timeout(const Duration(seconds: 45));
+      if (response.statusCode != 200) {
+        return null;
+      }
+      final Object? decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final Object? url = decoded['url'];
+      if (url is! String || !url.startsWith(imageKitUrlEndpoint)) {
+        return null;
+      }
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Keeps a file name safe for an HTTP header.
+  String _asciiName(String name) {
+    final String cleaned = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '-');
+    return cleaned.isEmpty || cleaned == '-' ? 'image' : cleaned;
   }
 
   Future<PickedMedia?> pickAudio() async {

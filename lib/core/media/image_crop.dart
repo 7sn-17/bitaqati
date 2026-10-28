@@ -18,13 +18,12 @@ Future<File?> cropImage(File image) async {
   try {
     final CroppedFile? result = await ImageCropper().cropImage(
       sourcePath: image.path,
-      // The cropper writes the output, so this is where the stored picture is
-      // sized. 2400px keeps a photographed page readable when zoomed without
-      // sending a 12-megapixel file to the bucket.
-      maxWidth: 2400,
-      maxHeight: 2400,
+      // No maxWidth/maxHeight here on purpose: sizing belongs to compressImage,
+      // which runs next and caps the longest edge at 1600. Letting the cropper
+      // downscale first would add a second resampling step to every picture.
+      // The quality stays high because this is an intermediate file.
       compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 90,
+      compressQuality: 95,
       uiSettings: <PlatformUiSettings>[
         AndroidUiSettings(
           toolbarTitle: 'قص الصورة',
