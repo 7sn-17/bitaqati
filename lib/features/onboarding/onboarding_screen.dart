@@ -62,6 +62,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ],
       arrows: false,
     ),
+    _OnboardingPage(
+      title: 'ادرس بطريقتك',
+      body:
+          'اختر من بين المراجعة بالبطاقات، وضع الاختبار، لعبة المطابقة، أو وضع '
+          'الكتابة. كلها ممتعة وفعالة!',
+      scene: 3,
+      chips: <_ChipSpec>[
+        _ChipSpec('اختبار', Icons.quiz_rounded, 0.74, 0.16),
+        _ChipSpec('مطابقة', Icons.grid_view_rounded, 0.06, 0.74),
+      ],
+      arrows: false,
+    ),
   ];
 
   @override
