@@ -73,7 +73,10 @@ class ReminderService {
     try {
       await _plugin.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          // A dedicated monochrome mask, not the launcher icon. Android draws
+          // the small notification icon as a silhouette in the status bar, so
+          // a coloured square came out as a white blob.
+          android: AndroidInitializationSettings('ic_notification'),
         ),
         onDidReceiveNotificationResponse: _handleResponse,
       );

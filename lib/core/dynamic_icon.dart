@@ -43,6 +43,17 @@ class AppIconOption {
   /// The alias the manifest gives the default icon. Passing null to the plugin
   /// restores it, which is why this one is not toggled like the others.
   static const String defaultAlias = 'DEFAULT';
+
+  /// The option for [alias], falling back to the default for anything unknown.
+  /// A preference written by an older build must not blank the icon.
+  static AppIconOption byAlias(String alias) {
+    for (final AppIconOption option in kAppIcons) {
+      if (option.alias == alias) {
+        return option;
+      }
+    }
+    return kAppIcons.first;
+  }
 }
 
 const List<AppIconOption> kAppIcons = <AppIconOption>[

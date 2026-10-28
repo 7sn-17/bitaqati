@@ -8,7 +8,9 @@ import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/legal_footer.dart';
+import '../../core/dynamic_icon.dart';
 import '../../data/auth_service.dart';
+import '../../data/icon_providers.dart';
 import '../legal/privacy_policy_screen.dart';
 import '../legal/terms_of_service_screen.dart';
 
@@ -69,8 +71,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final bool canUseGoogle =
         AppConfig.hasGoogleSignIn && AppConfig.hasSupabase;
+    // The icon this install is wearing, and the field it sits on. The first
+    // screen should look like the icon on the home screen: a phone wearing the
+    // blue icon used to open onto the yellow one.
+    final AppIconOption icon = ref.watch(activeIconProvider);
 
     return Scaffold(
+      backgroundColor: icon.background,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
@@ -86,7 +93,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: _form(context, canUseGoogle),
+                    children: <Widget>[
+                      _LoginMark(icon: icon),
+                      const SizedBox(height: 26),
+                      // The form keeps the normal surface and its normal ink.
+                      // Painting it straight onto the icon field would mean
+                      // re-colouring every label, error box and divider by
+                      // hand, and one of them would be missed.
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                        decoration: BoxDecoration(
+                          color: context.cardSurface,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.22),
+                              blurRadius: 30,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: _form(context, canUseGoogle),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -99,36 +131,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   List<Widget> _form(BuildContext context, bool canUseGoogle) {
     return <Widget>[
-      Center(
-        child: Container(
-          width: 88,
-          height: 88,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: context.isDark ? 0.5 : 0.12,
-                ),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            // The launcher icon, not the old brand mark: the first screen
-            // and the home screen should show the same picture.
-            child: Image.asset(
-              'assets/app_icons/default.png',
-              width: 88,
-              height: 88,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 22),
       Text(
         'مرحباً بك في بطاقاتي',
         textAlign: TextAlign.center,
@@ -141,7 +143,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         textAlign: TextAlign.center,
         style: context.texts.bodySmall?.copyWith(height: 1.8),
       ),
-      const SizedBox(height: 28),
+      const SizedBox(height: 26),
       if (_error != null) ...<Widget>[
         _ErrorBox(message: _error!),
         const SizedBox(height: 14),
@@ -151,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         child: OutlinedButton(
           onPressed: _busy || !canUseGoogle ? null : _signInWithGoogle,
           style: OutlinedButton.styleFrom(
-            backgroundColor: context.cardSurface,
+            backgroundColor: context.raisedSurface,
             side: BorderSide(color: context.colors.outlineVariant),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -223,12 +225,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         textAlign: TextAlign.center,
         style: context.texts.bodySmall?.copyWith(fontSize: 11, height: 1.7),
       ),
-      const SizedBox(height: 24),
+      const SizedBox(height: 22),
       LegalFooterLinks(
         onPrivacy: () => openLegalPage(context, const PrivacyPolicyScreen()),
         onTerms: () => openLegalPage(context, const TermsOfServiceScreen()),
       ),
     ];
+  }
+}
+
+/// The launcher icon, on its own field, above the form.
+///
+/// The artwork is the full-bleed file rather than the composed adaptive one:
+/// a rounded square is the shape this screen wants, and the adaptive file is
+/// already inset for the launcher's circular mask.
+class _LoginMark extends StatelessWidget {
+  const _LoginMark({required this.icon});
+
+  final AppIconOption icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 96,
+        height: 96,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.30),
+              blurRadius: 30,
+              offset: const Offset(0, 14),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Image.asset(
+            icon.asset,
+            width: 96,
+            height: 96,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
   }
 }
 

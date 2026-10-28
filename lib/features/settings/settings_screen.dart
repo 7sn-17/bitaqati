@@ -27,6 +27,7 @@ import '../../core/widgets/surface_card.dart';
 import '../../data/auth_service.dart';
 import '../../data/profile_providers.dart';
 import '../../data/profile_repository.dart';
+import '../../data/icon_providers.dart';
 import '../../data/pro_providers.dart';
 import '../../domain/freemium.dart';
 import '../paywall/paywall_screen.dart';
@@ -1337,33 +1338,7 @@ class _AppIconPicker extends ConsumerStatefulWidget {
 }
 
 class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
-  String? _current;
   bool _busy = false;
-  bool _supported = true;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  Future<void> _load() async {
-    final bool supported = await DynamicIconService.supported;
-    final String? current = supported
-        ? await DynamicIconService.current()
-        : null;
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _supported = supported;
-      // The launcher is the source of truth when it answers. When it does
-      // not, the remembered choice is still the best guess this install has.
-      _current =
-          current ??
-          DynamicIconService.remembered(ref.read(sharedPreferencesProvider));
-    });
-  }
 
   Future<void> _pick(AppIconOption option) async {
     if (option.pro && !ref.read(proNowProvider).active) {
@@ -1371,31 +1346,15 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
       showIconLockedDialog(context);
       return;
     }
-    if (_busy || _current == option.alias) {
+    if (_busy || ref.read(activeIconProvider).alias == option.alias) {
       return;
     }
     setState(() => _busy = true);
-    final bool ok = await DynamicIconService.apply(option.alias);
+    final bool ok = await ref.read(activeIconProvider.notifier).choose(option);
     if (!mounted) {
       return;
     }
-    if (ok) {
-      // Remembered so the next launch can put the launcher back if an update
-      // or a launcher reset leaves it showing something else.
-      await DynamicIconService.remember(
-        ref.read(sharedPreferencesProvider),
-        option.alias,
-      );
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _busy = false;
-      if (ok) {
-        _current = option.alias;
-      }
-    });
+    setState(() => _busy = false);
     if (!ok) {
       showAppMessage(
         context,
@@ -1411,6 +1370,11 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
   @override
   Widget build(BuildContext context) {
     final bool pro = ref.watch(proNowProvider).active;
+    final AppIconOption active = ref.watch(activeIconProvider);
+    // Optimistic while the platform channel answers: a device that cannot
+    // change icons should still show the picker, greyed by the note below.
+    final bool supported =
+        ref.watch(dynamicIconSupportProvider).valueOrNull ?? true;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: ClipRRect(
@@ -1435,7 +1399,7 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  _supported
+                  supported
                       ? 'بدّل شكل بطاقتي على شاشتك الرئيسية.'
                       : 'هذا الجهاز لا يسمح بتغيير أيقونة التطبيق.',
                   style: context.texts.bodySmall,
@@ -1447,7 +1411,7 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
                       Expanded(
                         child: _IconTile(
                           option: option,
-                          selected: _current == option.alias,
+                          selected: active.alias == option.alias,
                           locked: option.pro && !pro,
                           onTap: () => _pick(option),
                         ),

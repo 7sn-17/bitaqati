@@ -70,7 +70,11 @@ class PaywallInk {
       // fixed too: it is a badge, not a surface.
       onYellow: const Color(0xFF231A00),
       yellowSoft: context.warningSurface,
-      greenSoft: context.accentSoft,
+      // [selectedFill] is accentSoft in the light identities and a translucent
+      // accent in the dark ones. Mapping this to accentSoft directly was the
+      // bug behind an unreadable selected plan in dark mode: a pale green wash
+      // with pale ink on top.
+      greenSoft: context.selectedFill,
       radioEmpty: context.muted.withValues(alpha: 0.45),
       heart: context.danger,
       dangerSoft: context.danger.withValues(alpha: 0.12),

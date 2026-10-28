@@ -14,6 +14,7 @@ enum AudioSourceChoice { record, file }
 /// makes recording the first, obvious option and keeps the picker one tap away.
 Future<AudioSourceChoice?> showAudioSourceSheet(BuildContext context) {
   return showModalBottomSheet<AudioSourceChoice>(
+    useRootNavigator: true,
     context: context,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.55),

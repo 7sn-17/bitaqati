@@ -12,6 +12,7 @@ import 'deck_editor_sheet.dart';
 
 Future<void> showCreateSheet(BuildContext context) {
   return showModalBottomSheet<void>(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -153,6 +154,7 @@ class _CreateSheet extends ConsumerWidget {
     String target = decks.first.id;
     if (decks.length > 1) {
       final String? picked = await showModalBottomSheet<String>(
+        useRootNavigator: true,
         context: context,
         backgroundColor: Colors.transparent,
         builder: (BuildContext sheet) => SafeArea(

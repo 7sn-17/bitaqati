@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Android 12 draws its own splash screen and ignores windowBackground.
-         Left alone it would show whatever the launcher happens to hold, so the
-         icon is pinned to the same adaptive resource the launcher uses and the
-         backdrop to the same deep green the window below it paints. -->
+         It is pinned to a plain field with no icon: the animated Flutter
+         splash paints the chosen icon a moment later, and two logos in a row
+         was the double splash this replaced. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowSplashScreenBackground">@color/launch_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/launch_background</item>
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>

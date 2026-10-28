@@ -33,6 +33,7 @@ Future<String?> showDeckEditorSheet(
     }
   }
   final String? id = await showModalBottomSheet<String>(
+    useRootNavigator: true,
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

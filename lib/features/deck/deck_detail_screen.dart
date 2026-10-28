@@ -553,6 +553,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     final String? target = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       backgroundColor: Colors.transparent,
       builder: (BuildContext sheet) => SafeArea(
@@ -801,6 +802,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   /// global session cannot drift apart.
   void _showActions(BuildContext screenContext, DeckNode deck) {
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: screenContext,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) => SafeArea(
@@ -970,6 +972,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
       return;
     }
     showModalBottomSheet<void>(
+      useRootNavigator: true,
       context: screenContext,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) => SafeArea(

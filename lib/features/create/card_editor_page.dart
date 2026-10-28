@@ -560,6 +560,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
   Future<void> _openTagSheet(BuildContext context) async {
     final TextEditingController input = TextEditingController();
     final String? value = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -945,6 +946,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
   Future<void> _pickDeck(List<DeckNode> decks) async {
     final String? value = await showModalBottomSheet<String>(
+      useRootNavigator: true,
       context: context,
       backgroundColor: Colors.transparent,
       builder: (BuildContext sheet) => SafeArea(

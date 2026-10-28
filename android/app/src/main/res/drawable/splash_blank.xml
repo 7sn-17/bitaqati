@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A deliberately empty drawable.
+
+     Android 12 and later draw their own splash screen and put the launcher
+     icon in the middle of it. This app animates its own icon immediately
+     afterwards, so a native icon here meant two logos in a row, at two
+     different sizes, in two different colours. Pinning the splash icon to an
+     empty shape leaves a plain field that the Flutter splash paints over. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>
