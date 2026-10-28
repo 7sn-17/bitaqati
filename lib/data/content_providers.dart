@@ -33,7 +33,9 @@ final Provider<List<DeckNode>> allDecksProvider = Provider<List<DeckNode>>((
 ) {
   final List<DeckNode> decks =
       ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
-  final int? limit = ref.watch(proNowProvider).deckLimit;
+  // The allowance is a share of the library, so it has to be read from the
+  // library itself: half of these decks stay open, newest first.
+  final int? limit = ref.watch(proNowProvider).deckLimitFor(decks.length);
   if (limit == null || decks.length <= limit) {
     return decks;
   }
@@ -51,11 +53,11 @@ final Provider<List<DeckNode>> allDecksProvider = Provider<List<DeckNode>>((
 
 /// Null when unlimited, otherwise how many more decks may be created.
 final Provider<int?> decksLeftProvider = Provider<int?>((Ref ref) {
-  final int? limit = ref.watch(proNowProvider).deckLimit;
+  final int used = ref.watch(deckListProvider).valueOrNull?.length ?? 0;
+  final int? limit = ref.watch(proNowProvider).deckLimitFor(used);
   if (limit == null) {
     return null;
   }
-  final int used = ref.watch(deckListProvider).valueOrNull?.length ?? 0;
   final int left = limit - used;
   return left < 0 ? 0 : left;
 });

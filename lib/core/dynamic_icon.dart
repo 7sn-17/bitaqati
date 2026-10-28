@@ -1,6 +1,7 @@
 import 'dart:ui' show Color;
 
 import 'package:flutter_dynamic_icon_plus/flutter_dynamic_icon_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// One launcher icon the learner can wear.
 ///
@@ -112,5 +113,37 @@ abstract final class DynamicIconService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// The preference that remembers which icon was chosen.
+  static const String prefKey = 'launcher_icon_alias';
+
+  /// The icon this install is supposed to be wearing.
+  static String remembered(SharedPreferences prefs) {
+    final String? saved = prefs.getString(prefKey);
+    return saved == null || saved.isEmpty ? AppIconOption.defaultAlias : saved;
+  }
+
+  static Future<void> remember(SharedPreferences prefs, String alias) {
+    return prefs.setString(prefKey, alias);
+  }
+
+  /// Re-applies the remembered icon when the launcher is showing another one.
+  ///
+  /// Two things make this necessary. The enabled activity-alias survives an
+  /// app update, so a device that once picked the blue icon keeps it after the
+  /// APK is replaced — including after a build that changed what the default
+  /// alias points at. And the plugin answers "no alternate icon" both for the
+  /// default alias and when it cannot read the component at all, so the only
+  /// trustworthy comparison is against what this install remembers.
+  ///
+  /// Returns true when the launcher was actually changed.
+  static Future<bool> reconcile(SharedPreferences prefs) async {
+    final String wanted = remembered(prefs);
+    final String live = await current() ?? AppIconOption.defaultAlias;
+    if (live == wanted) {
+      return false;
+    }
+    return apply(wanted);
   }
 }

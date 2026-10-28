@@ -52,18 +52,19 @@ jobs:
       - name: Generate Drift code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Generate launcher icons
-        # Three passes, one per launcher icon. The default run reads the
-        # flutter_launcher_icons block in pubspec.yaml; the two Pro variants
-        # read their own config files because the generator only accepts one
-        # icon set per invocation. All three have to exist before the APK is
-        # assembled: the manifest points at them by name from its
-        # activity-alias entries, and a missing mipmap fails the resource
-        # link step rather than the icon switch at runtime.
+      - name: Verify launcher icons
+        # The icon resources are committed (see tool/gen_icons.py) because the
+        # generator this project used wrote every icon set to the same resource
+        # name, which made all three launcher entries render the last one. The
+        # check below fails fast if a resource the manifest names goes missing,
+        # instead of letting the Android resource link fail with a bare id.
         run: |
-          dart run flutter_launcher_icons
-          dart run flutter_launcher_icons -f flutter_launcher_icons_crown.yaml
-          dart run flutter_launcher_icons -f flutter_launcher_icons_blue.yaml
+          for name in ic_launcher launcher_icon_crown launcher_icon_blue; do
+            test -f "android/app/src/main/res/mipmap-anydpi-v26/${name}.xml" ||
+              { echo "::error::missing adaptive icon ${name}"; exit 1; }
+            test -f "android/app/src/main/res/drawable-xxxhdpi/${name}_foreground.png" ||
+              { echo "::error::missing foreground for ${name}"; exit 1; }
+          done
 
       - name: Prepare release signing
         env:

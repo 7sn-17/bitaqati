@@ -44,7 +44,7 @@ Future<void> _showUpgrade({
                   color: context.pay.yellowSoft,
                   shape: BoxShape.circle,
                 ),
-                child: FaIcon(icon, size: 26, color: context.pay.green),
+                child: FaIcon(icon, size: 26, color: context.pay.greenInk),
               ),
               const SizedBox(height: 16),
               Text(

@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>بطاقاتي · لوحة الإدارة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body { font-family: 'Cairo', system-ui, sans-serif; }
+  .num { font-variant-numeric: tabular-nums; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2a3a2b; border-radius: 999px; }
+  .fade { animation: fade .18s ease-out both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body class="bg-[#080C08] text-[#F2F7EF] min-h-screen">
+
+<!-- The publishable key is public by design: it is the same key the app ships
+     with, and every action below is authorised by row-level security on the
+     server, not by this page. -->
+<script>
+  const SUPABASE_URL = 'https://mftghnvtdryxzochquee.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mdGdobnZ0ZHJ5eHpvY2hxdWVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI4OTYwMzMsImV4cCI6MjEwODQ3MjAzM30._UCZmmnbe56jLn_kyhFhWwNKb1SK919aA2aPxxD6y6E';
+  // No session persistence on purpose: the page is opened from disk as often
+  // as from a server, and localStorage is not available to every file://
+  // origin. The session lives in memory for as long as the tab does.
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+  });
+
+  const state = { codes: [], users: [], tab: 'codes', filter: 'all', query: '', session: null };
+
+  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  function randomBlock(n) {
+    let out = '';
+    const bytes = new Uint8Array(n);
+    crypto.getRandomValues(bytes);
+    for (let i = 0; i < n; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
+    return out;
+  }
+
+  function newCode() {
+    return 'BTAQ-' + randomBlock(4) + '-' + randomBlock(4);
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function date(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  const PLAN_LABEL = { monthly: 'شهري', quarterly: '3 أشهر', yearly: 'سنوي' };
+
+  function toast(message, kind) {
+    const host = el('toast');
+    const node = document.createElement('div');
+    const tone = kind === 'error'
+      ? 'bg-[#3a1414] border-[#ff8a8a]/40 text-[#ffb4b4]'
+      : 'bg-[#14261a] border-[#9FE870]/40 text-[#9FE870]';
+    node.className = 'fade pointer-events-auto rounded-xl border px-4 py-2.5 text-sm shadow-lg ' + tone;
+    node.textContent = message;
+    host.appendChild(node);
+    setTimeout(function () { node.remove(); }, 4200);
+  }
+
+  // ------------------------------------------------------------------ auth --
+
+  function showLogin(message) {
+    el('app').classList.add('hidden');
+    el('login').classList.remove('hidden');
+    el('loginError').textContent = message || '';
+    el('loginError').classList.toggle('hidden', !message);
+  }
+
+  async function signIn(event) {
+    event.preventDefault();
+    const email = el('email').value.trim();
+    const password = el('password').value;
+    el('loginButton').disabled = true;
+    el('loginButton').textContent = 'جارٍ الدخول…';
+    const res = await sb.auth.signInWithPassword({ email: email, password: password });
+    el('loginButton').disabled = false;
+    el('loginButton').textContent = 'دخول';
+    if (res.error) {
+      showLogin('تعذّر الدخول: ' + res.error.message);
+      return;
+    }
+    await start();
+  }
+
+  async function start() {
+    const session = (await sb.auth.getSession()).data.session;
+    if (!session) { showLogin(''); return; }
+    const admin = await sb.rpc('is_admin');
+    if (admin.error || admin.data !== true) {
+      await sb.auth.signOut();
+      showLogin('هذا الحساب ليس في قائمة الإداريين. أضِف بريده إلى جدول admins أولاً.');
+      return;
+    }
+    state.session = session;
+    el('login').classList.add('hidden');
+    el('app').classList.remove('hidden');
+    el('who').textContent = session.user.email || '';
+    await Promise.all([loadCodes(), loadUsers()]);
+    render();
+  }
+
+  // ------------------------------------------------------------------ data --
+
+  async function loadCodes() {
+    const res = await sb.from('activation_codes')
+      .select('code,plan_type,is_used,expiry_date,used_by,used_at,note,created_at,profiles(display_name)')
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (res.error) { toast('تعذّر تحميل الأكواد: ' + res.error.message, 'error'); return; }
+    state.codes = res.data || [];
+  }
+
+  async function loadUsers() {
+    const res = await sb.from('profiles')
+      .select('id,display_name,is_pro,pro_expiry_date,updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(500);
+    if (res.error) { toast('تعذّر تحميل المستخدمين: ' + res.error.message, 'error'); return; }
+    state.users = res.data || [];
+  }
+
+  async function generate() {
+    const plan = el('plan').value;
+    const count = Math.max(1, Math.min(50, parseInt(el('count').value, 10) || 1));
+    const note = el('note').value.trim();
+    const rows = [];
+    const seen = {};
+    for (let i = 0; i < count; i++) {
+      let code = newCode();
+      while (seen[code]) code = newCode();
+      seen[code] = true;
+      rows.push({ code: code, plan_type: plan, note: note || null });
+    }
+    el('generateButton').disabled = true;
+    const res = await sb.from('activation_codes').insert(rows).select('code');
+    el('generateButton').disabled = false;
+    if (res.error) { toast('تعذّر توليد الأكواد: ' + res.error.message, 'error'); return; }
+    toast('تم توليد ' + rows.length + ' كوداً.');
+    state.lastBatch = rows.map(function (r) { return r.code; });
+    el('copyBatch').classList.remove('hidden');
+    el('note').value = '';
+    await loadCodes();
+    render();
+  }
+
+  async function revoke(code) {
+    if (!confirm('إلغاء الكود ' + code + '؟ لن يعمل بعد الآن.')) return;
+    const res = await sb.from('activation_codes').delete().eq('code', code);
+    if (res.error) { toast('تعذّر الإلغاء: ' + res.error.message, 'error'); return; }
+    toast('تم إلغاء الكود.');
+    await loadCodes();
+    render();
+  }
+
+  async function togglePro(user) {
+    const next = !user.is_pro;
+    const patch = { is_pro: next, pro_expiry_date: next ? oneYear() : user.pro_expiry_date };
+    const res = await sb.from('profiles').update(patch).eq('id', user.id);
+    if (res.error) { toast('تعذّر التحديث: ' + res.error.message, 'error'); return; }
+    toast(next ? 'تم تفعيل Pro.' : 'تم إيقاف Pro.');
+    await loadUsers();
+    render();
+  }
+
+  function oneYear() {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString();
+  }
+
+  // ---------------------------------------------------------------- render --
+
+  function matches(text) {
+    if (!state.query) return true;
+    return String(text || '').toLowerCase().indexOf(state.query) !== -1;
+  }
+
+  function render() {
+    el('statCodes').textContent = state.codes.length;
+    el('statUnused').textContent = state.codes.filter(function (c) { return !c.is_used; }).length;
+    el('statPro').textContent = state.users.filter(function (u) { return u.is_pro; }).length;
+
+    el('tabCodes').className = tabClass(state.tab === 'codes');
+    el('tabUsers').className = tabClass(state.tab === 'users');
+    el('codesPanel').classList.toggle('hidden', state.tab !== 'codes');
+    el('usersPanel').classList.toggle('hidden', state.tab !== 'users');
+
+    renderCodes();
+    renderUsers();
+  }
+
+  function tabClass(active) {
+    const base = 'px-4 py-2 rounded-xl text-sm font-bold transition ';
+    return base + (active
+      ? 'bg-[#9FE870] text-[#163300]'
+      : 'text-white/60 hover:text-white hover:bg-white/5');
+  }
+
+  function renderCodes() {
+    const rows = state.codes.filter(function (c) {
+      if (state.filter === 'unused' && c.is_used) return false;
+      if (state.filter === 'used' && !c.is_used) return false;
+      return matches(c.code) || matches(c.note) || matches(c.profiles && c.profiles.display_name);
+    });
+    const host = el('codesBody');
+    if (!rows.length) {
+      host.innerHTML = emptyRow(6, 'لا توجد أكواد بهذا التصفية.');
+      return;
+    }
+    host.innerHTML = rows.map(function (c) {
+      const owner = c.profiles && c.profiles.display_name ? c.profiles.display_name : (c.used_by ? 'مستخدم' : '—');
+      const badge = c.is_used
+        ? '<span class="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/60">مستخدم</span>'
+        : '<span class="rounded-full bg-[#9FE870]/15 px-2.5 py-1 text-xs font-bold text-[#9FE870]">متاح</span>';
+      return '<tr class="border-t border-white/5 hover:bg-white/[0.03]">' +
+        '<td class="px-4 py-3"><button data-copy="' + esc(c.code) + '" class="num dir-ltr font-mono text-sm tracking-wider text-[#9FE870] hover:underline" dir="ltr">' + esc(c.code) + '</button></td>' +
+        '<td class="px-4 py-3 text-sm text-white/80">' + esc(PLAN_LABEL[c.plan_type] || c.plan_type) + '</td>' +
+        '<td class="px-4 py-3">' + badge + '</td>' +
+        '<td class="px-4 py-3 text-sm text-white/60">' + esc(owner) + '</td>' +
+        '<td class="px-4 py-3 text-sm text-white/50">' + date(c.used_at || c.created_at) + '</td>' +
+        '<td class="px-4 py-3 text-left"><button data-revoke="' + esc(c.code) + '" class="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:border-[#ff8a8a]/40 hover:text-[#ffb4b4]">إلغاء</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function renderUsers() {
+    const rows = state.users.filter(function (u) {
+      return matches(u.display_name) || matches(u.id);
+    });
+    const host = el('usersBody');
+    if (!rows.length) {
+      host.innerHTML = emptyRow(5, 'لا يوجد مستخدمون.');
+      return;
+    }
+    host.innerHTML = rows.map(function (u) {
+      const badge = u.is_pro
+        ? '<span class="rounded-full bg-[#9FE870]/15 px-2.5 py-1 text-xs font-bold text-[#9FE870]">Pro</span>'
+        : '<span class="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/60">مجاني</span>';
+      const name = u.display_name || 'بدون اسم';
+      return '<tr class="border-t border-white/5 hover:bg-white/[0.03]">' +
+        '<td class="px-4 py-3 text-sm">' + esc(name) + '</td>' +
+        '<td class="px-4 py-3 text-xs text-white/40" dir="ltr">' + esc(String(u.id).slice(0, 8)) + '</td>' +
+        '<td class="px-4 py-3">' + badge + '</td>' +
+        '<td class="px-4 py-3 text-sm text-white/50">' + date(u.pro_expiry_date) + '</td>' +
+        '<td class="px-4 py-3 text-left"><button data-pro="' + esc(u.id) + '" class="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:border-[#9FE870]/40 hover:text-[#9FE870]">' +
+        (u.is_pro ? 'إيقاف Pro' : 'منح Pro') + '</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function emptyRow(span, message) {
+    return '<tr><td colspan="' + span + '" class="px-4 py-10 text-center text-sm text-white/40">' + esc(message) + '</td></tr>';
+  }
+
+  // ------------------------------------------------------------------ wire --
+
+  document.addEventListener('click', function (event) {
+    const copy = event.target.closest('[data-copy]');
+    if (copy) {
+      navigator.clipboard.writeText(copy.getAttribute('data-copy'));
+      toast('تم نسخ الكود.');
+      return;
+    }
+    const revokeButton = event.target.closest('[data-revoke]');
+    if (revokeButton) { revoke(revokeButton.getAttribute('data-revoke')); return; }
+    const proButton = event.target.closest('[data-pro]');
+    if (proButton) {
+      const user = state.users.find(function (u) { return u.id === proButton.getAttribute('data-pro'); });
+      if (user) togglePro(user);
+      return;
+    }
+  });
+
+  el('loginForm').addEventListener('submit', signIn);
+  el('generateButton').addEventListener('click', generate);
+  el('signOut').addEventListener('click', async function () { await sb.auth.signOut(); showLogin(''); });
+  el('copyBatch').addEventListener('click', function () {
+    if (!state.lastBatch) return;
+    navigator.clipboard.writeText(state.lastBatch.join('\n'));
+    toast('تم نسخ الدفعة.');
+  });
+  el('search').addEventListener('input', function (e) { state.query = e.target.value.trim().toLowerCase(); render(); });
+  el('tabCodes').addEventListener('click', function () { state.tab = 'codes'; render(); });
+  el('tabUsers').addEventListener('click', function () { state.tab = 'users'; render(); });
+  document.querySelectorAll('[data-filter]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      state.filter = button.getAttribute('data-filter');
+      document.querySelectorAll('[data-filter]').forEach(function (other) {
+        other.className = 'rounded-lg px-3 py-1.5 text-xs font-bold transition ' +
+          (other === button ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70');
+      });
+      render();
+    });
+  });
+
+  start();
+</script>
+
+<!-- --------------------------------------------------------------- shell -- -->
+
+<div id="toast" class="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center gap-2"></div>
+
+<div id="login" class="hidden min-h-screen items-center justify-center p-6 flex">
+  <form id="loginForm" class="w-full max-w-sm rounded-3xl border border-white/10 bg-[#111814] p-7 shadow-2xl">
+    <div class="mb-6 flex items-center gap-3">
+      <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9FE870] text-xl">🃏</div>
+      <div>
+        <p class="text-lg font-extrabold leading-tight">بطاقاتي</p>
+        <p class="text-xs text-white/50">لوحة الإدارة</p>
+      </div>
+    </div>
+    <label class="mb-1 block text-xs text-white/50" for="email">البريد الإلكتروني</label>
+    <input id="email" type="email" required dir="ltr" autocomplete="username"
+      class="mb-4 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-[#9FE870]/60" />
+    <label class="mb-1 block text-xs text-white/50" for="password">كلمة المرور</label>
+    <input id="password" type="password" required dir="ltr" autocomplete="current-password"
+      class="mb-4 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-[#9FE870]/60" />
+    <p id="loginError" class="mb-3 hidden rounded-lg bg-[#3a1414] px-3 py-2 text-xs text-[#ffb4b4]"></p>
+    <button id="loginButton" type="submit"
+      class="w-full rounded-xl bg-[#9FE870] py-2.5 text-sm font-extrabold text-[#163300] transition hover:bg-[#b4f58c]">دخول</button>
+    <p class="mt-4 text-center text-[11px] leading-relaxed text-white/30">
+      الحساب يجب أن يكون مُضافاً إلى جدول <span class="font-mono">admins</span> في قاعدة البيانات.
+    </p>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+  <header class="sticky top-0 z-30 border-b border-white/10 bg-[#0B110C]/85 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center gap-3 px-5 py-3">
+      <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#9FE870] text-base">🃏</div>
+      <div class="me-auto">
+        <p class="text-sm font-extrabold leading-tight">لوحة الإدارة</p>
+        <p id="who" class="text-[11px] text-white/40" dir="ltr"></p>
+      </div>
+      <button id="signOut" class="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:text-white">خروج</button>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-5 py-6">
+    <section class="mb-6 grid grid-cols-3 gap-3">
+      <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+        <p class="text-[11px] text-white/40">كل الأكواد</p>
+        <p id="statCodes" class="num mt-1 text-2xl font-extrabold">0</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+        <p class="text-[11px] text-white/40">أكواد متاحة</p>
+        <p id="statUnused" class="num mt-1 text-2xl font-extrabold text-[#9FE870]">0</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+        <p class="text-[11px] text-white/40">مشتركو Pro</p>
+        <p id="statPro" class="num mt-1 text-2xl font-extrabold">0</p>
+      </div>
+    </section>
+
+    <div class="mb-4 flex flex-wrap items-center gap-2">
+      <button id="tabCodes">الأكواد</button>
+      <button id="tabUsers">المستخدمون</button>
+      <input id="search" placeholder="بحث…" class="ms-auto w-44 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-[#9FE870]/60" />
+    </div>
+
+    <section id="codesPanel" class="hidden">
+      <div class="mb-4 rounded-2xl border border-white/10 bg-[#111814] p-4">
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="mb-1 block text-[11px] text-white/40" for="plan">الخطة</label>
+            <select id="plan" class="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none">
+              <option value="monthly">شهري</option>
+              <option value="quarterly">3 أشهر</option>
+              <option value="yearly" selected>سنوي</option>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-[11px] text-white/40" for="count">العدد</label>
+            <input id="count" type="number" min="1" max="50" value="1" dir="ltr"
+              class="num w-24 rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none" />
+          </div>
+          <div class="min-w-[12rem] flex-1">
+            <label class="mb-1 block text-[11px] text-white/40" for="note">ملاحظة (اختياري)</label>
+            <input id="note" placeholder="مدفوع نقداً · 28 أكتوبر"
+              class="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm outline-none focus:border-[#9FE870]/60" />
+          </div>
+          <button id="generateButton" class="rounded-xl bg-[#9FE870] px-5 py-2 text-sm font-extrabold text-[#163300] transition hover:bg-[#b4f58c] disabled:opacity-50">توليد</button>
+          <button id="copyBatch" class="hidden rounded-xl border border-white/10 px-4 py-2 text-sm text-white/70 hover:text-white">نسخ الدفعة</button>
+        </div>
+      </div>
+
+      <div class="mb-3 flex items-center gap-1">
+        <button data-filter="all" class="rounded-lg px-3 py-1.5 text-xs font-bold transition bg-white/10 text-white">الكل</button>
+        <button data-filter="unused" class="rounded-lg px-3 py-1.5 text-xs font-bold transition text-white/40 hover:text-white/70">متاح</button>
+        <button data-filter="used" class="rounded-lg px-3 py-1.5 text-xs font-bold transition text-white/40 hover:text-white/70">مستخدم</button>
+      </div>
+
+      <div class="overflow-hidden rounded-2xl border border-white/10 bg-[#111814]">
+        <table class="w-full text-right">
+          <thead class="bg-white/[0.03] text-[11px] uppercase tracking-wide text-white/40">
+            <tr>
+              <th class="px-4 py-2.5 font-bold">الكود</th>
+              <th class="px-4 py-2.5 font-bold">الخطة</th>
+              <th class="px-4 py-2.5 font-bold">الحالة</th>
+              <th class="px-4 py-2.5 font-bold">المستخدم</th>
+              <th class="px-4 py-2.5 font-bold">التاريخ</th>
+              <th class="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody id="codesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="usersPanel" class="hidden">
+      <div class="overflow-hidden rounded-2xl border border-white/10 bg-[#111814]">
+        <table class="w-full text-right">
+          <thead class="bg-white/[0.03] text-[11px] uppercase tracking-wide text-white/40">
+            <tr>
+              <th class="px-4 py-2.5 font-bold">الاسم</th>
+              <th class="px-4 py-2.5 font-bold">المعرّف</th>
+              <th class="px-4 py-2.5 font-bold">الاشتراك</th>
+              <th class="px-4 py-2.5 font-bold">ينتهي</th>
+              <th class="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+      <p class="mt-3 text-[11px] leading-relaxed text-white/30">
+        منح Pro من هنا يكتب <span class="font-mono">is_pro</span> وتاريخ انتهاء بعد سنة.
+        الإيقاف يُبقي التاريخ، فيحتفظ المستخدم بميزات من اشترك سابقاً (الثيم والحدّ الأكبر).
+      </p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

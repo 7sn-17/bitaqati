@@ -7,12 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/auth/auth_providers.dart';
 import 'core/config/app_config.dart';
+import 'core/dynamic_icon.dart';
 import 'core/notifications/reminder_providers.dart';
 import 'core/notifications/reminder_service.dart';
 import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_palette.dart';
+import 'core/widgets/splash_screen.dart';
 import 'data/pro_providers.dart';
 import 'data/sync_providers.dart';
 import 'domain/freemium.dart';
@@ -36,6 +38,13 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
     // Kicks off the first pull as soon as a session is restored, so a fresh
     // install on a new device shows the account's decks without a tap.
     ref.read(syncControllerProvider);
+    // The launcher keeps whatever alias was enabled when the icon was last
+    // changed, even across an update, so the icon on the home screen can drift
+    // from the one this install is supposed to wear. Re-apply it once per
+    // launch: a no-op when the two already agree.
+    unawaited(
+      DynamicIconService.reconcile(ref.read(sharedPreferencesProvider)),
+    );
     // A reminder tapped while the app was closed is delivered as a launch
     // detail rather than a callback, so it is drained once the router exists.
     ReminderService.instance.onOpenDeck = _openReview;
@@ -161,7 +170,13 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
       builder: (BuildContext context, Widget? child) {
         return Directionality(
           textDirection: isArabic ? TextDirection.rtl : TextDirection.ltr,
-          child: child ?? const SizedBox.shrink(),
+          // The splash covers the router for the first moment of the process
+          // rather than being a route of its own, so a deep link or a
+          // restored route is already where it belongs underneath.
+          child: AnimatedSplash(
+            arabic: isArabic,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

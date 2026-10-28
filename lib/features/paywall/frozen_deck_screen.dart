@@ -108,7 +108,7 @@ class _Wall extends StatelessWidget {
                       fontFamily: 'Cairo',
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: context.pay.green,
+                      color: context.pay.greenInk,
                     ),
                   ),
                 ],

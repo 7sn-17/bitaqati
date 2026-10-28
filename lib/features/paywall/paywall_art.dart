@@ -35,6 +35,7 @@ class PaywallInk {
     required this.ink,
     required this.muted,
     required this.green,
+    required this.greenInk,
     required this.onGreen,
     required this.greenDark,
     required this.border,
@@ -55,6 +56,11 @@ class PaywallInk {
       ink: context.ink,
       muted: context.muted,
       green: context.accent,
+      // [green] is the action colour, which is a bright highlight in every
+      // palette and therefore unreadable as text on a card. Anything green
+      // that has to be *read* — a price, a tick, the Pro column — uses this,
+      // which the theme guarantees against the card background.
+      greenInk: context.brandInk,
       onGreen: context.onAccent,
       greenDark: context.accentDeep,
       border: context.hairline,
@@ -81,8 +87,11 @@ class PaywallInk {
   /// Secondary text and captions.
   final Color muted;
 
-  /// The action colour: buttons, selected radios, prices.
+  /// The action colour: button fills, selected radios, borders.
   final Color green;
+
+  /// Green that can be read on a card. Priced, ticked and labelled with this.
+  final Color greenInk;
 
   /// Text and glyphs drawn on [green].
   final Color onGreen;

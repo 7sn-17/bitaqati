@@ -1256,7 +1256,7 @@ String _proSubtitle(ProStatus pro) {
         : 'فعّال · يتبقى $days يوماً';
   }
   if (pro.everPro) {
-    return 'انتهى اشتراكك · ${FreeLimits.bonusDecks} مجموعة بقيت مفتوحة';
+    return 'انتهى اشتراكك · نصف مجموعاتك مفتوحة، ${FreeLimits.decks} على الأقل';
   }
   return '${FreeLimits.decks} مجموعة و${FreeLimits.cards} بطاقة في الخطة المجانية';
 }
@@ -1357,7 +1357,11 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
     }
     setState(() {
       _supported = supported;
-      _current = current ?? AppIconOption.defaultAlias;
+      // The launcher is the source of truth when it answers. When it does
+      // not, the remembered choice is still the best guess this install has.
+      _current =
+          current ??
+          DynamicIconService.remembered(ref.read(sharedPreferencesProvider));
     });
   }
 
@@ -1372,6 +1376,17 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
     }
     setState(() => _busy = true);
     final bool ok = await DynamicIconService.apply(option.alias);
+    if (!mounted) {
+      return;
+    }
+    if (ok) {
+      // Remembered so the next launch can put the launcher back if an update
+      // or a launcher reset leaves it showing something else.
+      await DynamicIconService.remember(
+        ref.read(sharedPreferencesProvider),
+        option.alias,
+      );
+    }
     if (!mounted) {
       return;
     }

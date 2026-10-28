@@ -8,14 +8,8 @@ import 'package:flutter/foundation.dart';
 /// A limit that lives in two places drifts; this file is the only place the
 /// numbers are written down on the client.
 abstract final class FreeLimits {
-  /// Decks a free account may keep unlocked.
+  /// The floor: no account ever has fewer than this many decks open.
   static const int decks = 20;
-
-  /// Decks a lapsed subscriber keeps: the free allowance plus a 25% bonus.
-  ///
-  /// Nobody loses their work for letting a subscription end. The extra five
-  /// decks are the difference between "I was punished" and "I should renew".
-  static const int bonusDecks = 25;
 
   static const int cards = 1000;
   static const int studySessionsPerDeck = 4;
@@ -26,9 +20,17 @@ abstract final class FreeLimits {
   static const int occlusionCards = 5;
   static const int clozeCards = 20;
 
-  /// The deck allowance for someone who has never paid, or for someone whose
-  /// subscription has ended.
-  static int decksFor({required bool everPro}) => everPro ? bonusDecks : decks;
+  /// How many decks stay open once Pro ends.
+  ///
+  /// Half the library, rounded up, and never below [decks]. A flat number was
+  /// wrong in both directions: someone with twelve decks lost eight of them
+  /// for nothing, and someone with four hundred kept twenty and called it a
+  /// punishment. Proportional keeps the promise — nobody loses their work,
+  /// they lose half their shelf — while the floor keeps a small library whole.
+  static int unlockedFor(int total) {
+    final int half = (total / 2).ceil();
+    return half < decks ? decks : half;
+  }
 }
 
 /// The three paid plans, priced once so the paywall and the activation code
@@ -113,12 +115,13 @@ class ProStatus {
     return until == null || until.isAfter(DateTime.now());
   }
 
-  /// True once the account has ever been paid, which is what grants the
-  /// freeze bonus. An expired subscriber keeps 25 decks instead of 20.
+  /// True once the account has ever been paid, which is what keeps the paid
+  /// palette after a lapse.
   bool get everPro => isPro || expiry != null;
 
-  /// Null means unlimited.
-  int? get deckLimit => active ? null : FreeLimits.decksFor(everPro: everPro);
+  /// Null means unlimited. [total] is how many decks the library holds right
+  /// now, because the free allowance is proportional to it.
+  int? deckLimitFor(int total) => active ? null : FreeLimits.unlockedFor(total);
 
   int? get cardLimit => active ? null : FreeLimits.cards;
 

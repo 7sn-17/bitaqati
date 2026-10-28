@@ -168,7 +168,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   },
                   onClose: () => Navigator.of(context).maybePop(),
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 26),
                 if (_tab == 0) ..._subscribeTab(pro) else ..._codeTab(pro),
               ],
             ),
@@ -184,12 +184,12 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     return <Widget>[
       if (widget.reason != null) ...<Widget>[
         _ReasonStrip(text: widget.reason!),
-        const SizedBox(height: 22),
+        const SizedBox(height: 26),
       ],
       const _MascotRow(),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       _Title(pro: pro),
-      const SizedBox(height: 24),
+      const SizedBox(height: 28),
       Column(
         children: <Widget>[
           for (final ProPlan plan in ProPlan.values) ...<Widget>[
@@ -201,13 +201,13 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 setState(() => _plan = plan);
               },
             ),
-            if (plan != ProPlan.values.last) const SizedBox(height: 18),
+            if (plan != ProPlan.values.last) const SizedBox(height: 20),
           ],
         ],
       ),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       const _SupportBanner(),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       _PaymentMethods(
         methods: _methods,
         selected: _method,
@@ -216,15 +216,15 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
           setState(() => _method = index);
         },
       ),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       const _HowItWorks(),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       _CallToAction(plan: _plan, onTap: _continue),
       if (_feedback != null) ...<Widget>[
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         _Feedback(text: _feedback!, ok: _feedbackOk),
       ],
-      const SizedBox(height: 26),
+      const SizedBox(height: 30),
       const _Comparison(),
     ];
   }
@@ -234,11 +234,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   List<Widget> _codeTab(ProStatus pro) {
     return <Widget>[
       const _MascotRow(),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       const _Title(pro: null),
-      const SizedBox(height: 24),
+      const SizedBox(height: 28),
       Container(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 22),
         decoration: _toy(fill: context.pay.white, border: context.pay.border),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,22 +247,22 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               'أدخل كود التفعيل',
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 17,
+                fontSize: 15.5,
                 fontWeight: FontWeight.w800,
                 color: context.pay.ink,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               'الكود يصلك على واتساب بعد تأكيد الدفع. يعمل مرة واحدة، ويضيف مدة الخطة إلى اشتراكك الحالي.',
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 12.5,
+                fontSize: 11.5,
                 height: 1.7,
                 color: context.pay.muted,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             TextField(
               controller: _code,
               textAlign: TextAlign.center,
@@ -270,7 +270,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               textDirection: TextDirection.ltr,
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 18,
+                fontSize: 16.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 3,
                 color: context.pay.ink,
@@ -298,20 +298,20 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               ),
               onSubmitted: (_) => _activate(),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             _PrimaryButton(
               label: _busy ? 'جارٍ التحقق…' : 'تفعيل الكود',
               icon: _busy ? null : FontAwesomeIcons.unlock,
               onTap: _busy ? null : _activate,
             ),
             if (_feedback != null) ...<Widget>[
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               _Feedback(text: _feedback!, ok: _feedbackOk),
             ],
           ],
         ),
       ),
-      const SizedBox(height: 22),
+      const SizedBox(height: 26),
       if (pro.active) _ActiveBadge(pro: pro),
       const _HowItWorks(),
     ];
@@ -333,7 +333,7 @@ BoxDecoration _toy({
 // than constants. Everything else about them is still fixed.
 TextStyle _titleStyle(BuildContext context) => TextStyle(
   fontFamily: 'Cairo',
-  fontSize: 17,
+  fontSize: 15.5,
   fontWeight: FontWeight.w800,
   color: context.pay.ink,
   height: 1.4,
@@ -341,14 +341,14 @@ TextStyle _titleStyle(BuildContext context) => TextStyle(
 
 TextStyle _bodyStyle(BuildContext context) => TextStyle(
   fontFamily: 'Cairo',
-  fontSize: 13,
+  fontSize: 12,
   height: 1.75,
   color: context.pay.ink,
 );
 
 TextStyle _noteStyle(BuildContext context) => TextStyle(
   fontFamily: 'Cairo',
-  fontSize: 11.5,
+  fontSize: 11,
   height: 1.5,
   color: context.pay.muted,
 );
@@ -458,7 +458,7 @@ class _Segment extends StatelessWidget {
               duration: const Duration(milliseconds: 180),
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: active ? FontWeight.w800 : FontWeight.w700,
                 color: active ? context.pay.ink : context.pay.muted,
               ),
@@ -489,14 +489,14 @@ class _ReasonStrip extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          FaIcon(FontAwesomeIcons.lock, size: 15, color: context.pay.green),
+          FaIcon(FontAwesomeIcons.lock, size: 15, color: context.pay.greenInk),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 12.5,
+                fontSize: 11.5,
                 height: 1.6,
                 fontWeight: FontWeight.w700,
                 color: context.pay.ink,
@@ -537,7 +537,7 @@ class _MascotRow extends StatelessWidget {
               'مراجعة اليوم أسهل من تراكم الغد. خطوة صغيرة كل يوم تصنع الفرق!',
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 14,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 height: 1.7,
                 color: context.pay.ink,
@@ -568,7 +568,7 @@ class _Title extends StatelessWidget {
             text: TextSpan(
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 28,
+                fontSize: 25,
                 fontWeight: FontWeight.w800,
                 height: 1.4,
                 color: context.pay.ink,
@@ -588,7 +588,7 @@ class _Title extends StatelessWidget {
                       'Pro',
                       style: TextStyle(
                         fontFamily: 'Cairo',
-                        fontSize: 26,
+                        fontSize: 23,
                         fontWeight: FontWeight.w800,
                         height: 1.35,
                         color: context.pay.onYellow,
@@ -600,7 +600,7 @@ class _Title extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           pro != null && pro!.active
               ? 'اشتراكك فعّال. تمديده يضيف المدة الجديدة فوق المتبقي.'
@@ -608,7 +608,7 @@ class _Title extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 14,
+            fontSize: 13,
             height: 1.7,
             color: context.pay.muted,
           ),
@@ -640,7 +640,7 @@ class _PlanCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         decoration: _toy(
           fill: selected ? context.pay.greenSoft : context.pay.white,
           border: selected ? context.pay.green : context.pay.border,
@@ -660,12 +660,12 @@ class _PlanCard extends StatelessWidget {
                         plan.label,
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 17,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w800,
                           color: context.pay.ink,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(plan.tagline, style: _noteStyle(context)),
                     ],
                   ),
@@ -680,7 +680,7 @@ class _PlanCard extends StatelessWidget {
                         '\$${plan.priceUsd}',
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.w800,
                           color: context.pay.ink,
                           height: 1.1,
@@ -701,7 +701,7 @@ class _PlanCard extends StatelessWidget {
                         ),
                         style: TextStyle(
                           fontFamily: 'Cairo',
-                          fontSize: 11,
+                          fontSize: 10.5,
                           color: context.pay.muted,
                         ),
                       ),
@@ -727,7 +727,7 @@ class _PlanCard extends StatelessWidget {
                     'الأكثر اختياراً · وفر 50%',
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w800,
                       color: context.pay.onYellow,
                       height: 1.4,
@@ -807,7 +807,7 @@ class _SupportBanner extends StatelessWidget {
               text: TextSpan(
                 style: TextStyle(
                   fontFamily: 'Cairo',
-                  fontSize: 13,
+                  fontSize: 12,
                   height: 1.8,
                   color: context.pay.ink,
                 ),
@@ -848,7 +848,7 @@ class _PaymentMethods extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text('اختر طريقة الدفع', style: _titleStyle(context)),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -928,7 +928,7 @@ class _MethodTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
                   label,
                   textAlign: TextAlign.center,
@@ -936,7 +936,7 @@ class _MethodTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: context.pay.ink,
                   ),
@@ -947,7 +947,7 @@ class _MethodTile extends StatelessWidget {
                   maxLines: 2,
                   style: TextStyle(
                     fontFamily: 'Cairo',
-                    fontSize: 11,
+                    fontSize: 10.5,
                     height: 1.4,
                     color: context.pay.muted,
                   ),
@@ -1007,14 +1007,14 @@ class _HowItWorks extends StatelessWidget {
             'كيف تتم العملية؟',
             style: TextStyle(
               fontFamily: 'Cairo',
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w800,
               color: context.pay.ink,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           for (int index = 0; index < _steps.length; index++) ...<Widget>[
-            if (index > 0) const SizedBox(height: 12),
+            if (index > 0) const SizedBox(height: 14),
             Row(
               children: <Widget>[
                 Container(
@@ -1029,7 +1029,7 @@ class _HowItWorks extends StatelessWidget {
                     '${index + 1}',
                     style: TextStyle(
                       fontFamily: 'Cairo',
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w800,
                       color: context.pay.ink,
                       height: 1.1,
@@ -1066,13 +1066,13 @@ class _CallToAction extends StatelessWidget {
           icon: FontAwesomeIcons.whatsapp,
           onTap: onTap,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Text(
           '\$${plan.priceUsd}.00 ${plan.period} · يعادل ${plan.perMonth} شهرياً',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 12,
+            fontSize: 11.5,
             color: context.pay.muted,
           ),
         ),
@@ -1122,7 +1122,7 @@ class _PrimaryButton extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontFamily: 'Cairo',
-                  fontSize: 17,
+                  fontSize: 15.5,
                   fontWeight: FontWeight.w800,
                   color: context.pay.onGreen,
                 ),
@@ -1160,7 +1160,7 @@ class _Feedback extends StatelessWidget {
         text,
         style: TextStyle(
           fontFamily: 'Cairo',
-          fontSize: 12.5,
+          fontSize: 11.5,
           height: 1.6,
           fontWeight: FontWeight.w700,
           color: ok ? context.pay.greenDark : context.pay.heart,
@@ -1187,7 +1187,7 @@ class _ActiveBadge extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          FaIcon(FontAwesomeIcons.crown, size: 20, color: context.pay.green),
+          FaIcon(FontAwesomeIcons.crown, size: 20, color: context.pay.greenInk),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -1196,7 +1196,7 @@ class _ActiveBadge extends StatelessWidget {
                   : 'أنت مشترك في Pro. يتبقى $days يوماً.',
               style: TextStyle(
                 fontFamily: 'Cairo',
-                fontSize: 13.5,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w700,
                 color: context.pay.ink,
               ),
@@ -1215,6 +1215,7 @@ class _Comparison extends StatelessWidget {
 
   static const List<({String feature, String free, String pro})>
   _rows = <({String feature, String free, String pro})>[
+    (feature: 'أيقونة التطبيق', free: 'الافتراضية فقط', pro: '3 أيقونات'),
     (feature: 'المجموعات', free: '20 مجموعة', pro: 'غير محدود ∞'),
     (feature: 'البطاقات', free: '1000 بطاقة', pro: 'غير محدود ∞'),
     (
@@ -1252,12 +1253,12 @@ class _Comparison extends StatelessWidget {
           'المجاني مقابل Pro',
           style: TextStyle(
             fontFamily: 'Cairo',
-            fontSize: 19,
+            fontSize: 17,
             fontWeight: FontWeight.w800,
             color: context.pay.ink,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Container(
           decoration: BoxDecoration(
             color: context.pay.white,
@@ -1306,7 +1307,7 @@ class _FeatureRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextStyle featureStyle = TextStyle(
       fontFamily: 'Cairo',
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: FontWeight.w600,
       height: 1.5,
       color: header ? context.pay.muted : context.pay.ink,
@@ -1320,29 +1321,41 @@ class _FeatureRow extends StatelessWidget {
             : Border(top: BorderSide(color: context.pay.border)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Expanded(flex: 135, child: Text(feature, style: featureStyle)),
           const SizedBox(width: 8),
-          // The glyph sits inside the cell, next to the value it qualifies: a
-          // padlock on what the free tier caps and a check on what Pro lifts.
-          // A shared icon in the header said nothing about either column.
+          // Plain words in both value columns. A padlock on every free cell
+          // and a tick on every paid one carried no information the number
+          // beside it did not already carry, and two glyphs per row made a
+          // ten-row table read as decoration.
           Expanded(
             flex: 100,
-            child: _Cell(
-              text: free,
-              icon: header ? null : FontAwesomeIcons.lock,
-              color: context.pay.muted,
+            child: Text(
+              free,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 11.5,
+                height: 1.5,
+                color: context.pay.muted,
+                fontWeight: header ? FontWeight.w600 : FontWeight.w500,
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 100,
-            child: _Cell(
-              text: pro,
-              icon: header ? null : FontAwesomeIcons.check,
-              color: context.pay.green,
-              bold: true,
+            child: Text(
+              pro,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Cairo',
+                fontSize: 11.5,
+                height: 1.5,
+                color: header ? context.pay.muted : context.pay.greenInk,
+                fontWeight: header ? FontWeight.w600 : FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -1355,45 +1368,3 @@ class _FeatureRow extends StatelessWidget {
 ///
 /// The glyph is part of the cell rather than a legend in the header, so the
 /// reader never has to look back up to know which column they are in.
-class _Cell extends StatelessWidget {
-  const _Cell({
-    required this.text,
-    required this.color,
-    this.icon,
-    this.bold = false,
-  });
-
-  final String text;
-  final Color color;
-  final FaIconData? icon;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    final TextStyle style = TextStyle(
-      fontFamily: 'Cairo',
-      fontSize: 12,
-      fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-      height: 1.5,
-      color: color,
-    );
-    final FaIconData? glyph = icon;
-    if (glyph == null) {
-      return Text(text, textAlign: TextAlign.center, style: style);
-    }
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        // Nudged down so the small glyph sits on the text baseline of the
-        // first line rather than floating above it.
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: FaIcon(glyph, size: 9, color: color),
-        ),
-        const SizedBox(width: 4),
-        Flexible(child: Text(text, style: style)),
-      ],
-    );
-  }
-}
