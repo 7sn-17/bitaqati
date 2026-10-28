@@ -127,9 +127,14 @@ Future<void> _showUpgrade({
 /// The ceiling on decks.
 ///
 /// [lapsed] changes the wording: someone whose subscription just ended is not
-/// being sold to, they are being told which 25 decks stayed open.
-Future<void> showDeckLimitDialog(BuildContext context, {required bool lapsed}) {
-  final int limit = FreeLimits.decksFor(everPro: lapsed);
+/// being sold to, they are being told which decks stayed open. [total] is the
+/// size of the library, because a lapsed allowance is half of it.
+Future<void> showDeckLimitDialog(
+  BuildContext context, {
+  required bool lapsed,
+  required int total,
+}) {
+  final int limit = lapsed ? FreeLimits.unlockedFor(total) : FreeLimits.decks;
   return _showUpgrade(
     context: context,
     icon: FontAwesomeIcons.layerGroup,

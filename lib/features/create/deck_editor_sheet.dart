@@ -27,6 +27,7 @@ Future<String?> showDeckEditorSheet(
       await showDeckLimitDialog(
         context,
         lapsed: ref.read(proNowProvider).everPro,
+        total: ref.read(deckListProvider).valueOrNull?.length ?? 0,
       );
       return null;
     }

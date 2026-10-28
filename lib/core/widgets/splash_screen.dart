@@ -123,8 +123,8 @@ class _SplashSheet extends StatelessWidget {
                 .animate()
                 .fadeIn(duration: 380.ms, curve: Curves.easeOut)
                 .scale(
-                  begin: 0.74,
-                  end: 1,
+                  begin: const Offset(0.74, 0.74),
+                  end: const Offset(1, 1),
                   duration: 620.ms,
                   curve: Curves.easeOutBack,
                 ),
