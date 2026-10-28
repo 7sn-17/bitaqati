@@ -1,6 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
+// Not referenced by this file directly: the generated part file declares
+// DeckPrivacy columns, and a part file can only see the imports of its parent
+// library. Removing this line compiles fine here and fails the moment the app
+// is built, which is exactly how it went missing once.
+import '../../domain/enums.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
