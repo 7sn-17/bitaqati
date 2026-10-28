@@ -1453,76 +1453,76 @@ class _IconTile extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: <Widget>[
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: selected ? context.brandInk : context.hairline,
-                  width: selected ? 2.2 : 1,
-                ),
-              ),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: <Widget>[
-                  // The launcher's own preview: the composed adaptive layer,
-                  // masked to the same circle Android uses. The 70% inset is
-                  // already baked into the file, so this tile and the home
-                  // screen are drawn from one image, not two guesses.
-                  ClipOval(
-                    child: Container(
+            Stack(
+              clipBehavior: Clip.none,
+              children: <Widget>[
+                // The launcher's own preview: the composed adaptive layer,
+                // masked to the same circle Android uses. The artwork sits at
+                // 70% inside its own field, so the ring hugs the image with no
+                // gap: what the tile shows is what the home screen shows.
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: option.background,
+                  ),
+                  foregroundDecoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? context.brandInk : context.hairline,
+                      width: selected ? 2.4 : 1,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      option.adaptiveAsset,
                       width: 62,
                       height: 62,
-                      color: option.background,
-                      child: Image.asset(
-                        option.adaptiveAsset,
-                        width: 62,
-                        height: 62,
-                        fit: BoxFit.cover,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                if (locked)
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.42),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          CupertinoIcons.lock_fill,
+                          size: 18,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                  if (locked)
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.42),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            CupertinoIcons.lock_fill,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (selected)
-                    PositionedDirectional(
-                      top: -6,
-                      end: -6,
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: context.brandInk,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: context.colors.surfaceContainerHighest,
-                            width: 2,
-                          ),
-                        ),
-                        child: Icon(
-                          CupertinoIcons.checkmark_alt,
-                          size: 10,
+                if (selected)
+                  PositionedDirectional(
+                    top: -6,
+                    end: -6,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: context.brandInk,
+                        shape: BoxShape.circle,
+                        border: Border.all(
                           color: context.colors.surfaceContainerHighest,
+                          width: 2,
                         ),
                       ),
+                      child: Icon(
+                        CupertinoIcons.checkmark_alt,
+                        size: 10,
+                        color: context.colors.surfaceContainerHighest,
+                      ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(

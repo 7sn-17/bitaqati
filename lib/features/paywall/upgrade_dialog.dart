@@ -14,7 +14,6 @@ Future<void> _showUpgrade({
   required BuildContext context,
   required FaIconData icon,
   required String title,
-  required String message,
   required String reason,
   String action = 'ترقية الآن',
 }) {
@@ -73,18 +72,7 @@ Future<void> _showUpgrade({
                             height: 1.4,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          message,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Cairo',
-                            fontSize: 13,
-                            height: 1.75,
-                            color: context.pay.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                           decoration: BoxDecoration(
@@ -181,11 +169,6 @@ Future<void> showDeckLimitDialog(
     context: context,
     icon: FontAwesomeIcons.layerGroup,
     title: 'وصلت إلى $limit مجموعة',
-    message: lapsed
-        ? 'بعد انتهاء اشتراكك أبقينا أحدث $limit مجموعة مفتوحة، والبقية محفوظة كما هي بلا حذف. '
-              'جدّد Pro لتعود كل المجموعات للعمل.'
-        : 'الخطة المجانية تتسع لـ$limit مجموعة. مجموعاتك الحالية محفوظة، '
-              'وPro يرفع الحد بلا نهاية.',
     reason: lapsed
         ? 'أبقينا $limit مجموعة مفتوحة بعد انتهاء اشتراكك. جدّد لتعود كلها.'
         : 'وصلت إلى حد $limit مجموعة في الخطة المجانية.',
@@ -201,9 +184,6 @@ Future<void> showFrozenDeckDialog(
     context: context,
     icon: FontAwesomeIcons.lock,
     title: 'هذه المجموعة مجمّدة',
-    message:
-        '«$deckTitle» محفوظة بكل بطاقاتها ومواعيد مراجعتها، لكنها خارج المجموعات المفتوحة. '
-        'لا شيء حُذف: الترقية تعيدها للعمل فوراً.',
     reason: 'مجموعة «$deckTitle» مجمّدة. Pro يفتح كل مجموعاتك.',
   );
 }
@@ -214,9 +194,6 @@ Future<void> showThemeLockedDialog(BuildContext context) {
     context: context,
     icon: FontAwesomeIcons.palette,
     title: 'الثيمات لمشتركي Pro',
-    message:
-        'الخطة المجانية تعمل بثيم الغابة. Pro يفتح المحيط والغروب والكلاسيكي، '
-        'ويطبّقها على كل شاشة في التطبيق.',
     reason: 'الثيمات الملونة متاحة مع Pro.',
   );
 }
@@ -227,9 +204,6 @@ Future<void> showIconLockedDialog(BuildContext context) {
     context: context,
     icon: FontAwesomeIcons.crown,
     title: 'أيقونات التطبيق لمشتركي Pro',
-    message:
-        'بدّل أيقونة بطاقتي على شاشتك الرئيسية: الافتراضية، التاج، أو الأزرق. '
-        'متاح مع Pro.',
     reason: 'أيقونات التطبيق متاحة مع Pro.',
   );
 }
@@ -251,7 +225,6 @@ Future<void> showQuotaDialog(BuildContext context, QuotaKind kind) {
       QuotaKind.studySessions => FontAwesomeIcons.graduationCap,
     },
     title: kind.title,
-    message: kind.message,
     reason: kind.reason,
   );
 }

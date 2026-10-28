@@ -9,7 +9,7 @@ abstract final class AppConfig {
   /// Fallback only: the real version is read from the Android manifest at
   /// runtime (`appVersionProvider`), so the number on screen can never drift
   /// from the APK that is installed.
-  static const String appVersion = '2.0.6';
+  static const String appVersion = '2.0.7';
 
   /// Custom URL scheme kept for links that were already shared.
   ///

@@ -142,12 +142,25 @@ class ProfileRepository {
     if (name.isEmpty && deviceId.isEmpty) {
       return;
     }
-    await Supabase.instance.client.from('profiles').upsert(<String, Object?>{
+    final Map<String, Object?> payload = <String, Object?>{
       'id': userId,
       if (name.isNotEmpty) 'display_name': name,
       if (name.isNotEmpty) 'display_name_custom': true,
       if (deviceId.isNotEmpty) 'device_id': deviceId,
-    });
+    };
+    try {
+      await Supabase.instance.client.from('profiles').upsert(payload);
+    } on PostgrestException catch (error) {
+      // The device binding is written once and then frozen by the server. An
+      // account that signs in on a second phone must still be able to save its
+      // name, so a rejected write is retried without the device column — the
+      // binding the server already has is the one that counts.
+      if (deviceId.isEmpty || error.code != '42501') {
+        rethrow;
+      }
+      payload.remove('device_id');
+      await Supabase.instance.client.from('profiles').upsert(payload);
+    }
   }
 
   /// Pushes the local name when the cloud does not have it yet.
