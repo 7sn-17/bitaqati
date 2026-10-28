@@ -856,13 +856,23 @@ The generated resources are not committed. CI runs the script before every
 build, so an APK can never ship a stale set; a local build needs it once after a
 fresh clone.
 
-Each set is one file. The 1024px original is the adaptive foreground at its own
-margins — the cards already sit inside the safe zone — with
-`adaptive_icon_foreground_inset: 6` to keep their rounded edges clear of the
-launcher's 72/108 mask. The background colour is the artwork's own field, so the
-masked corners show the green the gradient ends on instead of a visible ring.
-The settings preview draws that same file inside a `ClipOval`, which is why the
-tile and the home screen cannot disagree.
+Each set is two files, and the split matters. `default.png` is the full-bleed
+artwork: it is the legacy mipmap, which Android 7 and older draw edge to edge,
+and it is what the splash, the login screen and the settings card show, so
+nothing in the app ever zooms or crops it. `default_adaptive.png` is the same
+artwork scaled to 70 % and composited on the icon's own corner colour, and that
+is the adaptive foreground. The launcher masks the foreground to a 72/108
+circle: artwork that filled the canvas lost its corners — the card's rounded
+edges were the first thing to go — and artwork left at its original 59 % looked
+lost in the middle. At 70 % the whole illustration clears the mask, and because
+the field matches the artwork's own background the seam falls outside the
+circle. The scale lives in the PNG rather than in
+`adaptive_icon_foreground_inset`, because an inset shrinks the layer and leaves
+its transparent centre resting on the background, which shows as a pale ring at
+every edge; the inset is therefore 0.
+
+The settings preview draws the composed file inside a `ClipOval`, which is what
+the launcher does to it, so the tile and the home screen are one image.
 
 **Icon drift.** The enabled alias survives an app update, so a phone that once
 picked the blue icon keeps it after the APK is replaced. `AppIconOption` is

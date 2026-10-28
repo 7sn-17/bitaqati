@@ -1466,17 +1466,17 @@ class _IconTile extends StatelessWidget {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: <Widget>[
-                  // The launcher's own preview: the original artwork, masked
-                  // to the same circle Android uses. It is the very file the
-                  // adaptive icon is built from, so this tile cannot drift
-                  // from the home screen.
+                  // The launcher's own preview: the composed adaptive layer,
+                  // masked to the same circle Android uses. The 70% inset is
+                  // already baked into the file, so this tile and the home
+                  // screen are drawn from one image, not two guesses.
                   ClipOval(
                     child: Container(
                       width: 62,
                       height: 62,
                       color: option.background,
                       child: Image.asset(
-                        option.asset,
+                        option.adaptiveAsset,
                         width: 62,
                         height: 62,
                         fit: BoxFit.cover,

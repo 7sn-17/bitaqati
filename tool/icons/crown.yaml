@@ -1,16 +1,22 @@
 flutter_launcher_icons:
-  # One file per icon set: the plugin always writes its adaptive foreground to
-  # the fixed resource name ic_launcher_foreground, so a single run for three
-  # icons leaves all three pointing at whichever ran last. tool/launcher_icons.sh
-  # runs them in sequence and files each set's output under its own name.
+  # Pro launcher icon: the crown variant.
+  #
+  # Two files, because the two Android icon systems want different things.
+  # `crown.png` is the artwork at full bleed and becomes the legacy
+  # mipmap, which is what Android 7 and older draw edge to edge.
+  # `crown_adaptive.png` is the same artwork scaled to 70% on a field of
+  # its own background colour, and becomes the adaptive foreground: the launcher
+  # masks that layer to a circle of 72dp inside the 108dp canvas, so artwork that
+  # filled the canvas lost its corners. At 70% the whole illustration sits inside
+  # the mask with a margin, and the field is the artwork's own corner colour, so
+  # nothing shows a seam.
+  #
+  # adaptive_icon_foreground_inset stays 0 because the padding is already baked
+  # into the file. Insets here would shrink the artwork a second time.
   android: "launcher_icon_crown"
   ios: false
   image_path: "assets/app_icons/crown.png"
   min_sdk_android: 21
   adaptive_icon_background: "#14662A"
-  adaptive_icon_foreground: "assets/app_icons/crown.png"
-  # The artwork already carries its own background and a generous margin, so
-  # the foreground is only nudged inwards: the launcher's 72dp mask crops the
-  # corners of a full-bleed square, and the card's rounded edges have to stay
-  # inside it untouched.
-  adaptive_icon_foreground_inset: 6
+  adaptive_icon_foreground: "assets/app_icons/crown_adaptive.png"
+  adaptive_icon_foreground_inset: 0

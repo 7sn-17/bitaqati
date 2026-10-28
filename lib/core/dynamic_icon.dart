@@ -14,6 +14,7 @@ class AppIconOption {
     required this.label,
     required this.note,
     required this.asset,
+    required this.adaptiveAsset,
     required this.background,
     this.pro = false,
   });
@@ -22,12 +23,17 @@ class AppIconOption {
   final String label;
   final String note;
 
-  /// The original 1024px artwork, used everywhere the icon is drawn.
-  ///
-  /// It is also the file the launcher icon is built from, so the splash, the
-  /// login screen, the picker and the home screen are all showing the same
-  /// pixels — there is no second, pre-composited copy to drift out of date.
+  /// The full-bleed artwork: the splash, the login screen and the legacy
+  /// mipmap all draw this file, unscaled and uncropped.
   final String asset;
+
+  /// The composed adaptive layer: the same artwork at 70% on [background].
+  ///
+  /// The launcher masks this file to a circle and draws it edge to edge, so
+  /// the settings preview uses this one at full tile size. Using [asset] and
+  /// scaling it down by hand would show the card larger than the home screen
+  /// does — the artwork already sits inside the adaptive safe zone.
+  final String adaptiveAsset;
 
   /// The colour behind the artwork in the adaptive layer.
   final Color background;
@@ -57,6 +63,7 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
     label: 'الافتراضي',
     note: 'الأصفر',
     asset: 'assets/app_icons/default.png',
+    adaptiveAsset: 'assets/app_icons/default_adaptive.png',
     background: Color(0xFF1A4632),
   ),
   AppIconOption(
@@ -64,6 +71,7 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
     label: 'التاج',
     note: 'لمشتركي Pro',
     asset: 'assets/app_icons/crown.png',
+    adaptiveAsset: 'assets/app_icons/crown_adaptive.png',
     background: Color(0xFF14662A),
     pro: true,
   ),
@@ -72,6 +80,7 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
     label: 'الأزرق',
     note: 'لمشتركي Pro',
     asset: 'assets/app_icons/blue.png',
+    adaptiveAsset: 'assets/app_icons/blue_adaptive.png',
     background: Color(0xFF0F2C51),
     pro: true,
   ),
