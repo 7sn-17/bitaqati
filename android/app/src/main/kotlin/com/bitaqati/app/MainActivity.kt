@@ -43,11 +43,20 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
+                    "supported" -> result.success(supported())
                     "currentAlias" -> result.success(currentAlias())
                     else -> result.notImplemented()
                 }
             }
     }
+
+    /**
+     * True when every alias this build expects is declared in the manifest.
+     *
+     * A build whose resources are missing one of them cannot switch icons at
+     * all, and the picker says so instead of offering a button that fails.
+     */
+    private fun supported(): Boolean = aliases.all { component(it) != null }
 
     /**
      * Enables [alias], then disables the others. Returns the alias that is on,

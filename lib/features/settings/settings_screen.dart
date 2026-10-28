@@ -1580,9 +1580,19 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
     }
     setState(() => _busy = false);
     if (!ok) {
+      // A refused change means one of two very different things, and the user
+      // can act on only one of them: the launcher ignored the swap, or the
+      // device never allowed it. Saying which one is the difference between a
+      // bug report and a shrug.
+      final bool supported =
+          ref.read(dynamicIconSupportProvider).valueOrNull ?? true;
       showAppMessage(
         context,
-        'تعذّر تغيير الأيقونة على هذا الجهاز.',
+        supported
+            ? 'تعذّر تغيير الأيقونة على هذا الجهاز. أعد المحاولة بعد إغلاق '
+                  'التطبيق من قائمة التطبيقات الأخيرة.'
+            : 'هذا الجهاز لا يسمح بتغيير أيقونة التطبيق. بعض أجهزة Xiaomi '
+                  'وRedmi تقيّد ذلك من النظام نفسه.',
         kind: AppMessageKind.error,
       );
       return;

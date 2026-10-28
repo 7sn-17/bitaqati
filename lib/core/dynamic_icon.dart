@@ -1,5 +1,4 @@
 import 'package:flutter/services.dart';
-import 'package:flutter_dynamic_icon_plus/flutter_dynamic_icon_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// One launcher icon the learner can wear.
@@ -87,73 +86,51 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
 
 /// Switches the launcher icon.
 ///
-/// Every call is wrapped: the platform channel throws on iOS, on a device whose
-/// launcher ignores aliases, and on a build where the manifest has not been
-/// updated. A failed icon change must never take the settings screen down with
-/// it, so the caller gets a bool and shows a quiet message.
+/// The work is done by the app itself, in MainActivity: the aliases are enabled
+/// and disabled directly through the package manager. A plugin was tried first
+/// and removed — it deferred the swap to a service that waits for the task to
+/// be removed from recents, so a user who pressed Home and came back never got
+/// the new icon. There is no library between this call and the platform now,
+/// which is also why a device that refuses the change can be reported honestly
+/// instead of guessed at.
+///
+/// Every call is wrapped: a device whose launcher ignores aliases, or a build
+/// whose manifest is missing one, must never take the settings screen down. The
+/// caller gets a bool and shows a quiet message.
 abstract final class DynamicIconService {
+  static const MethodChannel _channel = MethodChannel('com.bitaqati.app/icon');
+
+  /// Whether this build can change its icon at all: every alias has to be
+  /// declared, and the platform channel has to answer.
   static Future<bool> get supported async {
     try {
-      return await FlutterDynamicIconPlus.supportsAlternateIcons;
+      return await _channel.invokeMethod<bool>('supported') ?? false;
     } catch (_) {
       return false;
     }
   }
 
-  /// The channel that talks to MainActivity.
-  ///
-  /// The plugin is kept as the fallback, but on Android the native side does
-  /// the work: see MainActivity.kt for why the plugin's timing is wrong here.
-  static const MethodChannel _channel = MethodChannel('com.bitaqati.app/icon');
-
   /// The alias currently enabled, as a bare name, or null when it cannot be
-  /// read. The plugin answers with a fully qualified component name; the
-  /// channel answers with the bare one.
+  /// read.
   static Future<String?> current() async {
     try {
-      final String? native = await _channel.invokeMethod<String>(
-        'currentAlias',
-      );
-      if (native != null && native.isNotEmpty) {
-        return native;
-      }
-    } on MissingPluginException {
-      // A build without the native side: ask the plugin below.
-    } catch (_) {
-      return null;
-    }
-    try {
-      final String? name = await FlutterDynamicIconPlus.alternateIconName;
-      if (name == null || name.isEmpty) {
-        return null;
-      }
-      final int dot = name.lastIndexOf('.');
-      return dot == -1 ? name : name.substring(dot + 1);
+      final String? name = await _channel.invokeMethod<String>('currentAlias');
+      return name == null || name.isEmpty ? null : name;
     } catch (_) {
       return null;
     }
   }
 
+  /// Applies [alias] now and reports whether the launcher took it.
   static Future<bool> apply(String alias) async {
-    // The native path applies the swap now, in this call. The plugin only
-    // queues it until the task is removed from recents, which is why the home
-    // screen kept the old icon while the app already drew the new one.
     try {
       final String? applied = await _channel.invokeMethod<String>(
         'setAlias',
         <String, Object?>{'alias': alias},
       );
       return applied != null;
-    } on MissingPluginException {
-      // Fall through to the plugin.
     } on PlatformException {
       return false;
-    }
-    try {
-      await FlutterDynamicIconPlus.setAlternateIconName(
-        iconName: alias == AppIconOption.defaultAlias ? null : alias,
-      );
-      return true;
     } catch (_) {
       return false;
     }

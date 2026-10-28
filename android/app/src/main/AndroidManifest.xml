@@ -108,15 +108,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
-        <!-- Holds the icon the user picked until the task is removed, then
-             applies it. The swap has to happen off the activity lifecycle or
-             Android kills the app mid-change; stopWithTask must stay false so
-             onTaskRemoved is actually delivered. -->
-        <service
-            android:name="com.solusibejo.flutter_dynamic_icon_plus.FlutterDynamicIconPlusService"
-            android:enabled="true"
-            android:exported="false"
-            android:stopWithTask="false"/>
         <!-- uCrop, the native cropper behind image_cropper. It has to be
              declared by the host app or cropping crashes the moment it opens.
              The AppCompat theme is what uCrop's own activity expects. -->

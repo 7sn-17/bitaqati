@@ -86,7 +86,15 @@ class _AnimatedSplashState extends ConsumerState<AnimatedSplash> {
                     setState(() => _gone = true);
                   }
                 },
-                child: _SplashSheet(arabic: widget.arabic, icon: icon),
+                // The sheet sits above the app, not inside a page, so there
+                // is no Scaffold or Material above it: without one, Text falls
+                // back to the debug style and draws the yellow double
+                // underline. A transparent Material supplies the ancestor and
+                // paints nothing.
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: _SplashSheet(arabic: widget.arabic, icon: icon),
+                ),
               ),
             ),
           ),
