@@ -23,10 +23,9 @@ class ContentRepository {
     Uuid? uuid,
     DateTime Function()? clock,
     FsrsEngine engine = const FsrsEngine(),
-    MediaDeleteService mediaDelete = const MediaDeleteService(),
+    this.mediaDelete = const MediaDeleteService(),
   }) : _uuid = uuid ?? const Uuid(),
        _clock = clock ?? DateTime.now,
-       _mediaDelete = mediaDelete,
        fsrs = engine;
 
   final AppDatabase _db;
@@ -34,7 +33,7 @@ class ContentRepository {
   final DateTime Function() _clock;
 
   /// Removes the pictures and recordings a deleted card used to point at.
-  final MediaDeleteService _mediaDelete;
+  final MediaDeleteService mediaDelete;
 
   /// The scheduler every review goes through. Exposed so the review screen can
   /// preview the interval each rating would produce without a database round
@@ -335,7 +334,30 @@ ORDER BY d.position, d.created_at
     });
     // Only once the rows are gone. If the transaction had failed the cards
     // would still exist, and their pictures would have to survive with them.
-    _mediaDelete.schedule(media);
+    await _deleteUnusedMedia(media);
+  }
+
+  /// Deletes the media that no surviving card points at any more.
+  ///
+  /// A deck imported from another deck shares its ImageKit URLs verbatim, so
+  /// deleting one copy must not blank the pictures in the other. Running this
+  /// after the rows are gone makes the query below see exactly the survivors,
+  /// including the soft-deleted cards that are filtered out of it.
+  Future<void> _deleteUnusedMedia(List<String> candidates) async {
+    if (candidates.isEmpty) {
+      return;
+    }
+    final List<CardRow> rows = await (_db.select(
+      _db.cards,
+    )..where((c) => c.deletedAt.isNull())).get();
+    final Set<String> stillUsed = <String>{};
+    for (final CardRow card in rows) {
+      stillUsed.addAll(mediaUrlsIn(card.front));
+      stillUsed.addAll(mediaUrlsIn(card.back));
+    }
+    mediaDelete.schedule(
+      candidates.where((String url) => !stillUsed.contains(url)),
+    );
   }
 
   /// Splits ids so a delete never exceeds SQLite's bound-variable limit,
@@ -880,7 +902,7 @@ ORDER BY d.position, d.created_at
         await _enqueue('cards', card.id, SyncOperation.delete);
       }
     });
-    _mediaDelete.schedule(media);
+    await _deleteUnusedMedia(media);
   }
 
   /// Cards to study now in [deckId]: learning first, then reviews, then new

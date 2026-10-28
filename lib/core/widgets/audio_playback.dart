@@ -140,7 +140,7 @@ class _AudioAttachmentState extends State<AudioAttachment> {
   static String _format(Duration value) {
     final int minutes = value.inMinutes;
     final String seconds = (value.inSeconds % 60).toString().padLeft(2, '0');
-    return '${minutes}:${seconds}';
+    return '$minutes:$seconds';
   }
 
   @override

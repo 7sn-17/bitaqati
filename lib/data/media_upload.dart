@@ -82,7 +82,7 @@ class MediaUploadService {
     final String extension = _extensionOf(source.path, fallback: 'jpg');
     final String? url = await _uploadToImageKit(
       bytes: bytes,
-      fileName: '${stem}.${extension}',
+      fileName: '$stem.$extension',
     );
     return PickedMedia(
       url: url ?? 'file://${source.path}',
@@ -147,11 +147,11 @@ class MediaUploadService {
     final String stem = _asciiName(name, fallback: 'audio');
     final String? url = await _uploadToImageKit(
       bytes: bytes,
-      fileName: '${stem}.${extension}',
+      fileName: '$stem.$extension',
     );
     final String fallback = localPath == null || localPath.isEmpty
         ? ''
-        : 'file://${localPath}';
+        : 'file://$localPath';
     return PickedMedia(
       url: url ?? fallback,
       name: name,

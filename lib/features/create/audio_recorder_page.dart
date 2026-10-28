@@ -189,7 +189,7 @@ class _AudioRecorderPageState extends State<AudioRecorderPage> {
   static String _clock(int seconds) {
     final String minutes = (seconds ~/ 60).toString();
     final String rest = (seconds % 60).toString().padLeft(2, '0');
-    return '${minutes}:${rest}';
+    return '$minutes:$rest';
   }
 
   @override
