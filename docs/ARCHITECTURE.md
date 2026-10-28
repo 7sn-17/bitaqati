@@ -150,7 +150,7 @@ one function owns the whole path.
 ImagePicker.pickImage
   -> cropImage(File)        // lib/core/media/image_crop.dart
   -> compressImage(File)    // lib/core/media/image_compress.dart
-  -> POST /functions/v1/upload-image
+  -> POST /functions/v1/upload-media
   -> PickedMedia(url)
 ```
 
@@ -178,37 +178,85 @@ guarantees 1600.
 The occlusion editor uses the same path, so the canvas always draws on the
 cropped, compressed picture and the boxes are stored against it.
 
-## ImageKit uploads
+## ImageKit media
 
-Pictures live in ImageKit, not in Supabase Storage. The private key is a server
-secret held by the `upload-image` Edge Function: a key shipped inside an APK is
-a key anyone can extract and spend.
+Pictures and sound live in ImageKit, not in Supabase Storage. The private key is
+a server secret held by the Edge Functions: a key shipped inside an APK is a key
+anyone can extract and spend.
 
 | Piece | Where |
 |---|---|
 | `imageKitUrlEndpoint`, `imageKitPublicKey` | `lib/core/config/imagekit_config.dart` (public values only) |
 | `IMAGEKIT_PRIVATE_KEY`, `IMAGEKIT_URL_ENDPOINT` | Supabase Edge Function secrets |
-| Upload endpoint | `POST /functions/v1/upload-image` |
+| Upload endpoint | `POST /functions/v1/upload-media` |
+| Delete endpoint | `POST /functions/v1/delete-media` |
 
-The function refuses anything without a valid Supabase JWT (401 before a byte
-is read), caps the body at 8 MB, files uploads under `/cards/<user id>` so one
-account cannot overwrite another's pictures, and returns the ImageKit URL plus
-its `fileId`. The client accepts the response only when the URL starts with
-the account's endpoint, so a misconfigured function cannot write a foreign URL
-into a card.
+`upload-media` takes one file per request, sent as raw bytes with its
+name in `x-file-name`. The extension on that name decides everything:
+the kind (image or audio), the name ImageKit stores, and which cap applies -
+8 MB for a picture, 24 MB for a voice note. There is no MIME header to trust and
+no second code path for sound.
+
+The function refuses anything without a valid Supabase JWT (401 before a byte is
+read), files uploads under `/cards/<user id>` so one account cannot
+overwrite another's media, and returns the ImageKit URL plus its `fileId`.
+The client accepts the response only when the URL starts with the account's
+endpoint, so a misconfigured function cannot write a foreign URL into a card.
 
 Deployment:
 
 ```bash
 supabase secrets set IMAGEKIT_PRIVATE_KEY=... IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/7sn
-supabase functions deploy upload-image
+supabase functions deploy upload-media
+supabase functions deploy delete-media
 ```
 
-Deleting a card does not delete its ImageKit file: removal needs the private
-key and therefore a second function. Orphaned files are cheap, and a failed
-delete must never block a card edit.
+`upload-image` stays deployed with the same body as an alias for builds older
+than 1.7.0, which call that slug. It can be deleted once 1.7.0 is the oldest
+version in the wild.
 
-Audio still uses the `card-media` bucket. Only pictures moved.
+
+## Deleting media
+
+A card stores only the public URL, never the ImageKit file id, so
+`delete-media` does the lookup itself: it lists the caller's folder once,
+maps each requested URL to the id ImageKit gave it, and deletes the batch in
+calls of a hundred. Supabase Storage URLs are still accepted as a fallback, for
+recordings uploaded by builds from before the move.
+
+Two rules keep it safe. Every path must sit under `/cards/<caller id>/`, and
+a request naming somebody else's file is refused rather than quietly skipped.
+The caller is resolved from the JWT before anything is read.
+
+The call is made after the local transaction commits, not before. If the delete
+had failed, the deck would still exist and its pictures would have to survive
+with it; the reverse mistake only leaves an orphaned file, which costs a little
+storage and nothing else. `MediaDeleteService.schedule` fires it without
+awaiting, so a slow CDN round trip cannot stutter the animation that follows a
+deleted deck.
+
+## Audio: record, pick, upload, play
+
+The audio button on the card toolbar opens a sheet with two choices, because a
+phone with no recordings on it used to have no way to add sound at all:
+
+- «تسجيل صوتي جديد» pushes `AudioRecorderPage`: a live timer, a level meter fed
+  by `onAmplitudeChanged`, a big record/pause button and «إيقاف وحفظ». Mono,
+  44.1 kHz, AAC at 64 kbps - transparent for speech and about 2.4 MB at the
+  five-minute cap, which the page enforces by stopping itself.
+- «اختيار من الملفات» opens the system picker.
+
+Both end in `MediaUploadService`, which uploads the bytes through
+`upload-media` and returns a `PickedMedia`. The recorder page never
+uploads: it returns a path, so the screen keeps one job and one failure mode.
+
+`AudioAttachment` (`lib/core/widgets/audio_playback.dart`) is the chip
+that renders a recording in the review screen, in the editor preview and in the
+editor's attachment strip: a play/pause button, a waveform and an elapsed time.
+Each chip owns its own `AudioPlayer` - a card can carry a recording per side -
+and nothing is fetched until the chip is tapped. The waveform is derived from
+the URL rather than decoded, because the real shape would mean reading the whole
+file to draw twenty-six bars.
 
 ## Image occlusion
 
@@ -246,6 +294,10 @@ The queue purge matters: the queue has no foreign key to the deck, so a
 pending `upsert` left behind would push the deck back to the server and it
 would reappear on the next pull. Enqueuing the delete last keeps it from being
 swept away by that purge.
+
+The media goes too: the cards' pictures and recordings are collected while the
+rows still exist and handed to `MediaDeleteService` after the commit (see
+"Deleting media").
 
 On the server the same delete cascades: `cards.deck_id`, `card_states.card_id`
 and `review_logs.card_id` are all `ON DELETE CASCADE`, so removing the deck row

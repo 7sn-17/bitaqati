@@ -4,12 +4,14 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/media/media_links.dart';
 import '../core/scheduling/fsrs_engine.dart';
 import '../domain/card_draft.dart';
 import '../domain/enums.dart';
 import '../domain/models.dart';
 import 'local/app_database.dart';
 import 'local/tables.dart';
+import 'media_delete.dart';
 
 /// Reads and writes decks, cards and reviews in the local Drift database.
 ///
@@ -21,13 +23,18 @@ class ContentRepository {
     Uuid? uuid,
     DateTime Function()? clock,
     FsrsEngine engine = const FsrsEngine(),
+    MediaDeleteService mediaDelete = const MediaDeleteService(),
   }) : _uuid = uuid ?? const Uuid(),
        _clock = clock ?? DateTime.now,
+       _mediaDelete = mediaDelete,
        fsrs = engine;
 
   final AppDatabase _db;
   final Uuid _uuid;
   final DateTime Function() _clock;
+
+  /// Removes the pictures and recordings a deleted card used to point at.
+  final MediaDeleteService _mediaDelete;
 
   /// The scheduler every review goes through. Exposed so the review screen can
   /// preview the interval each rating would produce without a database round
@@ -280,8 +287,9 @@ ORDER BY d.position, d.created_at
   /// The cloud copy is removed by the sync queue. Postgres has a real
   /// `ON DELETE CASCADE` on the same relationships, so deleting the deck row
   /// there takes the cards, states and logs with it.
-  Future<void> deleteDeck(String deckId) {
-    return _db.transaction(() async {
+  Future<void> deleteDeck(String deckId) async {
+    final List<String> media = <String>[];
+    await _db.transaction(() async {
       final DeckRow? deck =
           await (_db.select(_db.decks)
                 ..where((d) => d.id.equals(deckId) & d.deletedAt.isNull()))
@@ -289,12 +297,18 @@ ORDER BY d.position, d.created_at
       if (deck == null) {
         throw StateError('Deck $deckId does not exist');
       }
+      final List<CardRow> cards = await (_db.select(
+        _db.cards,
+      )..where((c) => c.deckId.equals(deckId))).get();
       final List<String> cardIds = <String>[
-        for (final CardRow card in await (_db.select(
-          _db.cards,
-        )..where((c) => c.deckId.equals(deckId))).get())
-          card.id,
+        for (final CardRow card in cards) card.id,
       ];
+      // Every picture and recording this deck owns, collected while the rows
+      // still exist. Deleting them happens after the commit.
+      for (final CardRow card in cards) {
+        media.addAll(mediaUrlsIn(card.front));
+        media.addAll(mediaUrlsIn(card.back));
+      }
 
       for (final List<String> chunk in _chunks(cardIds)) {
         await (_db.delete(
@@ -319,6 +333,9 @@ ORDER BY d.position, d.created_at
       // Enqueued last, so purging the queue above cannot take it with it.
       await _enqueue('decks', deckId, SyncOperation.delete);
     });
+    // Only once the rows are gone. If the transaction had failed the cards
+    // would still exist, and their pictures would have to survive with them.
+    _mediaDelete.schedule(media);
   }
 
   /// Splits ids so a delete never exceeds SQLite's bound-variable limit,
@@ -839,8 +856,12 @@ ORDER BY d.position, d.created_at
   }
 
   /// Soft-deletes cards. Review history remains for statistics and undo.
-  Future<void> deleteCards(List<String> cardIds) {
-    return _db.transaction(() async {
+  ///
+  /// The rows stay, but the media does not: a card the learner can no longer
+  /// reach must not keep a picture alive in storage.
+  Future<void> deleteCards(List<String> cardIds) async {
+    final List<String> media = <String>[];
+    await _db.transaction(() async {
       final DateTime now = _clock();
       final List<CardRow> cards = await (_db.select(
         _db.cards,
@@ -854,9 +875,12 @@ ORDER BY d.position, d.created_at
         ),
       );
       for (final CardRow card in cards) {
+        media.addAll(mediaUrlsIn(card.front));
+        media.addAll(mediaUrlsIn(card.back));
         await _enqueue('cards', card.id, SyncOperation.delete);
       }
     });
+    _mediaDelete.schedule(media);
   }
 
   /// Cards to study now in [deckId]: learning first, then reviews, then new

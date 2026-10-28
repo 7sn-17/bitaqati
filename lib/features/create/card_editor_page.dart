@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/audio_playback.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/image_viewer.dart';
 import '../../core/widgets/speak_button.dart';
@@ -12,6 +13,8 @@ import '../../data/content_providers.dart';
 import '../../data/media_upload.dart';
 import '../../domain/card_draft.dart';
 import '../../domain/models.dart';
+import 'audio_recorder_page.dart';
+import 'audio_source_sheet.dart';
 import 'editor_common.dart';
 import 'occlusion_editor.dart';
 
@@ -378,11 +381,47 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     if (_uploading) {
       return;
     }
+    if (image) {
+      await _attachPicked(_media.pickImage, toFront: toFront, image: true);
+      return;
+    }
+    // Sound has two origins now, so the button asks before it acts. The sheet
+    // is dismissed before any work starts, which keeps the spinner out of a
+    // screen the learner may still be reading.
+    final AudioSourceChoice? choice = await showAudioSourceSheet(context);
+    if (choice == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (choice == AudioSourceChoice.record) {
+      final String? path = await AudioRecorderPage.open(context);
+      if (path == null) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      await _attachPicked(
+        () => _media.uploadRecording(path),
+        toFront: toFront,
+        image: false,
+      );
+      return;
+    }
+    await _attachPicked(_media.pickAudioFile, toFront: toFront, image: false);
+  }
+
+  /// Runs one picker or recorder result through the attach path.
+  Future<void> _attachPicked(
+    Future<PickedMedia?> Function() pick, {
+    required bool toFront,
+    required bool image,
+  }) async {
     setState(() => _uploading = true);
     try {
-      final PickedMedia? media = image
-          ? await _media.pickImage()
-          : await _media.pickAudio();
+      final PickedMedia? media = await pick();
       // The picker runs in another activity; the editor may have been popped
       // while it was open, and every branch below calls setState.
       if (!mounted) {
@@ -392,7 +431,9 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         return;
       }
       if (media.url.isEmpty) {
-        setState(() => _error = 'تعذّر قراءة الملف المحدد.');
+        setState(
+          () => _error = 'تعذّر إرفاق الملف. قد يكون كبيراً جداً أو غير مقروء.',
+        );
         return;
       }
       if (_kind == _CardKind.occlusion && media.isImage) {
@@ -1422,6 +1463,25 @@ class _MediaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!item.image) {
+      // A recording is worth hearing before the card is saved, so the strip
+      // carries the same playable chip the review screen shows instead of a
+      // second, decorative waveform.
+      return SizedBox(
+        width: 258,
+        child: Row(
+          children: <Widget>[
+            Expanded(child: AudioAttachment(url: item.url)),
+            IconButton(
+              onPressed: onRemove,
+              icon: const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
+              visualDensity: VisualDensity.compact,
+              tooltip: 'إزالة',
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       height: 56,
       padding: const EdgeInsetsDirectional.fromSTEB(4, 4, 2, 4),
@@ -1438,30 +1498,19 @@ class _MediaChip extends StatelessWidget {
             child: SizedBox(
               width: 46,
               height: 46,
-              child: item.image
-                  ? CardImage(
-                      url: item.url,
-                      height: 46,
-                      radius: 0,
-                      onTap: () => showImageViewer(context, item.url),
-                    )
-                  : ColoredBox(
-                      color: context.softAccent,
-                      child: Icon(
-                        CupertinoIcons.waveform,
-                        size: 20,
-                        color: context.brandInk,
-                      ),
-                    ),
+              child: CardImage(
+                url: item.url,
+                height: 46,
+                radius: 0,
+                onTap: () => showImageViewer(context, item.url),
+              ),
             ),
           ),
           const SizedBox(width: 8),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 96),
             child: Text(
-              item.image
-                  ? (item.name.isEmpty ? 'صورة' : item.name)
-                  : 'مقطع صوتي',
+              item.name.isEmpty ? 'صورة' : item.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: context.texts.labelSmall,

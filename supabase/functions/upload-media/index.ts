@@ -1,14 +1,18 @@
-
-// Uploads a compressed card image to ImageKit and returns its public URL.
+// Uploads one card attachment - a picture or a voice note - to ImageKit and
+// returns its public URL.
 //
 // The ImageKit private key never leaves this function: the app calls it with
 // the signed-in user's Supabase JWT, and only a verified user can push bytes
-// into the account. Files are filed under /cards/<user id> so one account can
-// never overwrite another's pictures.
+// into the account. Files are filed under /cards/<user id>, which is what lets
+// delete-media refuse to touch anything outside the caller's own folder.
+//
+// The client sends the raw bytes as the request body and names the file in
+// x-file-name. The extension on that name decides the kind, the ImageKit
+// folder entry and the size cap - there is no separate MIME header to trust.
 //
 // Deploy:
 //   supabase secrets set IMAGEKIT_PRIVATE_KEY=... IMAGEKIT_URL_ENDPOINT=...
-//   supabase functions deploy upload-image
+//   supabase functions deploy upload-media
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -17,9 +21,14 @@ const IMAGEKIT_URL_ENDPOINT = (
   Deno.env.get('IMAGEKIT_URL_ENDPOINT') ?? 'https://ik.imagekit.io/7sn'
 ).replace(/\/+$/, '');
 
-/// A compressed 1600px JPEG lands around 300 KB; anything past 8 MB is not a
-/// card picture and is refused before it reaches the network.
-const MAX_BYTES = 8 * 1024 * 1024;
+/// A compressed 1600px JPEG lands around 300 KB; five minutes of speech at
+/// 64 kbps lands around 2.4 MB. The caps are per kind, so a picture can never
+/// borrow the audio budget and slip 20 MB through the door.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
+
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'opus', 'flac', '3gp'];
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -55,15 +64,29 @@ async function userIdFrom(request: Request): Promise<string | null> {
   return typeof user?.id === 'string' ? user.id : null;
 }
 
-/// ImageKit decides the extension from the name, and the client always sends
-/// JPEG, so the name is reduced to a safe stem plus .jpg.
-function safeName(raw: string | null): string {
-  const stem = (raw ?? '')
-    .replace(/\.[a-z0-9]+$/i, '')
+/// Splits the client name into an ImageKit-safe stem and a lowercase
+/// extension. Arabic names pass through untouched - only separators and
+/// punctuation are folded - because the stem is never put in a header.
+function splitName(raw: string | null): { stem: string; extension: string } {
+  const value = (raw ?? '').trim();
+  const dot = value.lastIndexOf('.');
+  const stem = (dot > 0 ? value.slice(0, dot) : value)
     .replace(/[^\p{L}\p{N}_-]+/gu, '-')
     .slice(0, 60)
     .replace(/^-+|-+$/g, '');
-  return (stem || 'card') + '.jpg';
+  const extension = dot > 0 ? value.slice(dot + 1).toLowerCase() : '';
+  return { stem: stem || 'card', extension };
+}
+
+/// Which of the two caps applies, or null for a file we refuse to host.
+function kindOf(extension: string): 'image' | 'audio' | null {
+  if (IMAGE_EXTENSIONS.includes(extension)) {
+    return 'image';
+  }
+  if (AUDIO_EXTENSIONS.includes(extension)) {
+    return 'audio';
+  }
+  return null;
 }
 
 function toBase64(bytes: Uint8Array): string {
@@ -91,17 +114,24 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return json({ error: 'unauthorized' }, 401);
   }
 
+  const name = splitName(request.headers.get('x-file-name'));
+  const kind = kindOf(name.extension);
+  if (kind === null) {
+    return json({ error: 'unsupported_type' }, 415);
+  }
+
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.length === 0) {
     return json({ error: 'empty_body' }, 400);
   }
-  if (bytes.length > MAX_BYTES) {
-    return json({ error: 'too_large', limit: MAX_BYTES }, 413);
+  const limit = kind === 'image' ? MAX_IMAGE_BYTES : MAX_AUDIO_BYTES;
+  if (bytes.length > limit) {
+    return json({ error: 'too_large', kind, limit }, 413);
   }
 
   const form = new FormData();
   form.append('file', toBase64(bytes));
-  form.append('fileName', safeName(request.headers.get('x-file-name')));
+  form.append('fileName', name.stem + '.' + name.extension);
   form.append('folder', '/cards/' + userId);
   form.append('useUniqueFileName', 'true');
 
@@ -143,5 +173,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
     height: payload.height ?? 0,
     size: payload.size ?? bytes.length,
     name: payload.name ?? '',
+    kind,
   });
 });

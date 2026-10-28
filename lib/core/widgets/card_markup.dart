@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'audio_playback.dart';
 
 /// The card body is stored as light markdown so the same string renders in the
 /// editor, the card list, the review screen and the public library without a
@@ -495,39 +496,6 @@ class CardImage extends StatelessWidget {
       fit: fit,
       errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
           fallback,
-    );
-  }
-}
-
-/// Audio attachment chip. Tells the learner the card carries a recording.
-class AudioAttachment extends StatelessWidget {
-  const AudioAttachment({required this.url, super.key});
-
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: context.softAccent,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.graphic_eq_rounded, size: 18, color: context.brandInk),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'مقطع صوتي مرفق',
-              style: context.texts.bodySmall?.copyWith(
-                color: context.brandInk,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
