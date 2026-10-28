@@ -68,14 +68,16 @@ class GlassTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isDark = context.isDark;
-    final Color inactive = isDark ? context.muted : context.muted;
+    final Color inactive = context.muted;
+    // In the light identities the deep brand fill is the readable one on a
+    // white bar; in the dark ones it is the bright highlight.
     final Color active = isDark ? context.accent : context.primary;
-    final Color barColor = isDark
-        ? context.cardSurface.withValues(alpha: 0.76)
-        : Colors.white.withValues(alpha: 0.74);
+    final Color barColor = context.cardSurface.withValues(
+      alpha: isDark ? 0.76 : 0.74,
+    );
     final Color border = isDark
         ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.07);
+        : context.hairline;
     final BorderRadius radius = BorderRadius.circular(32);
 
     return SafeArea(
@@ -202,8 +204,8 @@ class _TabItem extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         badge > 99 ? '99+' : '$badge',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.onDanger,
                           fontSize: 8,
                           fontWeight: FontWeight.w700,
                           height: 1,

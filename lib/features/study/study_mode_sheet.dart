@@ -55,7 +55,7 @@ class StudyTarget {
     required this.dueCount,
   });
 
-  StudyTarget.deck(DeckNode deck)
+  const StudyTarget.deck(DeckNode deck)
     : this(
         scope: deck.id,
         title: deck.title,
@@ -64,7 +64,7 @@ class StudyTarget {
       );
 
   /// Every deck at once, with the totals the home hero already shows.
-  StudyTarget.everything({required int cardCount, required int dueCount})
+  const StudyTarget.everything({required int cardCount, required int dueCount})
     : this(
         scope: kAllDecksScope,
         title: 'جميع المجموعات',
