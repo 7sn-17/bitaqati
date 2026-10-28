@@ -187,9 +187,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   itemCount: _pages.length,
                   onPageChanged: (int value) => setState(() => _page = value),
                   itemBuilder: (BuildContext context, int index) {
-                    return _PageContent(
-                      key: ValueKey<int>(index),
-                      page: _pages[index],
+                    // A page's distance from the centre of the screen drives a
+                    // small counter-move in the drawing, so the scene drifts
+                    // against the swipe instead of travelling with it. That
+                    // depth is the difference between a picture on a slide and
+                    // a window onto one.
+                    return AnimatedBuilder(
+                      animation: _controller,
+                      builder: (BuildContext context, Widget? child) {
+                        final double page =
+                            _controller.hasClients &&
+                                _controller.position.haveDimensions
+                            ? (_controller.page ?? index.toDouble())
+                            : index.toDouble();
+                        return _PageContent(
+                          key: ValueKey<int>(index),
+                          page: _pages[index],
+                          parallax: (page - index).clamp(-1.0, 1.0),
+                        );
+                      },
                     );
                   },
                 ),
@@ -249,63 +265,86 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 }
 
 class _PageContent extends StatelessWidget {
-  const _PageContent({required this.page, super.key});
+  const _PageContent({required this.page, required this.parallax, super.key});
 
   final _OnboardingPage page;
 
+  /// How far this slide is from the centre of the pager: 0 on screen, ±1 a
+  /// full page away.
+  final double parallax;
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          const SizedBox(height: 18),
-          _AnimatedIllustration(page: page),
-          const SizedBox(height: 26),
-          Text(
-                page.title,
-                textAlign: TextAlign.center,
-                style: context.texts.displaySmall,
-              )
-              .animate()
-              .fadeIn(
-                delay: const Duration(milliseconds: 180),
-                duration: const Duration(milliseconds: 380),
-              )
-              .slideY(begin: 0.22, end: 0, curve: Curves.easeOutCubic),
-          const SizedBox(height: 12),
-          ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 330),
-                child: Text(
-                  page.body,
-                  textAlign: TextAlign.center,
-                  style: context.texts.bodyLarge?.copyWith(
-                    color: context.texts.bodySmall?.color,
-                    height: 1.85,
-                  ),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        // The drawing owns the top of the slide and nothing else. It is given a
+        // height that is a share of what is actually on screen, and the text is
+        // laid out below it as an ordinary sibling — never stacked over it, so
+        // no amount of drawing can end up behind the words.
+        final double hero = (constraints.maxHeight * 0.46).clamp(200.0, 320.0);
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                const SizedBox(height: 8),
+                Transform.translate(
+                  offset: Offset(0, parallax * 22),
+                  child: _AnimatedIllustration(page: page, height: hero),
                 ),
-              )
-              .animate()
-              .fadeIn(
-                delay: const Duration(milliseconds: 320),
-                duration: const Duration(milliseconds: 420),
-              )
-              .slideY(begin: 0.18, end: 0, curve: Curves.easeOutCubic),
-          const SizedBox(height: 8),
-        ],
-      ),
+                const SizedBox(height: 24),
+                Text(
+                      page.title,
+                      textAlign: TextAlign.center,
+                      style: context.texts.displaySmall,
+                    )
+                    .animate()
+                    .fadeIn(
+                      delay: const Duration(milliseconds: 180),
+                      duration: const Duration(milliseconds: 380),
+                    )
+                    .slideY(begin: 0.22, end: 0, curve: Curves.easeOutCubic),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 330),
+                      child: Text(
+                        page.body,
+                        textAlign: TextAlign.center,
+                        style: context.texts.bodyLarge?.copyWith(
+                          color: context.texts.bodySmall?.color,
+                          height: 1.85,
+                        ),
+                      ),
+                    )
+                    .animate()
+                    .fadeIn(
+                      delay: const Duration(milliseconds: 320),
+                      duration: const Duration(milliseconds: 420),
+                    )
+                    .slideY(begin: 0.18, end: 0, curve: Curves.easeOutCubic),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-/// The illustration is the hero of each slide: the SVG pops in, the accent
-/// blobs breathe behind it, and two chips fly in from the sides while a pair
-/// of arrows drifts along the diagonal.
+/// The illustration is the hero of each slide: the scene pops in, the accent
+/// glow breathes behind it, and two chips fly in from the sides while a pair
+/// of arrows drifts along the diagonal. Everything is drawn from the theme's
+/// own tokens, so it reads the same in Forest, Ocean, Sunset and Classic.
 class _AnimatedIllustration extends StatefulWidget {
-  const _AnimatedIllustration({required this.page});
+  const _AnimatedIllustration({required this.page, required this.height});
 
   final _OnboardingPage page;
+
+  /// How much of the slide the drawing may take.
+  final double height;
 
   @override
   State<_AnimatedIllustration> createState() => _AnimatedIllustrationState();
@@ -332,111 +371,129 @@ class _AnimatedIllustrationState extends State<_AnimatedIllustration>
 
   @override
   Widget build(BuildContext context) {
+    // One design canvas, scaled to whatever room the slide has. A fixed stack
+    // of absolute sizes used to be taller than its own box on small phones,
+    // and a child that overflows a Stack is painted outside it — over the
+    // title. Scaling the whole composition down cannot overflow.
     return SizedBox(
-      height: 300,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: <Widget>[
-          // Breathing halo.
-          AnimatedBuilder(
-            animation: _float,
-            builder: (BuildContext context, Widget? child) {
-              final double t = Curves.easeInOut.transform(_float.value);
-              return Transform.scale(scale: 0.92 + 0.08 * t, child: child);
-            },
-            child: Container(
-              width: 268,
-              height: 268,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: <Color>[
-                    context.softAccent,
-                    context.softAccent.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Orbiting accent dots.
-          AnimatedBuilder(
-            animation: _orbit,
-            builder: (BuildContext context, Widget? child) {
-              return SizedBox(
-                width: 292,
-                height: 292,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: <Widget>[
-                    for (int i = 0; i < 3; i++)
-                      Transform.translate(
-                        offset: Offset(
-                          math.cos(_orbit.value * 2 * math.pi + i * 2.1) * 132,
-                          math.sin(_orbit.value * 2 * math.pi + i * 2.1) * 132,
-                        ),
-                        child: Container(
-                          width: 7.0 + i * 1.6,
-                          height: 7.0 + i * 1.6,
-                          decoration: BoxDecoration(
-                            color: context.brandInk.withValues(
-                              alpha: 0.22 + 0.1 * i,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-          // The illustration itself.
-          AnimatedBuilder(
+      height: widget.height,
+      width: double.infinity,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: SizedBox(
+          width: 300,
+          height: 300,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: <Widget>[
+              // Breathing halo.
+              AnimatedBuilder(
                 animation: _float,
                 builder: (BuildContext context, Widget? child) {
                   final double t = Curves.easeInOut.transform(_float.value);
-                  return Transform.translate(
-                    offset: Offset(0, -6 + 12 * t),
-                    child: child,
-                  );
+                  return Transform.scale(scale: 0.92 + 0.08 * t, child: child);
                 },
                 child: Container(
-                  width: 250,
-                  height: 214,
+                  width: 268,
+                  height: 268,
                   decoration: BoxDecoration(
-                    color: context.cardSurface,
-                    borderRadius: BorderRadius.circular(40),
-                    border: Border.all(color: context.hairline),
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: context.isDark ? 0.42 : 0.06,
-                        ),
-                        blurRadius: 28,
-                        offset: const Offset(0, 14),
-                      ),
-                    ],
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: <Color>[
+                        context.softAccent,
+                        context.softAccent.withValues(alpha: 0),
+                      ],
+                    ),
                   ),
-                  padding: const EdgeInsets.all(16),
-                  child: OnboardingScene(index: widget.page.scene),
                 ),
-              )
-              .animate()
-              .scale(
-                begin: const Offset(0.82, 0.82),
-                end: const Offset(1, 1),
-                duration: const Duration(milliseconds: 560),
-                curve: Curves.easeOutBack,
-              )
-              .fadeIn(duration: const Duration(milliseconds: 320)),
-          // Floating chips.
-          for (int index = 0; index < widget.page.chips.length; index++)
-            _FloatingChip(spec: widget.page.chips[index], fromLeft: index == 0),
-          if (widget.page.arrows)
-            for (int index = 0; index < 2; index++)
-              _DriftingArrow(index: index, animation: _orbit),
-        ],
+              ),
+              // Orbiting accent dots.
+              AnimatedBuilder(
+                animation: _orbit,
+                builder: (BuildContext context, Widget? child) {
+                  return SizedBox(
+                    width: 292,
+                    height: 292,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: <Widget>[
+                        for (int i = 0; i < 3; i++)
+                          Transform.translate(
+                            offset: Offset(
+                              math.cos(_orbit.value * 2 * math.pi + i * 2.1) *
+                                  132,
+                              math.sin(_orbit.value * 2 * math.pi + i * 2.1) *
+                                  132,
+                            ),
+                            child: Container(
+                              width: 7.0 + i * 1.6,
+                              height: 7.0 + i * 1.6,
+                              decoration: BoxDecoration(
+                                color: context.brandInk.withValues(
+                                  alpha: 0.22 + 0.1 * i,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              // The illustration itself.
+              AnimatedBuilder(
+                    animation: _float,
+                    builder: (BuildContext context, Widget? child) {
+                      final double t = Curves.easeInOut.transform(_float.value);
+                      return Transform.translate(
+                        offset: Offset(0, -6 + 12 * t),
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      width: 250,
+                      height: 214,
+                      clipBehavior: Clip.antiAlias,
+                      decoration: BoxDecoration(
+                        color: context.cardSurface,
+                        borderRadius: BorderRadius.circular(40),
+                        border: Border.all(color: context.hairline),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: context.isDark ? 0.42 : 0.06,
+                            ),
+                            blurRadius: 28,
+                            offset: const Offset(0, 14),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: OnboardingScene(index: widget.page.scene),
+                    ),
+                  )
+                  .animate()
+                  .scale(
+                    begin: const Offset(0.82, 0.82),
+                    end: const Offset(1, 1),
+                    duration: const Duration(milliseconds: 560),
+                    curve: Curves.easeOutBack,
+                  )
+                  .fadeIn(duration: const Duration(milliseconds: 320)),
+              // Floating chips.
+              for (int index = 0; index < widget.page.chips.length; index++)
+                _FloatingChip(
+                  spec: widget.page.chips[index],
+                  fromLeft: index == 0,
+                ),
+              if (widget.page.arrows)
+                for (int index = 0; index < 2; index++)
+                  _DriftingArrow(index: index, animation: _orbit),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -550,7 +607,8 @@ class _OnboardingPage {
   final String title;
   final String body;
 
-  /// Which live scene to draw inside the card (0 review, 1 create, 2 library).
+  /// Which live scene to draw inside the card (0 review, 1 create, 2 library,
+  /// 3 the abstract study-mode cloud).
   final int scene;
   final List<_ChipSpec> chips;
   final bool arrows;

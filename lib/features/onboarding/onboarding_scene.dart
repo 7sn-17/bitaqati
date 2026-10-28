@@ -70,7 +70,7 @@ class _OnboardingSceneState extends State<OnboardingScene>
     return Stack(
       alignment: Alignment.center,
       children: <Widget>[
-        _Halo(color: context.accent, size: 244, strength: 0.55),
+        Positioned.fill(child: _Halo(color: context.accent, strength: 0.55)),
         Transform.translate(
           offset: const Offset(0, 28),
           child: Transform.rotate(
@@ -116,7 +116,7 @@ class _OnboardingSceneState extends State<OnboardingScene>
     return Stack(
       alignment: Alignment.center,
       children: <Widget>[
-        _Halo(color: context.accent, size: 236, strength: 0.5),
+        Positioned.fill(child: _Halo(color: context.accent, strength: 0.5)),
         Transform.translate(
           offset: Offset(0, drift),
           child: Transform.scale(
@@ -158,7 +158,7 @@ class _OnboardingSceneState extends State<OnboardingScene>
     return Stack(
       alignment: Alignment.center,
       children: <Widget>[
-        _Halo(color: context.accent, size: 230, strength: 0.42),
+        Positioned.fill(child: _Halo(color: context.accent, strength: 0.42)),
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -195,68 +195,159 @@ class _OnboardingSceneState extends State<OnboardingScene>
   // Slide 4: the four study modes, taking turns in the light.
   // ---------------------------------------------------------------------------
   Widget _modesScene(BuildContext context, double t) {
-    const List<({IconData icon, String label})> modes =
-        <({IconData icon, String label})>[
-          (icon: Icons.style_rounded, label: 'بطاقات'),
-          (icon: Icons.quiz_rounded, label: 'اختبار'),
-          (icon: Icons.grid_view_rounded, label: 'مطابقة'),
-          (icon: Icons.edit_rounded, label: 'كتابة'),
-        ];
-    // A spotlight that travels from tile to tile and then rests a beat on the
-    // last one, so the eye follows all four instead of landing on a favourite.
-    final double phase = (t * 4.4) % 4;
+    // Abstract on purpose. This slide is about the *idea* of many ways to
+    // learn, so it draws a mind at the centre of a cloud of cards rather than a
+    // grid of four glyphs: adding a fifth study mode later changes nothing
+    // here, because nothing here is a list.
+    final double spin = t * math.pi * 2;
+    final double breathe = 0.5 + 0.5 * math.sin(spin);
 
     return Stack(
       alignment: Alignment.center,
       children: <Widget>[
-        _Halo(color: context.accent, size: 236, strength: 0.45),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: WrapAlignment.center,
-          children: <Widget>[
-            for (int i = 0; i < modes.length; i++)
-              _ModeTile(
-                icon: modes[i].icon,
-                label: modes[i].label,
-                lit: (1 - (phase - i).abs()).clamp(0.0, 1.0),
+        Positioned.fill(child: _Halo(color: context.accent, strength: 0.55)),
+        // Two rings, out of phase, so the core reads as radiating rather than
+        // spinning.
+        for (int ring = 0; ring < 2; ring++)
+          Transform.scale(
+            scale: 0.94 + 0.08 * (0.5 + 0.5 * math.sin(spin + ring * math.pi)),
+            child: Container(
+              width: 116 + ring * 44.0,
+              height: 116 + ring * 44.0,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: context.brandInk.withValues(alpha: 0.12 - ring * 0.05),
+                ),
               ),
-          ],
+            ),
+          ),
+        // Cards orbiting the core: varied size, tint and depth, so the eye
+        // reads a crowd of them and not a fixed set.
+        for (int i = 0; i < 6; i++) _orbitingCard(context, i, spin),
+        // The core.
+        Container(
+          width: 78,
+          height: 78,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[context.accent, context.accentSoft],
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: context.accent.withValues(alpha: 0.34),
+                blurRadius: 26 + 12 * breathe,
+                spreadRadius: 1 + 2 * breathe,
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.psychology_rounded,
+            size: 38,
+            color: context.onAccent,
+          ),
         ),
       ],
+    );
+  }
+
+  /// One card in the cloud around the core.
+  ///
+  /// The angle is what makes it abstract: every card follows the same ellipse
+  /// at its own speed, so the composition never settles into a fixed shape and
+  /// never has to know how many study modes exist.
+  Widget _orbitingCard(BuildContext context, int index, double spin) {
+    final double angle =
+        spin * (0.42 + 0.05 * index) + index * (math.pi * 2 / 6) + 0.4;
+    final double depth = 0.5 + 0.5 * math.sin(angle);
+    final double size = 22 + 14 * depth;
+    final List<Color> palette = <Color>[
+      context.accent,
+      context.accentSoft,
+      context.brandInk,
+      context.star,
+    ];
+    final Color tint = palette[index % palette.length];
+
+    return Transform.translate(
+      offset: Offset(math.cos(angle) * 86, math.sin(angle) * 48),
+      child: Transform.rotate(
+        angle: math.sin(angle) * 0.32,
+        child: Opacity(
+          opacity: 0.5 + 0.5 * depth,
+          child: Container(
+            width: size,
+            height: size * 0.78,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                tint.withValues(alpha: 0.2),
+                context.cardSurface,
+              ),
+              borderRadius: BorderRadius.circular(size * 0.24),
+              border: Border.all(
+                color: tint.withValues(alpha: 0.5),
+                width: 1.1,
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: tint.withValues(alpha: 0.16 * depth),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Container(
+                width: size * 0.34,
+                height: 2.4,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
 // ---------------------------------------------------------------- primitives
 
-/// The soft light behind a scene. A radial gradient, so it has no edge.
+/// The soft light behind a scene.
+///
+/// It fills whatever box it is given and reaches zero before the edge, so the
+/// glow dissolves into the card instead of ending on a ring: a fixed-size halo
+/// inside a smaller card is clipped, and a clipped radial gradient is exactly
+/// what makes an illustration look printed rather than lit.
 class _Halo extends StatelessWidget {
-  const _Halo({required this.color, required this.size, this.strength = 0.5});
+  const _Halo({required this.color, this.strength = 0.5});
 
   final Color color;
-
-  final double size;
 
   final double strength;
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
+      child: DecoratedBox(
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
+            radius: 0.62,
             colors: <Color>[
-              color.withValues(alpha: 0.22 * strength),
-              color.withValues(alpha: 0.06 * strength),
+              color.withValues(alpha: 0.26 * strength),
+              color.withValues(alpha: 0.09 * strength),
               color.withValues(alpha: 0),
             ],
-            stops: const <double>[0.0, 0.55, 1.0],
+            stops: const <double>[0.0, 0.5, 1.0],
           ),
         ),
+        child: const SizedBox.expand(),
       ),
     );
   }
@@ -824,98 +915,3 @@ class _RatingBadge extends StatelessWidget {
 }
 
 // --------------------------------------------------------------------- slide 4
-
-class _ModeTile extends StatelessWidget {
-  const _ModeTile({required this.icon, required this.label, required this.lit});
-
-  final IconData icon;
-
-  final String label;
-
-  /// 0 is at rest, 1 is the mode the light is on right now.
-  final double lit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.scale(
-      scale: 1 + 0.045 * lit,
-      child: Container(
-        width: 104,
-        height: 82,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color.alphaBlend(
-                context.accent.withValues(alpha: 0.10 + 0.24 * lit),
-                context.cardSurface,
-              ),
-              Color.alphaBlend(
-                context.primary.withValues(alpha: context.isDark ? 0.14 : 0.05),
-                context.cardSurface,
-              ),
-            ],
-          ),
-          border: Border.all(
-            color: Color.lerp(context.hairline, context.accent, lit)!,
-            width: 1 + 0.6 * lit,
-          ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: context.isDark ? 0.4 : 0.06,
-              ),
-              blurRadius: 18,
-              offset: const Offset(0, 9),
-            ),
-            if (lit > 0.05)
-              BoxShadow(
-                color: context.accent.withValues(alpha: 0.32 * lit),
-                blurRadius: 26 * lit,
-                spreadRadius: 1.5,
-              ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: Color.lerp(
-                  context.softAccent,
-                  context.accent,
-                  lit * 0.85,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 17,
-                color: Color.lerp(
-                  context.brandInk,
-                  context.onAccent,
-                  lit * 0.85,
-                ),
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Cairo',
-                fontSize: 10.5,
-                fontWeight: FontWeight.w800,
-                height: 1.2,
-                color: context.ink,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
