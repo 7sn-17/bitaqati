@@ -467,11 +467,35 @@ class SettingsScreen extends ConsumerWidget {
       );
       return;
     }
-    if (!info.hasUpdate) {
-      showAppMessage(context, 'أنت على أحدث إصدار (v${info.currentVersion}).');
+    if (info.hasUpdate) {
+      await showUpdateDialog(context, info);
       return;
     }
-    await showUpdateDialog(context, info);
+    if (info.fromCache) {
+      // GitHub could not be reached and this is the last stored answer.
+      // Claiming "you are up to date" here was the bug: a rate-limited request
+      // came back as a clean bill of health. A stored answer may be days old,
+      // so it can only ever say when it was taken.
+      showAppMessage(
+        context,
+        'تعذّر الوصول إلى GitHub الآن. آخر تحقق ناجح: '
+        '${_checkedAtLabel(info.checkedAt)} — قد يكون هناك إصدار أحدث.',
+        kind: AppMessageKind.info,
+      );
+      return;
+    }
+    showAppMessage(context, 'أنت على أحدث إصدار (v${info.currentVersion}).');
+  }
+
+  /// `2026/10/28 21:40`, or a plain "سابقاً" when the stored answer carries no
+  /// timestamp.
+  static String _checkedAtLabel(DateTime? at) {
+    if (at == null) {
+      return 'سابقاً';
+    }
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${at.year}/${two(at.month)}/${two(at.day)} '
+        '${two(at.hour)}:${two(at.minute)}';
   }
 
   /// Hands the download link to the native share sheet.

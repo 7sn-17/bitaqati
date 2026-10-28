@@ -56,8 +56,23 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (!mounted) {
       return;
     }
-    final UpdateInfo? info = await ref.read(updateInfoProvider.future);
-    if (!mounted || info == null || !info.hasUpdate) {
+    UpdateInfo? info;
+    try {
+      info = await ref.read(updateInfoProvider.future);
+    } catch (error) {
+      // check() reports failures as null rather than throwing, but a provider
+      // that dies must not take the launch prompt down with it.
+      debugPrint('[update] launch check threw: $error');
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    debugPrint(
+      '[update] launch prompt · hasUpdate=${info?.hasUpdate} '
+      '· latest=${info?.latestVersion} · fromCache=${info?.fromCache}',
+    );
+    if (info == null || !info.hasUpdate) {
       return;
     }
     if (ref.read(updateDismissedProvider) == info.latestVersion) {
