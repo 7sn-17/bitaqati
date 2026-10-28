@@ -16,7 +16,7 @@ Future<void> _showUpgrade({
   required String title,
   required String message,
   required String reason,
-  String action = 'ترقية إلى Pro',
+  String action = 'ترقية الآن',
 }) {
   return showDialog<void>(
     context: context,
@@ -33,90 +33,132 @@ Future<void> _showUpgrade({
             radius: 26,
             lip: 0,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 64,
-                height: 64,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: context.pay.yellowSoft,
-                  shape: BoxShape.circle,
-                ),
-                child: FaIcon(icon, size: 26, color: context.pay.greenInk),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: context.pay.ink,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Cairo',
-                  fontSize: 13,
-                  height: 1.75,
-                  color: context.pay.muted,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(dialogContext).pop();
-                    openPaywall(context, reason: reason);
-                  },
-                  child: Container(
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: context.pay.green,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: <BoxShadow>[
-                        BoxShadow(
-                          color: context.pay.greenDark,
-                          offset: const Offset(0, 4),
-                          blurRadius: 0,
+          child: ConstrainedBox(
+            // Three paragraphs and two buttons do not fit on a small phone in
+            // landscape. The body scrolls; the buttons never move.
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Container(
+                          width: 64,
+                          height: 64,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: context.pay.yellowSoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: FaIcon(
+                            icon,
+                            size: 26,
+                            color: context.pay.greenInk,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: context.pay.ink,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Cairo',
+                            fontSize: 13,
+                            height: 1.75,
+                            color: context.pay.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                          decoration: BoxDecoration(
+                            color: context.pay.selectedFill,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            'هذه الميزة متاحة لمشتركي النسخة الاحترافية. '
+                            'اشتراكك لا يفتح لك ميزات لا نهائية فحسب، بل يساعدنا '
+                            'على استمرار تطبيق بطاقاتنا مجاناً للطلاب الذين لا '
+                            'يستطيعون الدفع. شكراً لدعمك!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: 'Cairo',
+                              fontSize: 12,
+                              height: 1.9,
+                              fontWeight: FontWeight.w600,
+                              color: context.pay.selectedInk,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    child: Text(
-                      action,
-                      style: TextStyle(
-                        fontFamily: 'Cairo',
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: context.pay.onGreen,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(dialogContext).pop();
+                      openPaywall(context, reason: reason);
+                    },
+                    child: Container(
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: context.pay.green,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: context.pay.greenDark,
+                            offset: const Offset(0, 4),
+                            blurRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        action,
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: context.pay.onGreen,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(
-                  'لاحقاً',
-                  style: TextStyle(
-                    fontFamily: 'Cairo',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: context.pay.muted,
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(
+                    'لاحقاً',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: context.pay.muted,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -163,7 +205,6 @@ Future<void> showFrozenDeckDialog(
         '«$deckTitle» محفوظة بكل بطاقاتها ومواعيد مراجعتها، لكنها خارج المجموعات المفتوحة. '
         'لا شيء حُذف: الترقية تعيدها للعمل فوراً.',
     reason: 'مجموعة «$deckTitle» مجمّدة. Pro يفتح كل مجموعاتك.',
-    action: 'افتح كل المجموعات',
   );
 }
 
@@ -177,7 +218,6 @@ Future<void> showThemeLockedDialog(BuildContext context) {
         'الخطة المجانية تعمل بثيم الغابة. Pro يفتح المحيط والغروب والكلاسيكي، '
         'ويطبّقها على كل شاشة في التطبيق.',
     reason: 'الثيمات الملونة متاحة مع Pro.',
-    action: 'افتح الثيمات',
   );
 }
 
@@ -191,7 +231,6 @@ Future<void> showIconLockedDialog(BuildContext context) {
         'بدّل أيقونة بطاقتي على شاشتك الرئيسية: الافتراضية، التاج، أو الأزرق. '
         'متاح مع Pro.',
     reason: 'أيقونات التطبيق متاحة مع Pro.',
-    action: 'افتح الأيقونات',
   );
 }
 

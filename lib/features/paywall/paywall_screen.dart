@@ -1,10 +1,15 @@
+import 'dart:async';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/arabic_date.dart';
 import '../../data/pro_providers.dart';
 import '../../domain/freemium.dart';
 import '../settings/developer_info_screen.dart';
@@ -143,6 +148,23 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     }
   }
 
+  /// The sheet a subscriber opens instead of the plans.
+  ///
+  /// Nothing here can change the entitlement — a code does that, and a human
+  /// does that — so the sheet is honest about it: what you hold, until when,
+  /// and the one button that reaches a person.
+  Future<void> _manageSubscription(ProStatus pro) {
+    HapticFeedback.selectionClick();
+    return showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      builder: (BuildContext sheet) => _ManageSheet(pro: pro),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ProStatus pro = ref.watch(proNowProvider);
@@ -181,6 +203,30 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   // ------------------------------------------------------------- subscribe --
 
   List<Widget> _subscribeTab(ProStatus pro) {
+    // A subscriber is not a prospect. Selling the same plan to someone who
+    // already paid reads as either a bug or a shakedown, so the whole pricing
+    // block — cards, payment methods, call to action, comparison — is replaced
+    // by a thank-you screen that answers the only two questions they have:
+    // am I still covered, and until when.
+    if (pro.active) {
+      return <Widget>[
+        if (widget.reason != null) ...<Widget>[
+          _ReasonStrip(text: widget.reason!),
+          const SizedBox(height: 26),
+        ],
+        _ProWelcome(
+          pro: pro,
+          onManage: () => _manageSubscription(pro),
+          onCode: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _tab = 1;
+              _feedback = null;
+            });
+          },
+        ),
+      ];
+    }
     return <Widget>[
       if (widget.reason != null) ...<Widget>[
         _ReasonStrip(text: widget.reason!),
@@ -642,7 +688,7 @@ class _PlanCard extends StatelessWidget {
         curve: Curves.easeOut,
         padding: const EdgeInsets.all(18),
         decoration: _toy(
-          fill: selected ? context.pay.greenSoft : context.pay.white,
+          fill: selected ? context.pay.selectedFill : context.pay.white,
           border: selected ? context.pay.green : context.pay.border,
         ),
         child: Stack(
@@ -662,11 +708,23 @@ class _PlanCard extends StatelessWidget {
                           fontFamily: 'Cairo',
                           fontSize: 15.5,
                           fontWeight: FontWeight.w800,
-                          color: context.pay.ink,
+                          color: selected
+                              ? context.pay.selectedInk
+                              : context.pay.ink,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(plan.tagline, style: _noteStyle(context)),
+                      Text(
+                        plan.tagline,
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 11,
+                          height: 1.5,
+                          color: selected
+                              ? context.pay.selectedInk.withValues(alpha: 0.72)
+                              : context.pay.muted,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -682,7 +740,9 @@ class _PlanCard extends StatelessWidget {
                           fontFamily: 'Cairo',
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
-                          color: context.pay.ink,
+                          color: selected
+                              ? context.pay.selectedInk
+                              : context.pay.ink,
                           height: 1.1,
                         ),
                       ),
@@ -702,7 +762,9 @@ class _PlanCard extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'Cairo',
                           fontSize: 10.5,
-                          color: context.pay.muted,
+                          color: selected
+                              ? context.pay.selectedInk.withValues(alpha: 0.72)
+                              : context.pay.muted,
                         ),
                       ),
                     ],
@@ -901,7 +963,7 @@ class _MethodTile extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.fromLTRB(6, 12, 6, 10),
             decoration: _toy(
-              fill: selected ? context.pay.greenSoft : context.pay.white,
+              fill: selected ? context.pay.selectedFill : context.pay.white,
               border: selected ? context.pay.green : context.pay.border,
               radius: 18,
               lip: 4,
@@ -938,7 +1000,7 @@ class _MethodTile extends StatelessWidget {
                     fontFamily: 'Cairo',
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: context.pay.ink,
+                    color: selected ? context.pay.selectedInk : context.pay.ink,
                   ),
                 ),
                 Text(
@@ -949,7 +1011,9 @@ class _MethodTile extends StatelessWidget {
                     fontFamily: 'Cairo',
                     fontSize: 10.5,
                     height: 1.4,
-                    color: context.pay.muted,
+                    color: selected
+                        ? context.pay.selectedInk.withValues(alpha: 0.72)
+                        : context.pay.muted,
                   ),
                 ),
               ],
@@ -1368,3 +1432,330 @@ class _FeatureRow extends StatelessWidget {
 ///
 /// The glyph is part of the cell rather than a legend in the header, so the
 /// reader never has to look back up to know which column they are in.
+
+// -------------------------------------------------------------- pro welcome
+
+/// What a subscriber sees instead of the price list.
+///
+/// The crown is the one gold thing on the screen and it is earned, not
+/// advertised: it is drawn in the palette's star colour with a soft halo, so
+/// the screen reads as a thank-you card rather than a receipt.
+class _ProWelcome extends StatelessWidget {
+  const _ProWelcome({
+    required this.pro,
+    required this.onManage,
+    required this.onCode,
+  });
+
+  final ProStatus pro;
+  final VoidCallback onManage;
+  final VoidCallback onCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final DateTime? until = pro.expiry;
+    final int? days = pro.daysLeft;
+    return Column(
+      children: <Widget>[
+        Container(
+              width: 118,
+              height: 118,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: <Color>[
+                    context.pay.yellow.withValues(alpha: 0.30),
+                    context.pay.yellow.withValues(alpha: 0.02),
+                  ],
+                ),
+                border: Border.all(
+                  color: context.pay.yellow.withValues(alpha: 0.55),
+                  width: 2,
+                ),
+                boxShadow: <BoxShadow>[
+                  BoxShadow(
+                    color: context.pay.yellow.withValues(alpha: 0.30),
+                    blurRadius: 38,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: FaIcon(
+                FontAwesomeIcons.crown,
+                size: 46,
+                color: context.pay.yellow,
+              ),
+            )
+            .animate()
+            .fadeIn(duration: 380.ms)
+            .scale(
+              begin: const Offset(0.78, 0.78),
+              end: const Offset(1, 1),
+              duration: 640.ms,
+              curve: Curves.easeOutBack,
+            ),
+        const SizedBox(height: 22),
+        Text(
+          'شكراً لدعمك',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            height: 1.35,
+            color: context.pay.ink,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'أنت من مشتركي النسخة الاحترافية. كل الميزات مفتوحة لك، '
+          'ومعك يبقى بطاقتي متاحاً لطالب آخر لا يستطيع الدفع.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            fontSize: 13,
+            height: 1.8,
+            color: context.pay.muted,
+          ),
+        ),
+        const SizedBox(height: 26),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          decoration: _toy(fill: context.pay.white, border: context.pay.border),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  FaIcon(
+                    FontAwesomeIcons.circleCheck,
+                    size: 15,
+                    color: context.pay.greenInk,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('اشتراكك فعّال', style: _titleStyle(context)),
+                  ),
+                  if (days != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: context.pay.selectedFill,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'متبقٍ $days يوماً',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: context.pay.selectedInk,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                until == null
+                    ? 'اشتراك دائم، بلا تاريخ انتهاء.'
+                    : 'ينتهي في ${formatArabicDate(until)}.',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 13,
+                  height: 1.7,
+                  color: context.pay.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _PrimaryButton(
+          label: 'إدارة الاشتراك',
+          icon: FontAwesomeIcons.gear,
+          onTap: onManage,
+        ),
+        const SizedBox(height: 6),
+        TextButton(
+          onPressed: onCode,
+          child: Text(
+            'لديك كود تفعيل؟ أضفه هنا',
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: context.pay.greenInk,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        const _SupportBanner(),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------------- manage
+
+/// The subscriber's own page: status, expiry, and a person to talk to.
+class _ManageSheet extends StatelessWidget {
+  const _ManageSheet({required this.pro});
+
+  final ProStatus pro;
+
+  @override
+  Widget build(BuildContext context) {
+    final DateTime? until = pro.expiry;
+    final int? days = pro.daysLeft;
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+            decoration: BoxDecoration(
+              color: context.pay.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: context.pay.border, width: 1.4),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.pay.border,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'إدارة الاشتراك',
+                        style: TextStyle(
+                          fontFamily: 'Cairo',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: context.pay.ink,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        CupertinoIcons.xmark,
+                        size: 20,
+                        color: context.pay.muted,
+                      ),
+                      tooltip: 'إغلاق',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _ManageRow(label: 'الحالة', value: 'فعّال'),
+                _ManageRow(
+                  label: 'ينتهي في',
+                  value: until == null ? 'بلا نهاية' : formatArabicDate(until),
+                ),
+                if (days != null)
+                  _ManageRow(label: 'المتبقي', value: '$days يوماً'),
+                const SizedBox(height: 14),
+                Text(
+                  'الاشتراك يُدار بكود التفعيل. للتمديد أو للإلغاء راسلنا على '
+                  'واتساب وسنعالج الطلب يدوياً في اليوم نفسه.',
+                  style: TextStyle(
+                    fontFamily: 'Cairo',
+                    fontSize: 12,
+                    height: 1.8,
+                    color: context.pay.muted,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _PrimaryButton(
+                  label: 'تواصل عبر واتساب',
+                  icon: FontAwesomeIcons.whatsapp,
+                  onTap: () => _contactSupport(context),
+                ),
+                const SizedBox(height: 4),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'إغلاق',
+                      style: TextStyle(
+                        fontFamily: 'Cairo',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: context.pay.muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _contactSupport(BuildContext context) {
+    final Uri uri = Uri.parse(
+      'https://wa.me/${DeveloperInfoScreen.whatsappNumber.replaceAll('+', '')}'
+      '?text=${Uri.encodeComponent('مرحباً! أريد إدارة اشتراكي في بطاقتي Pro.')}',
+    );
+    HapticFeedback.selectionClick();
+    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+  }
+}
+
+/// One labelled line in the management sheet.
+class _ManageRow extends StatelessWidget {
+  const _ManageRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: <Widget>[
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 12.5,
+              color: context.pay.muted,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: context.pay.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

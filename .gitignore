@@ -49,3 +49,11 @@ android/app/bitaqati.p12
 
 # Local assistant scratch
 .codebuddy/
+
+# Launcher icons are generated from assets/app_icons/ by
+# tool/launcher_icons.sh on every build, not stored in the repository.
+android/app/src/main/res/mipmap-anydpi-v26/
+android/app/src/main/res/mipmap-*/ic_launcher.png
+android/app/src/main/res/mipmap-*/launcher_icon_*.png
+android/app/src/main/res/drawable-*/ic_launcher_foreground.png
+android/app/src/main/res/drawable-*/launcher_icon_*_foreground.png

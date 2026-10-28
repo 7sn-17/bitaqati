@@ -33,7 +33,12 @@
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });
 
-  const state = { codes: [], users: [], tab: 'codes', filter: 'all', query: '', session: null };
+  // [stats] is the dashboard's overview: six counters in one row from
+  // admin_stats(). It is cached on the device and only replaced on an explicit
+  // refresh, so switching tabs or reopening the page does not touch the
+  // database at all.
+  const state = { codes: [], users: [], stats: null, statsAt: 0, tab: 'codes', filter: 'all', query: '', session: null };
+  const STATS_KEY = 'bitaqati.stats.v1';
 
   const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -62,6 +67,29 @@
     const d = new Date(value);
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function time(ms) {
+    const d = new Date(ms);
+    return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // localStorage is not available on every file:// origin, so every read and
+  // write is wrapped: a browser that refuses it simply gets an uncached page.
+  function readStatsCache() {
+    try {
+      const raw = localStorage.getItem(STATS_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object' || !parsed.stats) return null;
+      return parsed;
+    } catch (e) { return null; }
+  }
+
+  function writeStatsCache() {
+    try {
+      localStorage.setItem(STATS_KEY, JSON.stringify({ stats: state.stats, at: state.statsAt }));
+    } catch (e) { /* private mode, or no storage on this origin */ }
   }
 
   const PLAN_LABEL = { monthly: 'شهري', quarterly: '3 أشهر', yearly: 'سنوي' };
@@ -116,8 +144,17 @@
     el('login').classList.add('hidden');
     el('app').classList.remove('hidden');
     el('who').textContent = session.user.email || '';
-    await Promise.all([loadCodes(), loadUsers()]);
-    render();
+
+    // Paint the numbers this device already knows before the network answers:
+    // the page opens on real figures instead of a row of zeros that then jump.
+    const cached = readStatsCache();
+    if (cached) {
+      state.stats = cached.stats;
+      state.statsAt = cached.at || 0;
+      render();
+    }
+
+    await refreshAll({ silent: true });
   }
 
   // ------------------------------------------------------------------ data --
@@ -140,6 +177,34 @@
     state.users = res.data || [];
   }
 
+  /// Six counts in one request, one row back, no rows scanned on the client.
+  async function loadStats() {
+    const res = await sb.rpc('admin_stats');
+    if (res.error || !res.data) {
+      // A project without the migration, or an account that lost its admin
+      // row: keep whatever is on screen rather than blanking the tiles.
+      return false;
+    }
+    state.stats = res.data;
+    state.statsAt = Date.now();
+    writeStatsCache();
+    return true;
+  }
+
+  /// Everything the page shows, fetched once. This is the only path that
+  /// queries the database after sign-in.
+  async function refreshAll(options) {
+    const silent = !!(options && options.silent);
+    el('refreshIcon').classList.add('animate-spin');
+    try {
+      await Promise.all([loadStats(), loadCodes(), loadUsers()]);
+      render();
+      if (!silent) toast('تم التحديث.');
+    } finally {
+      el('refreshIcon').classList.remove('animate-spin');
+    }
+  }
+
   async function generate() {
     const plan = el('plan').value;
     const count = Math.max(1, Math.min(50, parseInt(el('count').value, 10) || 1));
@@ -160,7 +225,7 @@
     state.lastBatch = rows.map(function (r) { return r.code; });
     el('copyBatch').classList.remove('hidden');
     el('note').value = '';
-    await loadCodes();
+    await Promise.all([loadCodes(), loadStats()]);
     render();
   }
 
@@ -169,7 +234,7 @@
     const res = await sb.from('activation_codes').delete().eq('code', code);
     if (res.error) { toast('تعذّر الإلغاء: ' + res.error.message, 'error'); return; }
     toast('تم إلغاء الكود.');
-    await loadCodes();
+    await Promise.all([loadCodes(), loadStats()]);
     render();
   }
 
@@ -179,7 +244,7 @@
     const res = await sb.from('profiles').update(patch).eq('id', user.id);
     if (res.error) { toast('تعذّر التحديث: ' + res.error.message, 'error'); return; }
     toast(next ? 'تم تفعيل Pro.' : 'تم إيقاف Pro.');
-    await loadUsers();
+    await Promise.all([loadUsers(), loadStats()]);
     render();
   }
 
@@ -197,9 +262,15 @@
   }
 
   function render() {
-    el('statCodes').textContent = state.codes.length;
-    el('statUnused').textContent = state.codes.filter(function (c) { return !c.is_used; }).length;
-    el('statPro').textContent = state.users.filter(function (u) { return u.is_pro; }).length;
+    const stats = state.stats || {};
+    const users = stats.users != null ? stats.users : state.users.length;
+    const pro = stats.pro != null ? stats.pro : state.users.filter(function (u) { return u.is_pro; }).length;
+    const unused = stats.unused != null ? stats.unused : state.codes.filter(function (c) { return !c.is_used; }).length;
+    el('statUsers').textContent = users;
+    el('statPro').textContent = pro;
+    el('statDecks').textContent = stats.decks == null ? '—' : stats.decks;
+    el('statUnused').textContent = unused;
+    el('statsAt').textContent = state.statsAt ? '· ' + time(state.statsAt) : '';
 
     el('tabCodes').className = tabClass(state.tab === 'codes');
     el('tabUsers').className = tabClass(state.tab === 'users');
@@ -292,7 +363,30 @@
     }
   });
 
+  // Everything below touches elements that appear *after* this script in the
+  // document, so it waits for the parser. Without this the page threw on
+  // el('loginForm') being null and none of the buttons — including the login
+  // form itself — were ever wired.
+  document.addEventListener('DOMContentLoaded', function () {
   el('loginForm').addEventListener('submit', signIn);
+  el('refreshStats').addEventListener('click', function () { refreshAll(); });
+
+  // Pull to refresh, for the phone this page is usually opened on: the list
+  // has to be at the top, and the finger has to travel far enough to mean it.
+  let pullStart = 0;
+  let pulling = false;
+  document.addEventListener('touchstart', function (event) {
+    pulling = window.scrollY <= 0 && event.touches.length === 1;
+    pullStart = pulling ? event.touches[0].clientY : 0;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (event) {
+    if (!pulling) return;
+    if (window.scrollY > 0) { pulling = false; return; }
+    if (event.touches[0].clientY - pullStart > 90) {
+      pulling = false;
+      if (state.session) refreshAll();
+    }
+  }, { passive: true });
   el('generateButton').addEventListener('click', generate);
   el('signOut').addEventListener('click', async function () { await sb.auth.signOut(); showLogin(''); });
   el('copyBatch').addEventListener('click', function () {
@@ -315,6 +409,7 @@
   });
 
   start();
+  });
 </script>
 
 <!-- --------------------------------------------------------------- shell -- -->
@@ -358,18 +453,32 @@
   </header>
 
   <main class="mx-auto max-w-6xl px-5 py-6">
-    <section class="mb-6 grid grid-cols-3 gap-3">
-      <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
-        <p class="text-[11px] text-white/40">كل الأكواد</p>
-        <p id="statCodes" class="num mt-1 text-2xl font-extrabold">0</p>
+    <section class="mb-6">
+      <div class="mb-2 flex items-center gap-2">
+        <p class="text-[11px] text-white/40">نظرة عامة</p>
+        <span id="statsAt" class="text-[11px] text-white/25"></span>
+        <button id="refreshStats"
+          class="ms-auto flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 transition hover:border-[#9FE870]/40 hover:text-[#9FE870]">
+          <span id="refreshIcon" class="inline-block">↻</span> تحديث
+        </button>
       </div>
-      <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
-        <p class="text-[11px] text-white/40">أكواد متاحة</p>
-        <p id="statUnused" class="num mt-1 text-2xl font-extrabold text-[#9FE870]">0</p>
-      </div>
-      <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
-        <p class="text-[11px] text-white/40">مشتركو Pro</p>
-        <p id="statPro" class="num mt-1 text-2xl font-extrabold">0</p>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+          <p class="text-[11px] text-white/40">المستخدمون</p>
+          <p id="statUsers" class="num mt-1 text-2xl font-extrabold">0</p>
+        </div>
+        <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+          <p class="text-[11px] text-white/40">مشتركو Pro</p>
+          <p id="statPro" class="num mt-1 text-2xl font-extrabold text-[#9FE870]">0</p>
+        </div>
+        <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+          <p class="text-[11px] text-white/40">المجموعات</p>
+          <p id="statDecks" class="num mt-1 text-2xl font-extrabold">—</p>
+        </div>
+        <div class="rounded-2xl border border-white/10 bg-[#111814] p-4">
+          <p class="text-[11px] text-white/40">أكواد متاحة</p>
+          <p id="statUnused" class="num mt-1 text-2xl font-extrabold">0</p>
+        </div>
       </div>
     </section>
 

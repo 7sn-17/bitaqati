@@ -1,0 +1,16 @@
+flutter_launcher_icons:
+  # One file per icon set: the plugin always writes its adaptive foreground to
+  # the fixed resource name ic_launcher_foreground, so a single run for three
+  # icons leaves all three pointing at whichever ran last. tool/launcher_icons.sh
+  # runs them in sequence and files each set's output under its own name.
+  android: "ic_launcher"
+  ios: false
+  image_path: "assets/app_icons/default.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1A4632"
+  adaptive_icon_foreground: "assets/app_icons/default.png"
+  # The artwork already carries its own background and a generous margin, so
+  # the foreground is only nudged inwards: the launcher's 72dp mask crops the
+  # corners of a full-bleed square, and the card's rounded edges have to stay
+  # inside it untouched.
+  adaptive_icon_foreground_inset: 6

@@ -44,6 +44,8 @@ class PaywallInk {
     required this.onYellow,
     required this.yellowSoft,
     required this.greenSoft,
+    required this.selectedFill,
+    required this.selectedInk,
     required this.radioEmpty,
     required this.heart,
     required this.dangerSoft,
@@ -75,6 +77,13 @@ class PaywallInk {
       // bug behind an unreadable selected plan in dark mode: a pale green wash
       // with pale ink on top.
       greenSoft: context.selectedFill,
+      // The selected plan and the selected payment tile use this pair instead
+      // of [greenSoft]: a pale wash of the theme's accent that stays light in
+      // dark mode too, so the deep green ink on top always reads. A dark
+      // translucent fill with a light ink looked right but read as a hole in
+      // the page, and the deep green is the one colour the design keeps.
+      selectedFill: context.accentSoft,
+      selectedInk: const Color(0xFF163300),
       radioEmpty: context.muted.withValues(alpha: 0.45),
       heart: context.danger,
       dangerSoft: context.danger.withValues(alpha: 0.12),
@@ -120,6 +129,12 @@ class PaywallInk {
 
   /// Soft wash of the action colour.
   final Color greenSoft;
+
+  /// Pale wash behind a selected plan or payment tile.
+  final Color selectedFill;
+
+  /// Deep green reserved for text drawn on [selectedFill].
+  final Color selectedInk;
 
   /// An unselected control.
   final Color radioEmpty;

@@ -256,28 +256,38 @@ class LibraryRepository {
       }
     }
 
+    // One row instead of one row per rating. This used to download every star
+    // ever left on the deck and average them here: a popular deck meant four
+    // hundred rows over the wire to produce two numbers, on every open.
     double? averageRating;
     int ratingCount = 0;
     try {
-      final List<Map<String, dynamic>> ratingRows = await _client
-          .from('deck_ratings')
-          .select('rating')
-          .eq('deck_id', deckId);
-      if (ratingRows.isNotEmpty) {
-        int sum = 0;
-        for (final Map<String, dynamic> rating in ratingRows) {
-          sum += _int(rating['rating']);
+      final List<dynamic> summary = await _client.rpc<List<dynamic>>(
+        'deck_rating_summary',
+        params: <String, Object?>{'p_deck': deckId},
+      );
+      if (summary.isNotEmpty) {
+        final Map<String, dynamic> row = summary.first as Map<String, dynamic>;
+        final Object? average = row['average'];
+        if (average is num) {
+          averageRating = average > 0 ? average.toDouble() : null;
+        } else if (average is String) {
+          final double? parsed = double.tryParse(average);
+          averageRating = parsed != null && parsed > 0 ? parsed : null;
         }
-        ratingCount = ratingRows.length;
-        averageRating = sum / ratingRows.length;
+        ratingCount = _int(row['total']);
       }
     } catch (_) {
-      // Ratings are optional; a preview must still load without them.
+      // Ratings are optional; a preview must still load without them. A build
+      // talking to a project that has not applied the migration lands here.
     }
 
-    final List<Map<String, dynamic>> countRows = await _client
+    // A HEAD request with Prefer: count=exact. The old version fetched every
+    // card id in the deck and took the length, which is the same number for
+    // the cost of the whole deck.
+    final int cardCount = await _client
         .from('cards')
-        .select('id')
+        .count()
         .eq('deck_id', deckId)
         .isFilter('deleted_at', null);
     final DeckPrivacy privacy = deckPrivacyFromCloud(_string(row['privacy']));
@@ -296,7 +306,7 @@ class LibraryRepository {
       sourceDeckId: _string(row['source_deck_id']),
       originalDeckId: _string(row['original_deck_id']),
       originalAuthorName: _string(row['original_author_name']),
-      cardCount: countRows.length,
+      cardCount: cardCount,
       author: author,
       rating: averageRating,
       ratingCount: ratingCount,
