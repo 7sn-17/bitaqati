@@ -1163,7 +1163,7 @@ class _Feedback extends StatelessWidget {
           fontSize: 11.5,
           height: 1.6,
           fontWeight: FontWeight.w700,
-          color: ok ? context.pay.greenDark : context.pay.heart,
+          color: ok ? context.pay.greenInk : context.pay.heart,
         ),
       ),
     );

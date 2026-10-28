@@ -46,3 +46,6 @@ Thumbs.db
 # bitaqati.p12 at the repository root.
 android/app/bitaqati.p12
 .mcp.json
+
+# Local assistant scratch
+.codebuddy/
