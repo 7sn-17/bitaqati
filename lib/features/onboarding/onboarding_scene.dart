@@ -493,7 +493,7 @@ class _Ring extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            percent.toString() + '٪',
+            '$percent٪',
             style: TextStyle(
               fontFamily: 'Cairo',
               fontSize: 10,
@@ -773,10 +773,7 @@ class _DeckTile extends StatelessWidget {
                       color: context.ink,
                     ),
                   ),
-                  Text(
-                    cards.toString() + ' بطاقة',
-                    style: _captionStyle(context),
-                  ),
+                  Text('$cards بطاقة', style: _captionStyle(context)),
                 ],
               ),
             ),
