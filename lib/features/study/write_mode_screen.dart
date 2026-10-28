@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../data/content_providers.dart';
+import '../paywall/frozen_deck_screen.dart';
 import '../../domain/answer_match.dart';
 import '../../domain/models.dart';
 
@@ -26,6 +27,11 @@ class WriteModeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final DeckNode? deck = ref.watch(deckByIdProvider(deckId));
+    // A frozen deck keeps its cards but hands out no session. Checked before
+    // the card stream so the screen never flashes an empty-deck message.
+    if (deck != null && deck.frozen) {
+      return FrozenDeckScreen(deckTitle: deck.title);
+    }
     final List<ReviewCard>? cards = ref
         .watch(studyCardsProvider(deckId))
         .valueOrNull;

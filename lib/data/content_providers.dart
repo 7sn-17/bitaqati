@@ -5,6 +5,7 @@ import '../domain/gamification.dart';
 import '../domain/models.dart';
 import 'content_repository.dart';
 import 'local/database_provider.dart';
+import 'pro_providers.dart';
 
 final Provider<ContentRepository> contentRepositoryProvider =
     Provider<ContentRepository>(
@@ -19,9 +20,60 @@ final StreamProvider<List<DeckNode>> deckListProvider =
 
 /// Every deck as a flat list, read synchronously. Use this in widgets that
 /// already show their own loading state.
-final Provider<List<DeckNode>> allDecksProvider = Provider<List<DeckNode>>(
-  (Ref ref) => ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[],
-);
+///
+/// This is also where the free tier's freeze is applied, so nothing downstream
+/// has to remember it: a deck past the allowance arrives with [DeckNode.frozen]
+/// set, and every list, card and route already carries that flag.
+///
+/// The newest decks stay open. Someone who lapsed keeps studying what they were
+/// working on and only the shelf gathers dust, which is the opposite of
+/// deleting their oldest work.
+final Provider<List<DeckNode>> allDecksProvider = Provider<List<DeckNode>>((
+  Ref ref,
+) {
+  final List<DeckNode> decks =
+      ref.watch(deckListProvider).valueOrNull ?? const <DeckNode>[];
+  final int? limit = ref.watch(proNowProvider).deckLimit;
+  if (limit == null || decks.length <= limit) {
+    return decks;
+  }
+  final List<DeckNode> newest = <DeckNode>[...decks]
+    ..sort((DeckNode a, DeckNode b) => b.position.compareTo(a.position));
+  final Set<String> open = newest
+      .take(limit)
+      .map((DeckNode deck) => deck.id)
+      .toSet();
+  return <DeckNode>[
+    for (final DeckNode deck in decks)
+      open.contains(deck.id) ? deck : deck.copyWith(frozen: true),
+  ];
+});
+
+/// Null when unlimited, otherwise how many more decks may be created.
+final Provider<int?> decksLeftProvider = Provider<int?>((Ref ref) {
+  final int? limit = ref.watch(proNowProvider).deckLimit;
+  if (limit == null) {
+    return null;
+  }
+  final int used = ref.watch(deckListProvider).valueOrNull?.length ?? 0;
+  final int left = limit - used;
+  return left < 0 ? 0 : left;
+});
+
+/// Ids of the decks the free tier has frozen.
+///
+/// A frozen deck is not deleted and not hidden: it keeps its cards, its
+/// history and its place in the list, and it can be studied again the moment
+/// the subscription comes back. What it cannot do is hand out cards today, so
+/// every queue that spans the whole library subtracts this set.
+final Provider<Set<String>> frozenDeckIdsProvider = Provider<Set<String>>((
+  Ref ref,
+) {
+  return <String>{
+    for (final DeckNode deck in ref.watch(allDecksProvider))
+      if (deck.frozen) deck.id,
+  };
+});
 
 /// One deck by id, or null when it does not exist.
 final ProviderFamily<DeckNode?, String> deckByIdProvider =
@@ -53,9 +105,19 @@ bool isAllDecksScope(String scope) => scope == kAllDecksScope;
 final StreamProviderFamily<List<ReviewCard>, String> studyCardsProvider =
     StreamProvider.family<List<ReviewCard>, String>((Ref ref, String scope) {
       final ContentRepository repository = ref.watch(contentRepositoryProvider);
-      return isAllDecksScope(scope)
-          ? repository.watchAllCards()
-          : repository.watchCards(scope);
+      if (!isAllDecksScope(scope)) {
+        return repository.watchCards(scope);
+      }
+      final Set<String> frozen = ref.watch(frozenDeckIdsProvider);
+      if (frozen.isEmpty) {
+        return repository.watchAllCards();
+      }
+      return repository.watchAllCards().map(
+        (List<ReviewCard> cards) => <ReviewCard>[
+          for (final ReviewCard card in cards)
+            if (!frozen.contains(card.deckId)) card,
+        ],
+      );
     });
 
 /// Which queue a review session wants.
@@ -70,16 +132,27 @@ typedef StudyQuery = ({String? deckId, bool all});
 /// The cards a review session should show. Loaded once per session.
 final AutoDisposeFutureProviderFamily<List<ReviewCard>, StudyQuery>
 studyQueueProvider = FutureProvider.autoDispose
-    .family<List<ReviewCard>, StudyQuery>(
-      (Ref ref, StudyQuery query) => ref
+    .family<List<ReviewCard>, StudyQuery>((Ref ref, StudyQuery query) async {
+      // Read before the first await: Riverpod stops tracking dependencies
+      // once a provider body has suspended, so a watch after it would not
+      // rebuild the queue when the freeze changes.
+      final Set<String> frozen = ref.watch(frozenDeckIdsProvider);
+      final List<ReviewCard> queue = await ref
           .watch(contentRepositoryProvider)
           .studyQueue(
             query.deckId,
             newLimit: ref.watch(dailyNewLimitProvider),
             reviewLimit: ref.watch(dailyReviewLimitProvider),
             includeFuture: query.all,
-          ),
-    );
+          );
+      if (query.deckId != null || frozen.isEmpty) {
+        return queue;
+      }
+      return <ReviewCard>[
+        for (final ReviewCard card in queue)
+          if (!frozen.contains(card.deckId)) card,
+      ];
+    });
 
 final AutoDisposeFutureProviderFamily<List<ReviewCard>, String>
 searchCardsProvider = FutureProvider.autoDispose
@@ -114,6 +187,11 @@ final Provider<DueTotals> dueTotalsProvider = Provider<DueTotals>((Ref ref) {
   int learning = 0;
   int review = 0;
   for (final DeckNode deck in ref.watch(allDecksProvider)) {
+    // A frozen deck's cards are still scheduled, but the learner cannot answer
+    // them today, so counting them would promise work the session cannot show.
+    if (deck.frozen) {
+      continue;
+    }
     fresh += deck.dueNew;
     learning += deck.dueLearning;
     review += deck.dueReview;
@@ -131,6 +209,9 @@ final Provider<DeckNode?> todayReviewDeckProvider = Provider<DeckNode?>((
 ) {
   DeckNode? best;
   for (final DeckNode deck in ref.watch(allDecksProvider)) {
+    if (deck.frozen) {
+      continue;
+    }
     if (deck.dueCount > 0 && (best == null || deck.dueCount > best.dueCount)) {
       best = deck;
     }

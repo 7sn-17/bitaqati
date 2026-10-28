@@ -105,7 +105,7 @@ class _CreateSheet extends ConsumerWidget {
       );
       return;
     }
-    showDeckEditorSheet(parentContext);
+    showDeckEditorSheet(parentContext, ref);
   }
 
   void _openCardEditor(BuildContext context, WidgetRef ref) {

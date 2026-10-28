@@ -5,16 +5,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../data/content_providers.dart';
+import '../../data/pro_providers.dart';
+import '../../domain/freemium.dart';
 import '../../domain/models.dart';
+import '../paywall/upgrade_dialog.dart';
 import 'editor_common.dart';
 
 /// Opens the deck sheet. With [deck] it edits that deck's title, colour and
 /// icon; without it, the sheet creates a new deck.
 /// Returns the created or edited deck id, or null when dismissed.
 Future<String?> showDeckEditorSheet(
-  BuildContext context, {
+  BuildContext context,
+  WidgetRef ref, {
   DeckNode? deck,
 }) async {
+  // The free ceiling is checked before the sheet opens rather than after the
+  // learner has typed a name and picked a colour: being refused at the end of
+  // a form is the worst possible moment to be told about a limit.
+  if (deck == null) {
+    final int? left = ref.read(decksLeftProvider);
+    if (left != null && left <= 0) {
+      await showDeckLimitDialog(
+        context,
+        lapsed: ref.read(proNowProvider).everPro,
+      );
+      return null;
+    }
+  }
   final String? id = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,

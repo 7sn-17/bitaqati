@@ -13,6 +13,7 @@ import '../../features/legal/privacy_policy_screen.dart';
 import '../../features/legal/terms_of_service_screen.dart';
 import '../../features/library/library_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/paywall/paywall_screen.dart';
 import '../../features/progress/progress_screen.dart';
 import '../../features/review/review_screen.dart';
 import '../../features/search/search_screen.dart';
@@ -118,6 +119,22 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/paywall',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          final Object? extra = state.extra;
+          if (extra is Map) {
+            final Object? reason = extra['reason'];
+            final Object? tab = extra['tab'];
+            return PaywallScreen(
+              reason: reason is String ? reason : null,
+              initialTab: tab is int ? tab : 0,
+            );
+          }
+          return PaywallScreen(reason: extra is String ? extra : null);
+        },
       ),
       GoRoute(
         path: '/developer',

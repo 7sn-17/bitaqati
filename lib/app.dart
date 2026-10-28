@@ -13,7 +13,9 @@ import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_palette.dart';
+import 'data/pro_providers.dart';
 import 'data/sync_providers.dart';
+import 'domain/freemium.dart';
 
 class BitaqatiApp extends ConsumerStatefulWidget {
   const BitaqatiApp({super.key});
@@ -123,7 +125,16 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
   @override
   Widget build(BuildContext context) {
     final ThemeMode themeMode = ref.watch(themeModeProvider);
-    final AppThemeId paletteId = ref.watch(themePaletteProvider);
+    // A paid palette is only worn by someone who has paid for it. A lapsed
+    // subscriber keeps the colours they chose, the same grace the frozen
+    // decks get; an install that never subscribed falls back to Forest even
+    // if the saved preference says otherwise.
+    final ProStatus pro = ref.watch(proNowProvider);
+    final AppThemeId chosenPalette = ref.watch(themePaletteProvider);
+    final AppThemeId paletteId =
+        pro.everPro || chosenPalette == AppThemeId.forest
+        ? chosenPalette
+        : AppThemeId.forest;
     final Locale locale = ref.watch(languageProvider);
     final router = ref.watch(routerProvider);
     final bool isArabic = locale.languageCode == 'ar';

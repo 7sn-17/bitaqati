@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/enums.dart';
 import '../../domain/models.dart';
+import '../../features/paywall/upgrade_dialog.dart';
 import '../theme/app_theme.dart';
 
 class DeckCard extends StatelessWidget {
@@ -54,7 +55,7 @@ class DeckCard extends StatelessWidget {
     final Color onSurface = context.colors.onSurface;
     final Color muted = context.texts.bodySmall?.color ?? context.muted;
 
-    return Material(
+    final Widget card = Material(
       color: surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
@@ -64,7 +65,11 @@ class DeckCard extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        // A frozen deck is not a dead end: the tap explains why it is locked
+        // and offers the way out, instead of doing nothing.
+        onTap: deck.frozen
+            ? () => showFrozenDeckDialog(context, deckTitle: deck.title)
+            : onTap,
         child: Padding(
           padding: const EdgeInsets.all(13),
           child: Row(
@@ -130,7 +135,39 @@ class DeckCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (deck.dueCount > 0) ...<Widget>[
+                        if (deck.frozen) ...<Widget>[
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.raisedSurface,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                Icon(
+                                  CupertinoIcons.lock_fill,
+                                  size: 10,
+                                  color: muted,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'مجمّدة',
+                                  style: TextStyle(
+                                    color: muted,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (deck.dueCount > 0) ...<Widget>[
                           const SizedBox(width: 10),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -172,6 +209,7 @@ class DeckCard extends StatelessWidget {
         ),
       ),
     );
+    return deck.frozen ? Opacity(opacity: 0.66, child: card) : card;
   }
 }
 

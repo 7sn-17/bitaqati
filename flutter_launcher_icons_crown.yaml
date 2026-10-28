@@ -1,0 +1,17 @@
+# Pro launcher icon: the crown variant.
+#
+# flutter_launcher_icons reads one config per run, so the alternates live in
+# their own files and CI runs the generator three times. Keeping the icons
+# generated rather than committed means the mipmaps always match the artwork
+# in assets/app_icons and no density bucket is ever stale.
+#
+# Same full-bleed treatment as the default icon: the artwork is both the legacy
+# mipmap and the adaptive foreground, and the background colour is the one the
+# artwork's own corners use so the two layers meet without a seam.
+flutter_launcher_icons:
+  android: "launcher_icon_crown"
+  image_path: "assets/app_icons/crown.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#14662A"
+  adaptive_icon_foreground: "assets/app_icons/crown.png"
+  adaptive_icon_foreground_inset: 0

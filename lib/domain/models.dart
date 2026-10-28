@@ -309,6 +309,7 @@ class DeckNode {
     this.rating,
     this.ratingCount = 0,
     this.installCount = 0,
+    this.frozen = false,
   });
 
   final String id;
@@ -345,6 +346,13 @@ class DeckNode {
   final double? rating;
   final int ratingCount;
   final int installCount;
+
+  /// True when the free tier has put this deck past the allowance.
+  ///
+  /// A frozen deck is read-only: it keeps every card and every scheduling
+  /// state, it just cannot be opened for study. Nothing is deleted, because a
+  /// lapsed subscription must not cost someone their work.
+  final bool frozen;
 
   IconData get icon => kDeckIcons[iconKey] ?? Icons.layers_rounded;
 
@@ -413,6 +421,7 @@ class DeckNode {
     double? rating,
     int? ratingCount,
     int? installCount,
+    bool? frozen,
   }) {
     return DeckNode(
       id: id,
@@ -440,6 +449,7 @@ class DeckNode {
       rating: rating ?? this.rating,
       ratingCount: ratingCount ?? this.ratingCount,
       installCount: installCount ?? this.installCount,
+      frozen: frozen ?? this.frozen,
     );
   }
 }

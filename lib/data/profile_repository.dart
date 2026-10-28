@@ -31,6 +31,59 @@ class ProfileRepository {
   static const int minNameLength = 2;
   static const int maxNameLength = 40;
 
+  /// The whole profile row, so a widget can watch the name and the
+  /// subscription in one rebuild.
+  Stream<ProfileRow?> watchProfile(String userId) {
+    return (_db.select(
+      _db.profiles,
+    )..where((Profiles p) => p.userId.equals(userId))).watchSingleOrNull();
+  }
+
+  Future<ProfileRow?> readProfile(String userId) {
+    return (_db.select(
+      _db.profiles,
+    )..where((Profiles p) => p.userId.equals(userId))).getSingleOrNull();
+  }
+
+  /// Stores the device fingerprint on the profile.
+  ///
+  /// Written before the first cloud call so the very first deck push already
+  /// carries it: the server counts decks per device, and a push without one
+  /// would be rejected as a device it cannot measure.
+  Future<void> setDeviceId(String userId, String deviceId) async {
+    final ProfileRow? existing = await readProfile(userId);
+    if (existing?.deviceId == deviceId) {
+      return;
+    }
+    await (_db
+        .into(_db.profiles)
+        .insertOnConflictUpdate(
+          ProfilesCompanion.insert(
+            userId: userId,
+            deviceId: Value<String>(deviceId),
+            updatedAt: Value<DateTime>(_clock()),
+          ),
+        ));
+  }
+
+  /// Caches the entitlement the cloud just told us about.
+  Future<void> cachePro(
+    String userId, {
+    required bool isPro,
+    required DateTime? expiry,
+  }) async {
+    await (_db
+        .into(_db.profiles)
+        .insertOnConflictUpdate(
+          ProfilesCompanion.insert(
+            userId: userId,
+            isPro: Value<bool>(isPro),
+            proExpiryDate: Value<DateTime?>(expiry),
+            updatedAt: Value<DateTime>(_clock()),
+          ),
+        ));
+  }
+
   /// The chosen name, or an empty string when the user has not picked one.
   Stream<String> watchDisplayName(String userId) {
     return (_db.select(_db.profiles)
@@ -72,7 +125,11 @@ class ProfileRepository {
     }
   }
 
-  /// Writes the local name to Supabase. No-op when nothing was chosen yet.
+  /// Writes the local name and device id to Supabase.
+  ///
+  /// The device id is pushed even when no name was chosen: the server counts
+  /// free-tier decks per device, so an unnamed account still has to declare
+  /// which phone it is on or its pushes would be rejected.
   Future<void> pushToCloud(String userId) async {
     if (!AppConfig.hasSupabase) {
       return;
@@ -81,13 +138,15 @@ class ProfileRepository {
       _db.profiles,
     )..where((Profiles p) => p.userId.equals(userId))).getSingleOrNull();
     final String name = row?.displayName.trim() ?? '';
-    if (name.isEmpty) {
+    final String deviceId = row?.deviceId ?? '';
+    if (name.isEmpty && deviceId.isEmpty) {
       return;
     }
     await Supabase.instance.client.from('profiles').upsert(<String, Object?>{
       'id': userId,
-      'display_name': name,
-      'display_name_custom': true,
+      if (name.isNotEmpty) 'display_name': name,
+      if (name.isNotEmpty) 'display_name_custom': true,
+      if (deviceId.isNotEmpty) 'device_id': deviceId,
     });
   }
 

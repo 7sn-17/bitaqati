@@ -8,9 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../data/content_providers.dart';
+import '../../data/pro_providers.dart';
 import '../../domain/gamification.dart';
 import '../../domain/models.dart';
 import '../create/create_sheet.dart';
+import '../paywall/paywall_screen.dart';
 import '../study/study_mode_sheet.dart';
 
 const List<String> _months = <String>[
@@ -65,6 +67,7 @@ class ProgressScreen extends ConsumerWidget {
     // panels are replaced by one explanation until there is something real to
     // draw.
     final bool hasActivity = summary.totalReviews > 0;
+    final bool analytics = ref.watch(proNowProvider).active;
 
     return SafeArea(
       bottom: false,
@@ -83,8 +86,15 @@ class ProgressScreen extends ConsumerWidget {
           if (hasActivity) _StreakCard(summary: summary),
           _AchievementsSection(summary: summary),
           if (hasActivity) _RetentionCard(summary: summary),
-          if (hasActivity) _ForecastCard(forecast: forecast),
-          if (hasActivity) _HeatmapCard(summary: summary),
+          // The forecast and the heatmap are the two panels the plan
+          // comparison sells, so they are the two a free account does not
+          // get. Level, streak and achievements stay: those are the
+          // reasons to keep the app open, not the reasons to pay.
+          if (hasActivity && analytics) ...<Widget>[
+            _ForecastCard(forecast: forecast),
+            _HeatmapCard(summary: summary),
+          ] else if (hasActivity)
+            const _AnalyticsLock(),
           const SizedBox(height: 10),
         ],
       ),
@@ -1119,6 +1129,67 @@ class _LegendRow extends StatelessWidget {
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
             color: context.ink,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The paid half of the dashboard.
+///
+/// Placed exactly where the two panels would have been, so the screen keeps its
+/// rhythm and the learner sees what they are missing rather than a gap.
+class _AnalyticsLock extends StatelessWidget {
+  const _AnalyticsLock();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: 22),
+        const SectionHeader(
+          title: 'التحليلات المتقدمة',
+          subtitle: 'خريطة حرارية وتوقعات المراجعة',
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _Panel(
+            child: Column(
+              children: <Widget>[
+                Icon(
+                  CupertinoIcons.lock_fill,
+                  size: 24,
+                  color: context.brandInk,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'الخريطة الحرارية وتوقعات المراجعة من ميزات Pro. '
+                  'بقية لوحتك تعمل كما هي.',
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodySmall?.copyWith(
+                    fontSize: 11.5,
+                    height: 1.7,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => openPaywall(
+                    context,
+                    reason: 'التحليلات المتقدمة متاحة مع Pro.',
+                  ),
+                  child: Text(
+                    'معرفة المزيد',
+                    style: context.texts.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: context.brandInk,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],

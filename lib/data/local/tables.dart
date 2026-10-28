@@ -66,6 +66,21 @@ class Profiles extends Table {
   /// Google returned.
   TextColumn get displayName => text().withDefault(const Constant(''))();
 
+  /// Stable identifier of the physical device, mirrored to Supabase.
+  ///
+  /// Free-tier limits are counted per device, not per account: signing out and
+  /// creating a second account on the same phone must not reset the allowance.
+  TextColumn get deviceId => text().withDefault(const Constant(''))();
+
+  /// Cached copy of the cloud entitlement so the paywall can answer offline.
+  BoolColumn get isPro => boolean().withDefault(const Constant(false))();
+
+  /// When the paid period ends. Null means the user never subscribed.
+  ///
+  /// This doubles as the "was pro once" marker that grants the freeze bonus:
+  /// an expired subscriber keeps 25 decks instead of 20.
+  DateTimeColumn get proExpiryDate => dateTime().nullable()();
+
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override

@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'bitaqati'));
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -62,6 +62,15 @@ class AppDatabase extends _$AppDatabase {
           // which is exactly the marker the scheduler looks for when it
           // re-seeds a card that was scheduled by the old fixed intervals.
           await migrator.addColumn(cardStates, cardStates.fsrsVersion);
+        }
+
+        if (from < 7) {
+          // Freemium. The device id is what the free-tier limits are counted
+          // against, so it is written on the profile row rather than in a
+          // preference: it has to travel with the account to the cloud.
+          await migrator.addColumn(profiles, profiles.deviceId);
+          await migrator.addColumn(profiles, profiles.isPro);
+          await migrator.addColumn(profiles, profiles.proExpiryDate);
         }
       },
       beforeOpen: (OpeningDetails details) async {

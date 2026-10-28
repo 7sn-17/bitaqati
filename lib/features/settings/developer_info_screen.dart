@@ -20,6 +20,13 @@ class DeveloperInfoScreen extends StatelessWidget {
   static const String _email = 'hasantaha5689@gmail.com';
   static const String _instagram = 'https://instagram.com/7sn__08';
   static const String _whatsapp = 'https://wa.me/963984623461';
+
+  /// The number behind [_whatsapp].
+  ///
+  /// Public because the paywall writes its own message with the chosen plan
+  /// already in it, and rebuilding a wa.me link from a string is the only way
+  /// to prefill text.
+  static const String whatsappNumber = '+963984623461';
   static const String _telegram = 'https://t.me/DOVx3';
   static const String _photo = 'https://iili.io/nvhi46B.jpg';
 

@@ -13,7 +13,11 @@ import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/image_viewer.dart';
 import '../../core/widgets/speak_button.dart';
 import '../../data/content_providers.dart';
+import '../../data/pro_providers.dart';
+import '../../data/quota.dart';
+import '../../domain/freemium.dart';
 import '../../domain/models.dart';
+import '../paywall/frozen_deck_screen.dart';
 
 /// Loads the deck and the cards that are due now, then runs the session.
 class ReviewScreen extends ConsumerStatefulWidget {
@@ -31,6 +35,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   /// of time is recorded instead of being discarded as a duplicate tap.
   bool _all = false;
 
+  /// True once this visit has been counted against the free tier's daily
+  /// session allowance. A rebuild must not spend a second session.
+  bool _counted = false;
+
   @override
   Widget build(BuildContext context) {
     final String deckId = widget.deckId;
@@ -39,6 +47,11 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     // the whole library, so the session code stays identical.
     final bool global = isAllDecksScope(deckId);
     final DeckNode? found = global ? null : ref.watch(deckByIdProvider(deckId));
+    // A frozen deck keeps its cards but hands out no session, so the route
+    // explains itself instead of showing an empty queue.
+    if (found != null && found.frozen) {
+      return FrozenDeckScreen(deckTitle: found.title);
+    }
     final bool listReady = ref.watch(deckListProvider).hasValue;
     final List<ReviewCard>? queue = ref
         .watch(studyQueueProvider((deckId: global ? null : deckId, all: _all)))
@@ -56,6 +69,24 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           title: global ? 'جميع المجموعات' : '',
           color: context.primary,
         );
+    // The free tier gets a handful of sessions per deck per day. The count
+    // is taken when a ready screen appears rather than when an answer
+    // lands: the paywall sells "sessions", and a session that opened is a
+    // session. Only a deck-scoped session is counted; the global queue is
+    // already bounded by the deck allowance.
+    if (!global && !_counted) {
+      _counted = true;
+      if (!ref.read(proNowProvider).active) {
+        final QuotaLedger ledger = ref.read(quotaLedgerProvider);
+        if (ledger.sessionsToday(deckId) >= FreeLimits.studySessionsPerDeck) {
+          return QuotaWallScreen(
+            kind: QuotaKind.studySessions,
+            subtitle: found?.title,
+          );
+        }
+        unawaited(ledger.noteSession(deckId));
+      }
+    }
     final bool canStudyAll =
         !_all &&
         queue.isEmpty &&

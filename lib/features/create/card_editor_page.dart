@@ -12,12 +12,16 @@ import '../../core/widgets/image_viewer.dart';
 import '../../core/widgets/speak_button.dart';
 import '../../data/content_providers.dart';
 import '../../data/media_upload.dart';
+import '../../data/pro_providers.dart';
+import '../../data/quota.dart';
 import '../../domain/card_draft.dart';
+import '../../domain/freemium.dart';
 import '../../domain/models.dart';
 import 'audio_recorder_page.dart';
 import 'audio_source_sheet.dart';
 import 'editor_common.dart';
 import 'occlusion_editor.dart';
+import '../paywall/upgrade_dialog.dart';
 
 /// Full-screen card editor used for both "new card" and "edit card".
 ///
@@ -660,6 +664,40 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
     return '';
   }
 
+  /// The ceiling this new card would cross, or null when it fits.
+  ///
+  /// Only new cards are checked. Editing an existing card consumes no
+  /// allowance, and blocking it would lock a free account out of fixing a
+  /// typo the moment the library is full.
+  QuotaKind? _quotaBlocked() {
+    if (ref.read(proNowProvider).active) {
+      return null;
+    }
+    int images = 0;
+    int audio = 0;
+    for (final _Attachment item in <_Attachment>[
+      ..._frontMedia,
+      ..._backMedia,
+    ]) {
+      if (item.isImage) {
+        images++;
+      } else {
+        audio++;
+      }
+    }
+    if (_kind == _CardKind.occlusion && _imageUrl != null) {
+      images++;
+    }
+    return firstExceededQuota(
+      counts: ref.read(usageCountsProvider),
+      free: true,
+      occlusion: _kind == _CardKind.occlusion,
+      cloze: _kind == _CardKind.cloze,
+      images: images,
+      audio: audio,
+    );
+  }
+
   Future<bool> _store() async {
     final String? problem = _validate();
     if (problem != null) {
@@ -675,6 +713,16 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       // to save the whole batch.
       setState(() => _saving = false);
       return true;
+    }
+    if (!_editing) {
+      final QuotaKind? blocked = _quotaBlocked();
+      if (blocked != null) {
+        setState(() => _saving = false);
+        if (mounted) {
+          await showQuotaDialog(context, blocked);
+        }
+        return false;
+      }
     }
     final Map<String, Object?>? occlusion = _kind == _CardKind.occlusion
         ? occlusionPayload(_boxes)

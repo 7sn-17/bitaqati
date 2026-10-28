@@ -36,10 +36,12 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
+            <!-- No MAIN/LAUNCHER filter here on purpose. Every launcher icon,
+                 including the default one, is an activity-alias below, because
+                 the dynamic-icon plugin works by disabling every alias except
+                 the chosen one. If MainActivity itself carried the launcher
+                 filter it would have to be disabled too, and disabling the
+                 alias target makes all of the aliases unlaunchable. -->
             <!-- Legacy custom scheme, kept so links shared by older builds
                  still open the app. -->
             <intent-filter>
@@ -65,6 +67,56 @@
                 android:name="flutter_deeplinking_enabled"
                 android:value="false" />
         </activity>
+        <!-- The three launcher icons. Exactly one alias is enabled at a time;
+             the plugin flips them and Android swaps the icon on the home screen
+             without a reinstall. `.DEFAULT` is the yellow card and is the only
+             one enabled in a fresh install, so a device that never opens the
+             picker keeps the icon the release was built around. -->
+        <activity-alias
+            android:name=".DEFAULT"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="true"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".CrownIcon"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@mipmap/launcher_icon_crown"
+            android:roundIcon="@mipmap/launcher_icon_crown">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".BlueIcon"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:enabled="false"
+            android:icon="@mipmap/launcher_icon_blue"
+            android:roundIcon="@mipmap/launcher_icon_blue">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+        <!-- Holds the icon the user picked until the task is removed, then
+             applies it. The swap has to happen off the activity lifecycle or
+             Android kills the app mid-change; stopWithTask must stay false so
+             onTaskRemoved is actually delivered. -->
+        <service
+            android:name="com.solusibejo.flutter_dynamic_icon_plus.FlutterDynamicIconPlusService"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false"/>
         <!-- uCrop, the native cropper behind image_cropper. It has to be
              declared by the host app or cropping crashes the moment it opens.
              The AppCompat theme is what uCrop's own activity expects. -->

@@ -11,8 +11,12 @@ import '../../core/widgets/app_message.dart';
 import '../../core/widgets/surface_card.dart';
 import '../../data/card_import_parser.dart';
 import '../../data/content_providers.dart';
+import '../../data/pro_providers.dart';
+import '../../data/quota.dart';
 import '../../domain/card_draft.dart';
+import '../../domain/freemium.dart';
 import '../../domain/models.dart';
+import '../paywall/upgrade_dialog.dart';
 
 /// Paste a list, check it, then save the whole batch at once.
 ///
@@ -163,6 +167,27 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
     if (_saving) {
       return;
     }
+    // Two ceilings apply to a bulk import: the library's card allowance and
+    // the monthly import allowance. Both are checked before the first write
+    // so a blocked import leaves nothing half-saved.
+    if (!ref.read(proNowProvider).active) {
+      final QuotaLedger ledger = ref.read(quotaLedgerProvider);
+      final int remaining =
+          FreeLimits.importCardsPerMonth - ledger.importedThisMonth();
+      final QuotaKind? blocked = firstExceededQuota(
+        counts: ref.read(usageCountsProvider),
+        free: true,
+        adding: _drafts.length,
+      );
+      if (blocked != null) {
+        await showQuotaDialog(context, blocked);
+        return;
+      }
+      if (_drafts.length > remaining) {
+        await showQuotaDialog(context, QuotaKind.importCards);
+        return;
+      }
+    }
     setState(() => _saving = true);
     try {
       final List<String> ids = await ref
@@ -180,6 +205,7 @@ class _SmartImportScreenState extends ConsumerState<SmartImportScreen> {
         );
         return;
       }
+      unawaited(ref.read(quotaLedgerProvider).noteImported(ids.length));
       context.pop('تمت إضافة ${ids.length} بطاقة.');
     } catch (_) {
       if (mounted) {

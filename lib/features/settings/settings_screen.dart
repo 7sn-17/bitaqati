@@ -16,6 +16,7 @@ import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_palette.dart';
+import '../../core/dynamic_icon.dart';
 import '../../core/updates/update_providers.dart';
 import '../../core/updates/update_service.dart';
 import '../../core/user_display.dart';
@@ -24,6 +25,10 @@ import '../../core/widgets/surface_card.dart';
 import '../../data/auth_service.dart';
 import '../../data/profile_providers.dart';
 import '../../data/profile_repository.dart';
+import '../../data/pro_providers.dart';
+import '../../domain/freemium.dart';
+import '../paywall/paywall_screen.dart';
+import '../paywall/upgrade_dialog.dart';
 import '../updates/update_dialog.dart';
 
 /// What the share sheet sends. One paragraph about the app, then the direct
@@ -58,6 +63,7 @@ class SettingsScreen extends ConsumerWidget {
     final UpdateInfo? update = ref.watch(updateInfoProvider).valueOrNull;
     final String version =
         ref.watch(appVersionProvider).valueOrNull ?? AppConfig.appVersion;
+    final ProStatus pro = ref.watch(proNowProvider);
     final int newLimit = ref.watch(dailyNewLimitProvider);
     final int reviewLimit = ref.watch(dailyReviewLimitProvider);
 
@@ -142,6 +148,26 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const _SectionLabel('الاشتراك'),
+            _Group(
+              children: <Widget>[
+                _Row(
+                  icon: CupertinoIcons.rosette,
+                  title: 'بطاقاتي Pro',
+                  subtitle: _proSubtitle(pro),
+                  trailing: _ProChip(active: pro.active),
+                  onTap: () => openPaywall(context),
+                ),
+                _Row(
+                  icon: CupertinoIcons.ticket,
+                  title: 'لدي كود تفعيل',
+                  subtitle: 'أدخل الكود الذي وصلك بعد الدفع',
+                  onTap: () => openPaywall(context, tab: 1),
+                ),
+              ],
+            ),
+            const _SectionLabel('أيقونة التطبيق'),
+            const _AppIconPicker(),
             const _SectionLabel('الحساب'),
             _Group(
               children: <Widget>[
@@ -1043,7 +1069,18 @@ class _ThemeSwatches extends ConsumerWidget {
                     id: id,
                     brightness: brightness,
                     selected: id == active,
+                    locked:
+                        !ref.watch(proNowProvider).active &&
+                        id != AppThemeId.forest,
                     onTap: () {
+                      final bool locked =
+                          !ref.read(proNowProvider).active &&
+                          id != AppThemeId.forest;
+                      if (locked) {
+                        HapticFeedback.lightImpact();
+                        showThemeLockedDialog(context);
+                        return;
+                      }
                       HapticFeedback.selectionClick();
                       ref.read(themePaletteProvider.notifier).select(id);
                     },
@@ -1064,12 +1101,16 @@ class _Swatch extends StatelessWidget {
     required this.id,
     required this.brightness,
     required this.selected,
+    required this.locked,
     required this.onTap,
   });
 
   final AppThemeId id;
   final Brightness brightness;
   final bool selected;
+
+  /// True when this palette belongs to the paid tier and the account is free.
+  final bool locked;
   final VoidCallback onTap;
 
   @override
@@ -1158,18 +1199,306 @@ class _Swatch extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                id.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.texts.labelSmall?.copyWith(
-                  fontSize: 9.5,
-                  color: selected ? context.brandInk : context.muted,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  if (locked) ...<Widget>[
+                    Icon(
+                      CupertinoIcons.lock_fill,
+                      size: 8,
+                      color: context.muted,
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                  Flexible(
+                    child: Text(
+                      id.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.texts.labelSmall?.copyWith(
+                        fontSize: 9.5,
+                        color: selected ? context.brandInk : context.muted,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One line describing the subscription, for the settings row.
+String _proSubtitle(ProStatus pro) {
+  if (pro.active) {
+    final int? days = pro.daysLeft;
+    return days == null
+        ? 'اشتراكك فعّال بلا تاريخ انتهاء'
+        : 'فعّال · يتبقى $days يوماً';
+  }
+  if (pro.everPro) {
+    return 'انتهى اشتراكك · ${FreeLimits.bonusDecks} مجموعة بقيت مفتوحة';
+  }
+  return '${FreeLimits.decks} مجموعة و${FreeLimits.cards} بطاقة في الخطة المجانية';
+}
+
+/// The little pill on the subscription row.
+class _ProChip extends StatelessWidget {
+  const _ProChip({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: active ? context.accent : context.softAccent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        active ? 'Pro' : 'ترقية',
+        style: TextStyle(
+          fontFamily: 'ReadexPro',
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: active ? context.onAccent : context.onSoftAccent,
+        ),
+      ),
+    );
+  }
+}
+
+/// The launcher-icon picker.
+///
+/// The two alternates are part of the paid tier, so a free tap opens the
+/// paywall instead of doing nothing: the row is a shop window, not a dead end.
+class _AppIconPicker extends ConsumerStatefulWidget {
+  const _AppIconPicker();
+
+  @override
+  ConsumerState<_AppIconPicker> createState() => _AppIconPickerState();
+}
+
+class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
+  String? _current;
+  bool _busy = false;
+  bool _supported = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final bool supported = await DynamicIconService.supported;
+    final String? current = supported
+        ? await DynamicIconService.current()
+        : null;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _supported = supported;
+      _current = current ?? AppIconOption.defaultAlias;
+    });
+  }
+
+  Future<void> _pick(AppIconOption option) async {
+    if (option.pro && !ref.read(proNowProvider).active) {
+      HapticFeedback.lightImpact();
+      showIconLockedDialog(context);
+      return;
+    }
+    if (_busy || _current == option.alias) {
+      return;
+    }
+    setState(() => _busy = true);
+    final bool ok = await DynamicIconService.apply(option.alias);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _busy = false;
+      if (ok) {
+        _current = option.alias;
+      }
+    });
+    if (!ok) {
+      showAppMessage(
+        context,
+        'تعذّر تغيير الأيقونة على هذا الجهاز.',
+        kind: AppMessageKind.error,
+      );
+      return;
+    }
+    HapticFeedback.selectionClick();
+    showAppMessage(context, 'تم تغيير أيقونة التطبيق.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool pro = ref.watch(proNowProvider).active;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Material(
+          color: context.colors.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Icon(
+                      CupertinoIcons.app_badge,
+                      size: 16,
+                      color: context.brandInk,
+                    ),
+                    const SizedBox(width: 8),
+                    Text('أيقونة التطبيق', style: context.texts.titleSmall),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _supported
+                      ? 'بدّل شكل بطاقتي على شاشتك الرئيسية.'
+                      : 'هذا الجهاز لا يسمح بتغيير أيقونة التطبيق.',
+                  style: context.texts.bodySmall,
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: <Widget>[
+                    for (final AppIconOption option in kAppIcons) ...<Widget>[
+                      Expanded(
+                        child: _IconTile(
+                          option: option,
+                          selected: _current == option.alias,
+                          locked: option.pro && !pro,
+                          onTap: () => _pick(option),
+                        ),
+                      ),
+                      if (option != kAppIcons.last) const SizedBox(width: 10),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  const _IconTile({
+    required this.option,
+    required this.selected,
+    required this.locked,
+    required this.onTap,
+  });
+
+  final AppIconOption option;
+  final bool selected;
+  final bool locked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: option.label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          children: <Widget>[
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected ? context.brandInk : context.hairline,
+                  width: selected ? 2.2 : 1,
+                ),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      option.asset,
+                      width: 62,
+                      height: 62,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  if (locked)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.42),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            CupertinoIcons.lock_fill,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (selected)
+                    PositionedDirectional(
+                      top: -6,
+                      end: -6,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: context.brandInk,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: context.colors.surfaceContainerHighest,
+                            width: 2,
+                          ),
+                        ),
+                        child: Icon(
+                          CupertinoIcons.checkmark_alt,
+                          size: 10,
+                          color: context.colors.surfaceContainerHighest,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              option.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.texts.labelSmall?.copyWith(
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? context.brandInk : context.muted,
+              ),
+            ),
+          ],
         ),
       ),
     );

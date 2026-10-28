@@ -82,10 +82,11 @@ radio to poll a queue that is almost always empty.
 A queue row that fails five times is dropped rather than blocking the queue
 forever; its `last_error` is kept for diagnosis.
 
-## Local schema (Drift v6)
+## Local schema (Drift v7)
 
 ```text
-profiles(user_id PK, display_name, updated_at)
+profiles(user_id PK, display_name, device_id, is_pro, pro_expiry_date,
+         updated_at)
 decks(id PK, owner_id, share_code, position, title, description, color_hex,
       icon, privacy, cover_url, tags, settings, is_starter, source_deck_id,
       original_deck_id, original_author_name, source_version, forked_at,
@@ -767,6 +768,58 @@ list is legible without touching any widget.
 The editor shows both sets in a three-row scrollable window rather than a wrap,
 so 42 swatches and 79 icons do not push the save button off the sheet.
 
+## Freemium
+
+Two tiers, enforced in three places so a patched APK does not unlock anything.
+
+**The numbers.** `FreeLimits` in `lib/domain/freemium.dart` is the only place
+they are written down on the client: 20 decks, 1000 cards, four study sessions
+per deck per day, five synced decks, 150 imported cards a month, 50 images,
+15 recordings, five occlusion cards, twenty cloze cards. The paywall's
+comparison table, the guards and the dialogs all read that table, so a number
+cannot appear twice with two values.
+
+**The device.** Limits are counted per phone, not per account, because
+otherwise signing up again is the whole bypass. `deviceIdProvider` hashes
+`ANDROID_ID`, model, manufacturer, device and build fingerprint with FNV-1a and
+caches the result, so nothing identifying leaves the device and the server only
+ever learns "same phone or not". `profiles.device_id` carries it to the cloud.
+
+**The freeze.** Nothing is ever deleted when a subscription ends. The allowance
+becomes `decksFor(everPro: true)` — 20 plus a 25% bonus, 25 — and
+`allDecksProvider` marks every deck past the newest 25 with `DeckNode.frozen`.
+Frozen is a view, not a state: the deck keeps its cards, its history and its
+place in the list. `frozenDeckIdsProvider` then subtracts those decks from the
+global queues, from the due totals and from the "review today" card, so the
+dashboard never promises work the session cannot open. A frozen deck's detail
+screen, review route and study modes all render `FrozenDeckScreen` instead.
+
+**The calendar.** Sessions and imports reset by themselves: `QuotaLedger` stores
+the day or month alongside the counter and reads a blob from another period as
+zero. No scheduled job, and a phone that was off for a week does not spend last
+week's allowance.
+
+**The server.** `decks_enforce_limit` and `cards_enforce_limit` run as
+`before insert` triggers, count across every account that shares the device id,
+and raise `DECK_LIMIT_REACHED` / `CARD_LIMIT_REACHED`. They skip when
+`auth.uid()` is null (migrations, service role) and when the row already exists,
+so an upsert of an unchanged deck is never refused. `profiles_guard_entitlement`
+rejects any client write to `is_pro` or `pro_expiry_date`.
+
+**Activation codes.** `activation_codes` is service-role only. The
+`activate-code` Edge Function verifies the JWT, then calls
+`redeem_activation_code`, which locks the row, validates unused and unexpired,
+stacks the plan's months onto `greatest(now(), pro_expiry_date)`, marks it used
+and upserts the profile — one transaction, so a dropped connection cannot burn a
+paid code.
+
+**Launcher icons.** Three `activity-alias` entries (`.DEFAULT`, `.CrownIcon`,
+`.BlueIcon`) all point at `MainActivity`, which no longer carries the
+MAIN/LAUNCHER filter itself. That is deliberate: the plugin swaps icons by
+disabling every alias but one, and disabling the alias *target* would leave the
+app with no launcher entry at all. CI runs `flutter_launcher_icons` three times,
+once per icon set.
+
 ## Cloud schema
 
 Migrations live in `supabase/migrations/` and are applied in filename order:
@@ -785,6 +838,7 @@ Migrations live in `supabase/migrations/` and are applied in filename order:
 | `20261027000700_flatten_decks.sql` | Dropped every nesting column and the tree indexes |
 | `20261027000800_public_decks_hardening.sql` | `security_invoker` on the view, column grants, pinned `search_path` |
 | `20261027000900_new_user_metadata.sql` | `handle_new_user` reads Google's name and picture |
+| `20261028000100_freemium.sql` | Entitlement columns, `activation_codes`, deck and card limit triggers, `redeem_activation_code` |
 
 Every user table has RLS. The client only ever ships the publishable key.
 

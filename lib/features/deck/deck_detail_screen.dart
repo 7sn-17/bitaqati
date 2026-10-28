@@ -24,6 +24,7 @@ import '../../domain/models.dart';
 import '../create/deck_editor_sheet.dart';
 import '../create/editor_common.dart';
 import '../library/install_library_deck.dart';
+import '../paywall/upgrade_dialog.dart';
 import '../study/study_mode_sheet.dart';
 
 /// A deck screen with two strict modes, matching the two-level hierarchy:
@@ -81,9 +82,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     final List<ReviewCard> cards =
         cardsAsync.valueOrNull ?? const <ReviewCard>[];
     final List<ReviewCard> visibleCards = _matching(cards);
-    final bool canStudy = !isPreview && deck.cardCount > 0;
+    final bool canStudy = !isPreview && deck.cardCount > 0 && !deck.frozen;
     final String studyLabel = isPreview
         ? (_installing ? 'جارٍ الإضافة' : 'أضف نسخة إلى مجموعاتي')
+        : deck.frozen
+        ? 'مجمّدة · افتحها مع Pro'
         : deck.cardCount == 0
         ? 'لا بطاقات للمراجعة بعد'
         : deck.dueCount == 0
@@ -340,6 +343,11 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                   child: FilledButton(
                     onPressed: canStudy
                         ? () => openStudyMode(context, deck)
+                        : deck.frozen
+                        ? () => showFrozenDeckDialog(
+                            context,
+                            deckTitle: deck.title,
+                          )
                         : null,
                     style: FilledButton.styleFrom(
                       backgroundColor: context.accent,
@@ -875,7 +883,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
     )) {
       return;
     }
-    showDeckEditorSheet(context, deck: deck);
+    showDeckEditorSheet(context, ref, deck: deck);
   }
 
   Future<void> _installPreview(BuildContext context, DeckNode deck) async {
