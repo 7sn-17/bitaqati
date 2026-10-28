@@ -1,12 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dynamic_icon_plus/flutter_dynamic_icon_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// One launcher icon the learner can wear.
 ///
 /// [alias] is the `activity-alias` declared in AndroidManifest.xml. The plugin
 /// toggles the enabled component, so the value has to match that declaration
-/// exactly; the launcher picks the new icon up without the app restarting.
+/// exactly.
 class AppIconOption {
   const AppIconOption({
     required this.alias,
@@ -87,82 +88,59 @@ const List<AppIconOption> kAppIcons = <AppIconOption>[
 
 /// Switches the launcher icon.
 ///
-/// The work is done by the app itself, in MainActivity: the aliases are enabled
-/// and disabled directly through the package manager. A plugin was tried first
-/// and removed — it deferred the swap to a service that waits for the task to
-/// be removed from recents, so a user who pressed Home and came back never got
-/// the new icon. There is no library between this call and the platform now,
-/// which is also why a device that refuses the change can be reported honestly
-/// instead of guessed at.
+/// The swap is done by flutter_dynamic_icon_plus. It is deliberate: this is the
+/// exact code that has changed the icon on this project's devices before, and
+/// hand-rolling the same package-manager calls did not, because the timing is
+/// the whole problem.
 ///
-/// Every call is wrapped: a device whose launcher ignores aliases, or a build
-/// whose manifest is missing one, must never take the settings screen down. The
-/// caller gets a bool and shows a quiet message.
+/// The plugin stores the request and hands it to a service that applies it in
+/// onTaskRemoved — once the app has left the recents list. That is the only
+/// moment a launcher re-reads a package's icon; flipping an alias while the app
+/// is still on screen leaves the home screen showing the artwork it already
+/// resolved, and on several launchers it finishes the task as well. Nothing is
+/// applied in the foreground, so nothing closes under the user.
 abstract final class DynamicIconService {
-  static const MethodChannel _channel = MethodChannel('com.bitaqati.app/icon');
+  /// Read-only diagnostics. The plugin owns every write; this channel only asks
+  /// the package manager what it currently thinks, so a stuck icon can be
+  /// diagnosed from logcat instead of guessed at.
+  static const MethodChannel _diagnostics = MethodChannel(
+    'com.bitaqati.app/icon',
+  );
 
   /// Whether this build can change its icon at all: every alias has to be
   /// declared, and the platform channel has to answer.
   static Future<bool> get supported async {
     try {
-      return await _channel.invokeMethod<bool>('supported') ?? false;
-    } catch (_) {
+      return await FlutterDynamicIconPlus.supportsAlternateIcons;
+    } catch (error) {
+      debugPrint('[icon] supportsAlternateIcons failed: $error');
       return false;
     }
   }
 
   /// The alias currently enabled, as a bare name, or null when it cannot be
-  /// read.
+  /// read. The plugin answers with a fully qualified component name.
   static Future<String?> current() async {
     try {
-      final String? name = await _channel.invokeMethod<String>('currentAlias');
-      return name == null || name.isEmpty ? null : name;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Queues [alias] and reports whether this build can wear it.
-  ///
-  /// Nothing changes on the home screen yet, on purpose: the swap runs when the
-  /// app leaves the screen. A launcher resolves a package icon while it is in
-  /// front, so flipping an alias under a launcher that is already showing the
-  /// old artwork leaves it showing the old artwork — and on several devices it
-  /// finishes the task as well, which reads as "the app closed and nothing
-  /// changed". Every icon plugin that works defers the swap the same way.
-  static Future<bool> apply(String alias) async {
-    try {
-      final String? queued = await _channel.invokeMethod<String>(
-        'setAlias',
-        <String, Object?>{'alias': alias},
-      );
-      return queued != null;
-    } on PlatformException {
-      return false;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// The alias waiting to be applied, if any.
-  static Future<String?> pending() async {
-    try {
-      final String? name = await _channel.invokeMethod<String>('pendingAlias');
-      return name == null || name.isEmpty ? null : name;
-    } catch (_) {
+      final String? name = await FlutterDynamicIconPlus.alternateIconName;
+      if (name == null || name.isEmpty) {
+        return null;
+      }
+      final int dot = name.lastIndexOf('.');
+      return dot == -1 ? name : name.substring(dot + 1);
+    } catch (error) {
+      debugPrint('[icon] alternateIconName failed: $error');
       return null;
     }
   }
 
   /// Every alias and the state the package manager reports for it.
   ///
-  /// Diagnostics only: "enabled" is the one on the home screen, "default"
-  /// follows the manifest, "disabled" was switched off by this app. A read of
-  /// this before and after a change is the difference between "the launcher
-  /// ignored us" and "the swap never happened".
+  /// "enabled" is the one on the home screen, "default" follows the manifest,
+  /// "disabled" was switched off. Logged before a request and at launch.
   static Future<Map<String, String>> state() async {
     try {
-      final Map<Object?, Object?>? raw = await _channel
+      final Map<Object?, Object?>? raw = await _diagnostics
           .invokeMethod<Map<Object?, Object?>>('state');
       if (raw == null) {
         return const <String, String>{};
@@ -173,6 +151,23 @@ abstract final class DynamicIconService {
       };
     } catch (_) {
       return const <String, String>{};
+    }
+  }
+
+  /// Queues [alias]. The plugin applies it when the task leaves recents, which
+  /// is what makes the home screen redraw.
+  static Future<bool> apply(String alias) async {
+    final String? live = await current();
+    debugPrint('[icon] request=$alias · live=$live · ${await state()}');
+    try {
+      await FlutterDynamicIconPlus.setAlternateIconName(
+        iconName: alias == AppIconOption.defaultAlias ? null : alias,
+      );
+      debugPrint('[icon] queued $alias; applied when the task leaves recents');
+      return true;
+    } catch (error) {
+      debugPrint('[icon] the plugin refused $alias: $error');
+      return false;
     }
   }
 
@@ -193,21 +188,20 @@ abstract final class DynamicIconService {
   ///
   /// Two things make this necessary. The enabled activity-alias survives an
   /// app update, so a device that once picked the blue icon keeps it after the
-  /// APK is replaced — including after a build that changed what the default
-  /// alias points at. And the plugin answers "no alternate icon" both for the
-  /// default alias and when it cannot read the component at all, so the only
-  /// trustworthy comparison is against what this install remembers.
+  /// APK is replaced. And a request that never reached the service — the
+  /// process can be killed before the task is removed — would otherwise be
+  /// lost for good. Queueing it again costs one call and heals both.
   ///
-  /// Returns true when a swap was queued for the next time the app leaves the
-  /// screen.
+  /// Returns true when a swap was queued.
   static Future<bool> reconcile(SharedPreferences prefs) async {
     final String wanted = remembered(prefs);
     final String live = await current() ?? AppIconOption.defaultAlias;
     if (live == wanted) {
+      debugPrint('[icon] launch · live=$live matches the choice');
       return false;
     }
     debugPrint(
-      '[icon] launcher drifted · wanted=$wanted live=$live · ${await state()}',
+      '[icon] launch · wanted=$wanted live=$live · ${await state()} · re-queueing',
     );
     return apply(wanted);
   }

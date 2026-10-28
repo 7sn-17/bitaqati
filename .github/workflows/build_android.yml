@@ -66,12 +66,21 @@ jobs:
         # Fails fast if a resource the manifest names is missing, instead of
         # letting the Android resource link fail later with a bare id.
         run: |
+          # Every alias names a mipmap, and a launcher on API 26+ reads the
+          # adaptive XML while anything older reads the plain PNG. A missing
+          # density does not fail the link — it shows a blank or stale icon on
+          # that device — so all of them are checked here.
           for name in ic_launcher launcher_icon_crown launcher_icon_blue; do
             test -f "android/app/src/main/res/mipmap-anydpi-v26/${name}.xml" ||
               { echo "::error::missing adaptive icon ${name}"; exit 1; }
-            test -f "android/app/src/main/res/drawable-xxxhdpi/${name}_foreground.png" ||
-              { echo "::error::missing foreground for ${name}"; exit 1; }
+            for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+              test -f "android/app/src/main/res/mipmap-${density}/${name}.png" ||
+                { echo "::error::missing mipmap-${density}/${name}.png"; exit 1; }
+              test -f "android/app/src/main/res/drawable-${density}/${name}_foreground.png" ||
+                { echo "::error::missing drawable-${density}/${name}_foreground.png"; exit 1; }
+            done
           done
+          find android/app/src/main/res -name '*launcher*' -o -name 'ic_launcher*' | sort
 
       - name: Prepare release signing
         env:

@@ -108,6 +108,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+        <!-- Holds the icon the user picked until the task is removed, then
+             applies it. The swap has to happen after the app has left the
+             screen: a launcher resolves a package icon while it is in front, so
+             flipping the alias earlier leaves the home screen showing the old
+             artwork. stopWithTask must stay false or onTaskRemoved is never
+             delivered, and the service must be declared here because the
+             plugin's own manifest does not declare it. -->
+        <service
+            android:name="com.solusibejo.flutter_dynamic_icon_plus.FlutterDynamicIconPlusService"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false"/>
         <!-- uCrop, the native cropper behind image_cropper. It has to be
              declared by the host app or cropping crashes the moment it opens.
              The AppCompat theme is what uCrop's own activity expects. -->

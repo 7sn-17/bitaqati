@@ -1632,7 +1632,8 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
     HapticFeedback.selectionClick();
     showAppMessage(
       context,
-      'اخترت الأيقونة. ستتغير على الشاشة الرئيسية عند خروجك من التطبيق.',
+      'اخترت الأيقونة. ستظهر على الشاشة الرئيسية بعد إغلاق التطبيق من '
+      'التطبيقات الأخيرة.',
     );
   }
 
@@ -1692,8 +1693,9 @@ class _AppIconPickerState extends ConsumerState<_AppIconPicker> {
                 if (supported) ...<Widget>[
                   const SizedBox(height: 10),
                   Text(
-                    'تُطبَّق الأيقونة عند خروجك من التطبيق، لأن النظام لا يعيد '
-                    'قراءتها وهو في المقدمة. لن يُغلق التطبيق أثناء استخدامك.',
+                    'تُطبَّق الأيقونة بعد إغلاق التطبيق من قائمة التطبيقات '
+                    'الأخيرة، لأن النظام لا يعيد قراءتها وهو في المقدمة. لن '
+                    'يُغلق التطبيق أثناء استخدامك.',
                     style: context.texts.bodySmall?.copyWith(
                       color: context.muted,
                     ),
