@@ -104,8 +104,12 @@ bool isAllDecksScope(String scope) => scope == kAllDecksScope;
 ///
 /// The study screens take a scope id, not a deck, so "review all due cards"
 /// runs through exactly the same code as "review this deck".
-final StreamProviderFamily<List<ReviewCard>, String> studyCardsProvider =
-    StreamProvider.family<List<ReviewCard>, String>((Ref ref, String scope) {
+/// Auto-disposed on purpose: a study screen is the only reader, and a session
+/// that has ended should not leave a query over every card of the deck running
+/// for the rest of the app's life.
+final AutoDisposeStreamProviderFamily<List<ReviewCard>, String>
+studyCardsProvider = StreamProvider.autoDispose
+    .family<List<ReviewCard>, String>((Ref ref, String scope) {
       final ContentRepository repository = ref.watch(contentRepositoryProvider);
       if (!isAllDecksScope(scope)) {
         return repository.watchCards(scope);
@@ -262,8 +266,10 @@ final StreamProvider<List<DueForecastDay>> dueForecastProvider =
     );
 
 /// Total, new, learning, due, mature and retention values for one deck.
-final StreamProviderFamily<DeckStatistics, String> deckStatisticsProvider =
-    StreamProvider.family<DeckStatistics, String>(
+/// Auto-disposed: only the deck detail screen shows these numbers.
+final AutoDisposeStreamProviderFamily<DeckStatistics, String>
+deckStatisticsProvider = StreamProvider.autoDispose
+    .family<DeckStatistics, String>(
       (Ref ref, String deckId) =>
           ref.watch(contentRepositoryProvider).watchDeckStatistics(deckId),
     );

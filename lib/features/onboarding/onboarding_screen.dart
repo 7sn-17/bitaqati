@@ -200,10 +200,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                                 _controller.position.haveDimensions
                             ? (_controller.page ?? index.toDouble())
                             : index.toDouble();
-                        return _PageContent(
-                          key: ValueKey<int>(index),
-                          page: _pages[index],
-                          parallax: (page - index).clamp(-1.0, 1.0),
+                        return TickerMode(
+                          // Only the page on screen animates. The PageView
+                          // keeps its neighbours alive, and three repeating
+                          // controllers for one visible slide is three times
+                          // the frames for nothing.
+                          enabled: index == _page,
+                          child: _PageContent(
+                            key: ValueKey<int>(index),
+                            page: _pages[index],
+                            parallax: (page - index).clamp(-1.0, 1.0),
+                          ),
                         );
                       },
                     );

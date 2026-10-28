@@ -75,6 +75,11 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Sync reads this before it touches the network: while the app is off
+    // screen there is nothing to draw, so a push can wait for the resume that
+    // will happen anyway.
+    ref.read(appActiveProvider.notifier).state =
+        state == AppLifecycleState.resumed;
     if (state != AppLifecycleState.resumed) {
       return;
     }

@@ -12,6 +12,16 @@ final Provider<SyncService> syncServiceProvider = Provider<SyncService>(
   (Ref ref) => SyncService(ref.watch(appDatabaseProvider)),
 );
 
+/// Whether the app is on screen right now.
+///
+/// Written by the root widget on every lifecycle change. Sync reads it before
+/// it touches the radio: a connectivity event can arrive while the app is in
+/// the background, and pushing a queue from there would wake the device for
+/// work that could wait until the learner comes back.
+final StateProvider<bool> appActiveProvider = StateProvider<bool>(
+  (Ref ref) => true,
+);
+
 /// Whether the device currently has a network route, as a stream.
 ///
 /// Kept here because the sync controller is the only other thing that cares,
@@ -105,6 +115,11 @@ class SyncController extends Notifier<SyncState> {
 
   Future<void> syncNow({bool force = false}) async {
     if (!_alive || state.running) {
+      return;
+    }
+    // Nothing syncs while the app is off screen. The queue is durable, so the
+    // pass that would have run here simply happens on the next resume.
+    if (!ref.read(appActiveProvider)) {
       return;
     }
     final DateTime? last = _lastPass;

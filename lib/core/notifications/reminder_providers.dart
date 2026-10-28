@@ -25,6 +25,29 @@ final FutureProvider<bool> exactAlarmProvider = FutureProvider<bool>(
   (Ref ref) => ReminderService.instance.hasExactAlarms(),
 );
 
+/// Whether the learner asked for reminders at an exact minute.
+///
+/// Off by default, because an exact alarm wakes the device out of doze for a
+/// nudge that nobody is timing with a stopwatch. The permission alone is not
+/// consent: on Android 12 and 13 it is granted at install, which used to mean
+/// every reminder was exact whether the user wanted it or not.
+final NotifierProvider<ExactRemindersNotifier, bool> exactRemindersProvider =
+    NotifierProvider<ExactRemindersNotifier, bool>(ExactRemindersNotifier.new);
+
+class ExactRemindersNotifier extends Notifier<bool> {
+  static const String _key = 'exact_reminders';
+
+  @override
+  bool build() {
+    return ref.watch(sharedPreferencesProvider).getBool(_key) ?? false;
+  }
+
+  Future<void> set(bool value) async {
+    state = value;
+    await ref.read(sharedPreferencesProvider).setBool(_key, value);
+  }
+}
+
 /// Keeps the scheduled reminders in step with what is actually due.
 ///
 /// The database emits on every answer, so the work is debounced: a whole
@@ -70,7 +93,12 @@ class ReminderCoordinator {
     final int due = _ref.read(totalDueProvider);
     final int slots = enabled ? ReminderService.slotsFor(due) : 0;
     final DeckNode? deck = _ref.read(todayReviewDeckProvider);
-    final ({int slots, String? deckId}) next = (slots: slots, deckId: deck?.id);
+    final bool exact = _ref.read(exactRemindersProvider);
+    final ({int slots, String? deckId, bool exact}) next = (
+      slots: slots,
+      deckId: deck?.id,
+      exact: exact,
+    );
     if (_last == next) {
       return;
     }
@@ -83,6 +111,7 @@ class ReminderCoordinator {
       dueCount: due,
       deckId: deck?.id,
       deckTitle: deck?.title,
+      exact: exact,
     );
   }
 

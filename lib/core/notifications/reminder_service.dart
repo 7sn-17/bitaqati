@@ -141,6 +141,7 @@ class ReminderService {
     required int dueCount,
     String? deckId,
     String? deckTitle,
+    bool exact = false,
   }) async {
     await init();
     try {
@@ -152,7 +153,7 @@ class ReminderService {
       if (await access() != ReminderAccess.granted) {
         return;
       }
-      final AndroidScheduleMode mode = await _scheduleMode();
+      final AndroidScheduleMode mode = await _scheduleMode(exact);
       final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
       for (int index = 0; index < count; index++) {
         tz.TZDateTime when = tz.TZDateTime(
@@ -208,12 +209,19 @@ class ReminderService {
     }
   }
 
-  /// Exact alarms are blocked on Android 14+ until the user allows them, and a
-  /// blocked request must not stop the reminder: an inexact alarm that wakes
-  /// the device from doze still arrives within the hour.
-  Future<AndroidScheduleMode> _scheduleMode() async {
-    final bool exact = await _android?.canScheduleExactNotifications() ?? false;
-    return exact
+  /// Inexact unless the learner asked for punctuality and the system allows it.
+  ///
+  /// An exact alarm wakes the device out of doze; a daily study nudge does not
+  /// need that. Both modes use `allowWhileIdle`, so the reminder still arrives
+  /// on a phone that has been asleep all day — just within the hour rather than
+  /// on the minute.
+  Future<AndroidScheduleMode> _scheduleMode(bool exact) async {
+    if (!exact) {
+      return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+    final bool allowed =
+        await _android?.canScheduleExactNotifications() ?? false;
+    return allowed
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
   }

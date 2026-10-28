@@ -20,7 +20,8 @@ class AudioAttachment extends StatefulWidget {
   State<AudioAttachment> createState() => _AudioAttachmentState();
 }
 
-class _AudioAttachmentState extends State<AudioAttachment> {
+class _AudioAttachmentState extends State<AudioAttachment>
+    with WidgetsBindingObserver {
   /// Enough bars to read as a waveform at chip width, few enough that each one
   /// stays a visible 2-3 px sliver on a small phone.
   static const int _barCount = 26;
@@ -38,6 +39,7 @@ class _AudioAttachmentState extends State<AudioAttachment> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _player = AudioPlayer();
     // ReleaseMode.stop rewinds when the clip ends, so a second tap replays it
     // from the beginning instead of sitting at the end doing nothing.
@@ -65,8 +67,22 @@ class _AudioAttachmentState extends State<AudioAttachment> {
     });
   }
 
+  /// Leaving the app stops the clip.
+  ///
+  /// A voice note is part of a card that is on screen; playing it from the
+  /// background would keep the audio session and the speaker awake for a
+  /// screen the learner cannot see.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed || !_playing) {
+      return;
+    }
+    unawaited(_player.pause());
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     _durationSub?.cancel();
     _stateSub?.cancel();

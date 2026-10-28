@@ -63,7 +63,7 @@ class SettingsScreen extends ConsumerWidget {
     final bool notificationsEnabled = ref.watch(notificationsEnabledProvider);
     final ReminderAccess access =
         ref.watch(reminderAccessProvider).valueOrNull ?? ReminderAccess.denied;
-    final bool exactAlarms = ref.watch(exactAlarmProvider).valueOrNull ?? false;
+    final bool exactReminders = ref.watch(exactRemindersProvider);
     final UpdateInfo? update = ref.watch(updateInfoProvider).valueOrNull;
     final String version =
         ref.watch(appVersionProvider).valueOrNull ?? AppConfig.appVersion;
@@ -245,16 +245,24 @@ class SettingsScreen extends ConsumerWidget {
                       ref.invalidate(reminderAccessProvider);
                     },
                   ),
-                if (notificationsEnabled &&
-                    access == ReminderAccess.granted &&
-                    !exactAlarms)
+                if (notificationsEnabled && access == ReminderAccess.granted)
                   _Row(
                     icon: CupertinoIcons.clock,
-                    title: 'تذكير في الوقت المحدد',
-                    subtitle: 'قد يتأخر التنبيه حتى ساعة بسبب توفير الطاقة. اسمح بالمنبهات الدقيقة.',
+                    title: exactReminders
+                        ? 'تذكير في الوقت المحدد: مفعّل'
+                        : 'تذكير في الوقت المحدد',
+                    subtitle: exactReminders
+                        ? 'يصل التنبيه في الدقيقة التي حدّدتها، مقابل استهلاك '
+                              'أعلى للبطارية. اضغط للإيقاف.'
+                        : 'متوقف — قد يتأخر التنبيه حتى ساعة، وهذا يوفّر '
+                              'البطارية. اضغط للتفعيل.',
                     onTap: () async {
-                      await ReminderService.instance.requestExactAlarms();
-                      ref.invalidate(exactAlarmProvider);
+                      final bool next = !exactReminders;
+                      if (next) {
+                        await ReminderService.instance.requestExactAlarms();
+                        ref.invalidate(exactAlarmProvider);
+                      }
+                      await ref.read(exactRemindersProvider.notifier).set(next);
                       unawaited(
                         ref.read(reminderCoordinatorProvider).refresh(),
                       );
