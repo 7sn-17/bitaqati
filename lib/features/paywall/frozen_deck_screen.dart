@@ -28,7 +28,7 @@ class FrozenDeckScreen extends StatelessWidget {
           'الاشتراك بدل أن تُحذف، وتعود للعمل فور تجديد Pro.',
       action: 'افتحها مع Pro',
       reason:
-          'مجموعة "${deckTitle}" مجمّدة. جدّد Pro لفتحها ومتابعة المراجعة '
+          'مجموعة "$deckTitle" مجمّدة. جدّد Pro لفتحها ومتابعة المراجعة '
           'من حيث توقفت.',
     );
   }
@@ -139,7 +139,7 @@ class _Wall extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      const Icon(
+                      const FaIcon(
                         FontAwesomeIcons.crown,
                         size: 15,
                         color: PaywallInk.white,
@@ -222,7 +222,7 @@ class _LockedMascot extends StatelessWidget {
                 radius: 15,
                 lip: 4,
               ),
-              child: const Icon(
+              child: const FaIcon(
                 FontAwesomeIcons.lock,
                 size: 17,
                 color: PaywallInk.white,

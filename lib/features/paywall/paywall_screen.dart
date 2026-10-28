@@ -1078,7 +1078,9 @@ class _PrimaryButton extends StatelessWidget {
 
   final String label;
   final VoidCallback? onTap;
-  final IconData? icon;
+  // FaIconData, not IconData: font_awesome_flutter 11 ships its own icon type,
+  // and every icon on this screen comes from that set.
+  final FaIconData? icon;
 
   @override
   Widget build(BuildContext context) {

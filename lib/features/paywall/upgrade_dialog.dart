@@ -12,7 +12,7 @@ import 'paywall_screen.dart';
 /// ceiling, and it should look like part of the product rather than an error.
 Future<void> _showUpgrade({
   required BuildContext context,
-  required IconData icon,
+  required FaIconData icon,
   required String title,
   required String message,
   required String reason,

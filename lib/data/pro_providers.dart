@@ -13,7 +13,9 @@ import '../core/auth/auth_providers.dart';
 import '../core/config/app_config.dart';
 import '../core/providers.dart';
 import '../domain/freemium.dart';
+import 'local/app_database.dart';
 import 'profile_providers.dart';
+import 'profile_repository.dart';
 
 /// A stable fingerprint of this phone.
 ///
@@ -44,11 +46,12 @@ final FutureProvider<String> deviceIdProvider = FutureProvider<String>((
       info.device,
       info.fingerprint,
     ].join('|');
-    deviceId = 'and_' + _fnv1a(seed);
+    deviceId = 'and_${_fnv1a(seed)}';
   } catch (_) {
     // Not Android, or the platform channel refused. A random id still gives
     // the account a stable device, it just cannot detect a reinstall.
-    deviceId = 'dev_' + const Uuid().v4().replaceAll('-', '').substring(0, 20);
+    final String fresh = const Uuid().v4().replaceAll('-', '');
+    deviceId = 'dev_${fresh.substring(0, 20)}';
   }
   await prefs.setString(_deviceKey, deviceId);
   return deviceId;

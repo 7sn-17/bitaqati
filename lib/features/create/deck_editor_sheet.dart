@@ -6,7 +6,6 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../data/content_providers.dart';
 import '../../data/pro_providers.dart';
-import '../../domain/freemium.dart';
 import '../../domain/models.dart';
 import '../paywall/upgrade_dialog.dart';
 import 'editor_common.dart';

@@ -679,7 +679,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       ..._frontMedia,
       ..._backMedia,
     ]) {
-      if (item.isImage) {
+      if (item.image) {
         images++;
       } else {
         audio++;
