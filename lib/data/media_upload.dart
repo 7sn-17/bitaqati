@@ -110,7 +110,7 @@ class MediaUploadService {
           .post(
             Uri.parse('${AppConfig.supabaseUrl}/functions/v1/upload-image'),
             headers: <String, String>{
-              'Authorization': 'Bearer ${token}',
+              'Authorization': 'Bearer $token',
               'apikey': AppConfig.supabasePublishableKey,
               'Content-Type': 'application/octet-stream',
               // HTTP headers are Latin-1: an Arabic file name has to be folded
