@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/legal_footer.dart';
 import '../legal/privacy_policy_screen.dart';
@@ -29,7 +28,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   static const List<_OnboardingPage> _pages = <_OnboardingPage>[
     _OnboardingPage(
       title: 'راجع أقل، تذكّر أكثر',
-      body: 'بطاقاتي يستخدم التكرار المتباعد ليعرض لك البطاقة المناسبة في '
+      body:
+          'بطاقاتي يستخدم التكرار المتباعد ليعرض لك البطاقة المناسبة في '
           'الوقت المناسب، لا أكثر ولا أقل.',
       scene: 0,
       chips: <_ChipSpec>[
@@ -40,7 +40,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ),
     _OnboardingPage(
       title: 'أنشئ بطاقات بطريقتك',
-      body: 'اختر بطاقة أساسية أو ملء فراغ أو تغطية صورة، وأضف التنسيق '
+      body:
+          'اختر بطاقة أساسية أو ملء فراغ أو تغطية صورة، وأضف التنسيق '
           'والوسوم والتلميحات قبل الحفظ.',
       scene: 1,
       chips: <_ChipSpec>[
@@ -51,7 +52,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ),
     _OnboardingPage(
       title: 'مكتبة من المتعلّمين',
-      body: 'اكتشف مجموعات جاهزة في العلوم واللغات والتاريخ والمهارات '
+      body:
+          'اكتشف مجموعات جاهزة في العلوم واللغات والتاريخ والمهارات '
           'وأي مجال تريد إتقانه، ثم أضف ما يناسبك إلى مساحتك.',
       scene: 2,
       chips: <_ChipSpec>[
@@ -92,11 +94,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final bool? wants = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialog) => AlertDialog(
-        icon: const Icon(
-          CupertinoIcons.bell,
-          color: AppColors.accent,
-          size: 30,
-        ),
+        icon: Icon(CupertinoIcons.bell, color: context.accent, size: 30),
         title: const Text('تذكير لطيف كل يوم؟'),
         content: const Text(
           'سنرسل تنبيهات قصيرة في أوقات محددة عندما تكون لديك بطاقات '
@@ -113,8 +111,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           FilledButton(
             onPressed: () => Navigator.of(dialog).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accent,
-              foregroundColor: AppColors.primary,
+              backgroundColor: context.accent,
+              foregroundColor: context.onAccent,
             ),
             child: const Text('تفعيل التذكير'),
           ),
@@ -166,12 +164,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ),
                   const Spacer(),
                   if (!isLast)
-                    TextButton(
-                      onPressed: _finish,
-                      child: const Text('تخطي'),
-                    ).animate().fadeIn(
-                      delay: const Duration(milliseconds: 400),
-                    ),
+                    TextButton(onPressed: _finish, child: const Text('تخطي'))
+                        .animate()
+                        .fadeIn(delay: const Duration(milliseconds: 400)),
                 ],
               ),
               Expanded(
@@ -208,21 +203,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
               const SizedBox(height: 18),
               SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    if (isLast) {
-                      _finish();
-                    } else {
-                      _controller.nextPage(
-                        duration: const Duration(milliseconds: 420),
-                        curve: Curves.easeOutCubic,
-                      );
-                    }
-                  },
-                  child: Text(isLast ? 'ابدأ الآن' : 'التالي'),
-                ),
-              )
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        if (isLast) {
+                          _finish();
+                        } else {
+                          _controller.nextPage(
+                            duration: const Duration(milliseconds: 420),
+                            curve: Curves.easeOutCubic,
+                          );
+                        }
+                      },
+                      child: Text(isLast ? 'ابدأ الآن' : 'التالي'),
+                    ),
+                  )
                   .animate()
                   .fadeIn(duration: const Duration(milliseconds: 320))
                   .slideY(begin: 0.35, end: 0, curve: Curves.easeOutCubic),
@@ -257,10 +252,10 @@ class _PageContent extends StatelessWidget {
           _AnimatedIllustration(page: page),
           const SizedBox(height: 26),
           Text(
-            page.title,
-            textAlign: TextAlign.center,
-            style: context.texts.displaySmall,
-          )
+                page.title,
+                textAlign: TextAlign.center,
+                style: context.texts.displaySmall,
+              )
               .animate()
               .fadeIn(
                 delay: const Duration(milliseconds: 180),
@@ -269,16 +264,16 @@ class _PageContent extends StatelessWidget {
               .slideY(begin: 0.22, end: 0, curve: Curves.easeOutCubic),
           const SizedBox(height: 12),
           ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 330),
-            child: Text(
-              page.body,
-              textAlign: TextAlign.center,
-              style: context.texts.bodyLarge?.copyWith(
-                color: context.texts.bodySmall?.color,
-                height: 1.85,
-              ),
-            ),
-          )
+                constraints: const BoxConstraints(maxWidth: 330),
+                child: Text(
+                  page.body,
+                  textAlign: TextAlign.center,
+                  style: context.texts.bodyLarge?.copyWith(
+                    color: context.texts.bodySmall?.color,
+                    height: 1.85,
+                  ),
+                ),
+              )
               .animate()
               .fadeIn(
                 delay: const Duration(milliseconds: 320),
@@ -386,35 +381,35 @@ class _AnimatedIllustrationState extends State<_AnimatedIllustration>
           ),
           // The illustration itself.
           AnimatedBuilder(
-            animation: _float,
-            builder: (BuildContext context, Widget? child) {
-              final double t = Curves.easeInOut.transform(_float.value);
-              return Transform.translate(
-                offset: Offset(0, -6 + 12 * t),
-                child: child,
-              );
-            },
-            child: Container(
-              width: 250,
-              height: 214,
-              decoration: BoxDecoration(
-                color: context.cardSurface,
-                borderRadius: BorderRadius.circular(40),
-                border: Border.all(color: context.hairline),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: context.isDark ? 0.42 : 0.06,
-                    ),
-                    blurRadius: 28,
-                    offset: const Offset(0, 14),
+                animation: _float,
+                builder: (BuildContext context, Widget? child) {
+                  final double t = Curves.easeInOut.transform(_float.value);
+                  return Transform.translate(
+                    offset: Offset(0, -6 + 12 * t),
+                    child: child,
+                  );
+                },
+                child: Container(
+                  width: 250,
+                  height: 214,
+                  decoration: BoxDecoration(
+                    color: context.cardSurface,
+                    borderRadius: BorderRadius.circular(40),
+                    border: Border.all(color: context.hairline),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: context.isDark ? 0.42 : 0.06,
+                        ),
+                        blurRadius: 28,
+                        offset: const Offset(0, 14),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16),
-              child: OnboardingScene(index: widget.page.scene),
-            ),
-          )
+                  padding: const EdgeInsets.all(16),
+                  child: OnboardingScene(index: widget.page.scene),
+                ),
+              )
               .animate()
               .scale(
                 begin: const Offset(0.82, 0.82),
@@ -425,10 +420,7 @@ class _AnimatedIllustrationState extends State<_AnimatedIllustration>
               .fadeIn(duration: const Duration(milliseconds: 320)),
           // Floating chips.
           for (int index = 0; index < widget.page.chips.length; index++)
-            _FloatingChip(
-              spec: widget.page.chips[index],
-              fromLeft: index == 0,
-            ),
+            _FloatingChip(spec: widget.page.chips[index], fromLeft: index == 0),
           if (widget.page.arrows)
             for (int index = 0; index < 2; index++)
               _DriftingArrow(index: index, animation: _orbit),
@@ -447,53 +439,54 @@ class _FloatingChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment(
-        spec.alignmentX * 2 - 1,
-        spec.alignmentY * 2 - 1,
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-        decoration: BoxDecoration(
-          color: context.cardSurface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.hairline),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: context.isDark ? 0.4 : 0.08,
+      alignment: Alignment(spec.alignmentX * 2 - 1, spec.alignmentY * 2 - 1),
+      child:
+          Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: context.cardSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.hairline),
+                  boxShadow: <BoxShadow>[
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: context.isDark ? 0.4 : 0.08,
+                      ),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(spec.icon, size: 14, color: context.brandInk),
+                    const SizedBox(width: 6),
+                    Text(
+                      spec.label,
+                      style: context.texts.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: context.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              .animate()
+              .fadeIn(
+                delay: const Duration(milliseconds: 520),
+                duration: const Duration(milliseconds: 380),
+              )
+              .slideX(
+                begin: fromLeft ? -0.8 : 0.8,
+                end: 0,
+                delay: const Duration(milliseconds: 520),
+                duration: const Duration(milliseconds: 460),
+                curve: Curves.easeOutBack,
               ),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(spec.icon, size: 14, color: context.brandInk),
-            const SizedBox(width: 6),
-            Text(
-              spec.label,
-              style: context.texts.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.ink,
-              ),
-            ),
-          ],
-        ),
-      )
-          .animate()
-          .fadeIn(
-            delay: const Duration(milliseconds: 520),
-            duration: const Duration(milliseconds: 380),
-          )
-          .slideX(
-            begin: fromLeft ? -0.8 : 0.8,
-            end: 0,
-            delay: const Duration(milliseconds: 520),
-            duration: const Duration(milliseconds: 460),
-            curve: Curves.easeOutBack,
-          ),
     );
   }
 }

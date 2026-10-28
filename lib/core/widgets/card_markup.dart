@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'audio_playback.dart';
 
@@ -925,9 +924,7 @@ class _OcclusionMask extends StatelessWidget {
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            color: context.isDark
-                ? AppColors.darkSurfaceHigh
-                : AppColors.primary,
+            color: context.isDark ? context.raisedSurface : context.primary,
             border: Border.all(
               color: context.brandInk.withValues(alpha: 0.55),
               width: 1.4,
@@ -938,7 +935,7 @@ class _OcclusionMask extends StatelessWidget {
             child: Icon(
               Icons.question_mark_rounded,
               size: 18,
-              color: context.isDark ? AppColors.darkAccent : AppColors.accent,
+              color: context.isDark ? context.brandInk : context.accent,
             ),
           ),
         ),
@@ -948,9 +945,9 @@ class _OcclusionMask extends StatelessWidget {
     final bool hasAnswer = box.answer.trim().isNotEmpty;
     final Widget face = Container(
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.accent, width: 1.8),
+        border: Border.all(color: context.accent, width: 1.8),
         borderRadius: BorderRadius.circular(6),
-        color: AppColors.accent.withValues(alpha: 0.12),
+        color: context.accent.withValues(alpha: 0.12),
       ),
       padding: const EdgeInsets.all(3),
       alignment: Alignment.center,
@@ -962,9 +959,7 @@ class _OcclusionMask extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: context.isDark
-                      ? AppColors.darkAnswerSurface
-                      : Colors.white,
+                  color: context.isDark ? context.answerSurface : Colors.white,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -973,9 +968,7 @@ class _OcclusionMask extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: context.isDark
-                        ? AppColors.darkInk
-                        : AppColors.primary,
+                    color: context.isDark ? context.ink : context.primary,
                   ),
                 ),
               ),
@@ -1011,9 +1004,9 @@ class _OcclusionMask extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 230),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: context.isDark ? AppColors.darkAnswerSurface : Colors.white,
+        color: context.isDark ? context.answerSurface : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.accent, width: 1.2),
+        border: Border.all(color: context.accent, width: 1.2),
         boxShadow: <BoxShadow>[
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -1032,7 +1025,7 @@ class _OcclusionMask extends StatelessWidget {
           fontSize: 12.5,
           fontWeight: FontWeight.w700,
           height: 1.5,
-          color: context.isDark ? AppColors.darkInk : AppColors.primary,
+          color: context.isDark ? context.ink : context.primary,
         ),
       ),
     );

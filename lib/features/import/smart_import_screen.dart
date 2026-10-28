@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/surface_card.dart';
@@ -387,7 +386,7 @@ class _EditorBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: context.isDark ? AppColors.darkSurface : Colors.white,
+        color: context.cardSurface,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: context.colors.outlineVariant),
       ),
@@ -462,7 +461,7 @@ class _BoxAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color muted = context.texts.bodySmall?.color ?? AppColors.muted;
+    final Color muted = context.texts.bodySmall?.color ?? context.muted;
     final Color color = onTap == null
         ? muted.withValues(alpha: 0.4)
         : context.brandInk;
@@ -590,14 +589,14 @@ class _FormatCard extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: AppColors.accent,
+                  color: context.accent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   CupertinoIcons.sparkles,
                   size: 17,
-                  color: AppColors.primary,
+                  color: context.primary,
                 ),
               ),
               const SizedBox(width: 10),
@@ -647,7 +646,7 @@ class _FormatRow extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: context.isDark ? AppColors.darkSurfaceHigh : AppColors.canvas,
+          color: context.isDark ? context.raisedSurface : context.canvas,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -686,25 +685,25 @@ class _PreviewHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
-              color: AppColors.warning,
+              color: context.warningSurface,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: <Widget>[
-                const Icon(
+                Icon(
                   CupertinoIcons.exclamationmark_triangle,
                   size: 14,
-                  color: AppColors.warningInk,
+                  color: context.warningInk,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'تم تجاهل $skipped سطراً: لا يحتوي على | أو ينقصه أحد الطرفين.',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'IBMPlexSansArabic',
                       fontSize: 11.5,
                       height: 1.7,
-                      color: AppColors.warningInk,
+                      color: context.warningInk,
                     ),
                   ),
                 ),
@@ -732,7 +731,7 @@ class _DraftTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color muted = context.texts.bodySmall?.color ?? AppColors.muted;
+    final Color muted = context.texts.bodySmall?.color ?? context.muted;
     return SurfaceCard(
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
@@ -745,8 +744,8 @@ class _DraftTile extends StatelessWidget {
             margin: const EdgeInsets.only(top: 2, left: 8),
             decoration: BoxDecoration(
               color: context.isDark
-                  ? AppColors.darkSurfaceHigh
-                  : AppColors.accentSoft,
+                  ? context.raisedSurface
+                  : context.accentSoft,
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
@@ -756,9 +755,7 @@ class _DraftTile extends StatelessWidget {
                 fontFamily: 'ReadexPro',
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: context.isDark
-                    ? AppColors.darkAccent
-                    : AppColors.primary,
+                color: context.isDark ? context.brandInk : context.primary,
               ),
             ),
           ),
@@ -833,11 +830,11 @@ class _MiniChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color muted = context.texts.bodySmall?.color ?? AppColors.muted;
+    final Color muted = context.texts.bodySmall?.color ?? context.muted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: context.isDark ? AppColors.darkSurfaceHigh : AppColors.canvas,
+        color: context.isDark ? context.raisedSurface : context.canvas,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -956,8 +953,8 @@ class _HelpDialog extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: context.isDark
-                      ? AppColors.darkSurfaceHigh
-                      : AppColors.canvas,
+                      ? context.raisedSurface
+                      : context.canvas,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: context.hairline),
                 ),

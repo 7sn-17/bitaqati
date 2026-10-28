@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 
@@ -37,7 +36,7 @@ class DeveloperInfoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool dark = context.isDark;
-    final Color muted = dark ? AppColors.darkMuted : AppColors.muted;
+    final Color muted = dark ? context.muted : context.muted;
 
     return Scaffold(
       body: SafeArea(
@@ -50,10 +49,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                 _BackButton(onTap: () => Navigator.of(context).maybePop()),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    'المطور',
-                    style: context.texts.headlineMedium,
-                  ),
+                  child: Text('المطور', style: context.texts.headlineMedium),
                 ),
               ],
             ),
@@ -66,7 +62,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                 fontFamily: 'ReadexPro',
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: dark ? AppColors.darkInk : AppColors.ink,
+                color: dark ? context.ink : context.ink,
               ),
             ),
             const SizedBox(height: 4),
@@ -79,7 +75,7 @@ class DeveloperInfoScreen extends StatelessWidget {
               icon: FontAwesomeIcons.envelope,
               label: 'البريد الإلكتروني',
               value: _email,
-              tint: AppColors.blue,
+              tint: context.info,
               onTap: () => _open(context, 'mailto:$_email'),
             ),
             _ContactCard(
@@ -142,11 +138,7 @@ class DeveloperInfoScreen extends StatelessWidget {
 }
 
 class _Hero extends StatelessWidget {
-  const _Hero({
-    required this.name,
-    required this.role,
-    required this.photo,
-  });
+  const _Hero({required this.name, required this.role, required this.photo});
 
   final String name;
   final String role;
@@ -157,8 +149,8 @@ class _Hero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: <Color>[AppColors.primary, AppColors.primaryDeep],
+        gradient: LinearGradient(
+          colors: <Color>[context.primary, context.primaryDeep],
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
         ),
@@ -186,10 +178,10 @@ class _Hero extends StatelessWidget {
             ),
             child: Text(
               role,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'IBMPlexSansArabic',
                 fontSize: 12,
-                color: AppColors.accent,
+                color: context.accent,
               ),
             ),
           ),
@@ -227,7 +219,7 @@ class _ContactCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: dark ? AppColors.darkSurface : AppColors.surface,
+        color: dark ? context.cardSurface : context.raisedSurface,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
           onTap: onTap,
@@ -253,7 +245,7 @@ class _ContactCard extends StatelessWidget {
                           fontFamily: 'ReadexPro',
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
-                          color: dark ? AppColors.darkInk : AppColors.ink,
+                          color: dark ? context.ink : context.ink,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -265,7 +257,7 @@ class _ContactCard extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: 'IBMPlexSansArabic',
                           fontSize: 12.5,
-                          color: dark ? AppColors.darkMuted : AppColors.muted,
+                          color: dark ? context.muted : context.muted,
                         ),
                       ),
                     ],
@@ -274,7 +266,7 @@ class _ContactCard extends StatelessWidget {
                 Icon(
                   CupertinoIcons.arrow_up_right,
                   size: 16,
-                  color: dark ? AppColors.darkMuted : AppColors.muted,
+                  color: dark ? context.muted : context.muted,
                 ),
               ],
             ),
@@ -302,14 +294,14 @@ class _BackButton extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurfaceHigh : AppColors.surface,
+            color: context.raisedSurface,
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
           child: Icon(
             CupertinoIcons.chevron_forward,
             size: 18,
-            color: context.isDark ? AppColors.darkInk : AppColors.ink,
+            color: context.ink,
           ),
         ),
       ),
@@ -333,14 +325,14 @@ class _Avatar extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: <Color>[AppColors.accent, Color(0xFF63C13A)],
+          colors: <Color>[context.accent, context.accentDeep],
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.38),
+            color: context.accent.withValues(alpha: 0.38),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -353,25 +345,25 @@ class _Avatar extends StatelessWidget {
           memCacheWidth: 276,
           maxWidthDiskCache: 276,
           fadeInDuration: const Duration(milliseconds: 260),
-          placeholder: (BuildContext context, String url) => _fallback(),
-          errorWidget:
-              (BuildContext context, String url, Object error) => _fallback(),
+          placeholder: (BuildContext context, String url) => _fallback(context),
+          errorWidget: (BuildContext context, String url, Object error) =>
+              _fallback(context),
         ),
       ),
     );
   }
 
-  Widget _fallback() {
+  Widget _fallback(BuildContext context) {
     return Container(
-      color: AppColors.accent,
+      color: context.accent,
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'ReadexPro',
           fontSize: 34,
           fontWeight: FontWeight.w700,
-          color: AppColors.primary,
+          color: context.primary,
         ),
       ),
     );

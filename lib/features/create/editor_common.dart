@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Splits "a, b، c" into clean tags. Accepts Latin and Arabic commas.
@@ -16,7 +15,7 @@ List<String> parseTags(String raw) {
 /// Fill used by inputs inside editor sheets. Darker than the sheet itself so
 /// fields stay visible in both themes.
 Color editorFieldFill(BuildContext context) {
-  return context.isDark ? AppColors.darkCanvas : AppColors.surface;
+  return context.isDark ? context.canvas : context.raisedSurface;
 }
 
 InputDecoration editorDecoration(
@@ -46,11 +45,11 @@ InputDecoration editorDecoration(
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: radius,
-      borderSide: const BorderSide(color: AppColors.danger, width: 1.2),
+      borderSide: BorderSide(color: context.danger, width: 1.2),
     ),
     focusedErrorBorder: OutlineInputBorder(
       borderRadius: radius,
-      borderSide: const BorderSide(color: AppColors.danger, width: 1.2),
+      borderSide: BorderSide(color: context.danger, width: 1.2),
     ),
   );
 }
@@ -97,9 +96,7 @@ class EditorSheetFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color surface = context.isDark
-        ? AppColors.darkSurfaceHigh
-        : Colors.white;
+    final Color surface = context.raisedSurface;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(

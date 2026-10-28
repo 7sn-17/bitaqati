@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/content_providers.dart';
 import '../../domain/models.dart';
 
 /// The four ways a learner can spend a session on a deck.
@@ -28,6 +28,11 @@ Future<StudyMode?> showStudyModeSheet(
     barrierColor: Colors.black.withValues(alpha: 0.58),
     isScrollControlled: true,
     useSafeArea: true,
+    // The floating tab bar lives in the shell's Stack, and the shell's
+    // navigator sits above this sheet: without the root navigator the bar
+    // paints over the sheet and hides the last mode. On the root navigator the
+    // sheet and its scrim cover the whole screen, which is what a modal is.
+    useRootNavigator: true,
     builder: (BuildContext context) => _StudyModeSheet(
       deckTitle: deckTitle,
       cardCount: cardCount,
@@ -36,31 +41,84 @@ Future<StudyMode?> showStudyModeSheet(
   );
 }
 
+/// What a session will study: one deck, or everything.
+///
+/// The two cases share every line of routing below, which is the point — the
+/// global queue is not a second study engine, it is the same one with a wider
+/// scope id.
+@immutable
+class StudyTarget {
+  const StudyTarget({
+    required this.scope,
+    required this.title,
+    required this.cardCount,
+    required this.dueCount,
+  });
+
+  StudyTarget.deck(DeckNode deck)
+    : this(
+        scope: deck.id,
+        title: deck.title,
+        cardCount: deck.cardCount,
+        dueCount: deck.dueCount,
+      );
+
+  /// Every deck at once, with the totals the home hero already shows.
+  StudyTarget.everything({required int cardCount, required int dueCount})
+    : this(
+        scope: kAllDecksScope,
+        title: 'جميع المجموعات',
+        cardCount: cardCount,
+        dueCount: dueCount,
+      );
+
+  final String scope;
+  final String title;
+  final int cardCount;
+  final int dueCount;
+}
+
 /// Asks which mode to study [deck] in, then opens it.
 ///
 /// Every "start studying" button in the app goes through here — the deck
 /// screen, the home hero and the progress tab. Home used to push the flashcard
 /// route directly, so the other three modes were only reachable from inside a
 /// deck.
-Future<void> openStudyMode(BuildContext context, DeckNode deck) async {
+Future<void> openStudyMode(BuildContext context, DeckNode deck) {
+  return openStudyTarget(context, StudyTarget.deck(deck));
+}
+
+/// Studies every due card in the library, whichever deck it lives in.
+Future<void> openGlobalStudy(
+  BuildContext context, {
+  required int cardCount,
+  required int dueCount,
+}) {
+  return openStudyTarget(
+    context,
+    StudyTarget.everything(cardCount: cardCount, dueCount: dueCount),
+  );
+}
+
+Future<void> openStudyTarget(BuildContext context, StudyTarget target) async {
   final StudyMode? mode = await showStudyModeSheet(
     context,
-    deckTitle: deck.title,
-    cardCount: deck.cardCount,
-    dueCount: deck.dueCount,
+    deckTitle: target.title,
+    cardCount: target.cardCount,
+    dueCount: target.dueCount,
   );
   if (mode == null || !context.mounted) {
     return;
   }
   switch (mode) {
     case StudyMode.review:
-      await context.push('/review/${deck.id}');
+      await context.push('/review/${target.scope}');
     case StudyMode.test:
-      await context.push('/test/${deck.id}');
+      await context.push('/test/${target.scope}');
     case StudyMode.match:
-      await context.push('/match/${deck.id}');
+      await context.push('/match/${target.scope}');
     case StudyMode.write:
-      await context.push('/write/${deck.id}');
+      await context.push('/write/${target.scope}');
   }
 }
 
@@ -134,8 +192,8 @@ class _StudyModeSheet extends StatelessWidget {
                   icon: CupertinoIcons.rectangle_on_rectangle_angled,
                   title: 'المراجعة',
                   subtitle: _reviewSubtitle(),
-                  tint: AppColors.primary,
-                  accent: AppColors.accent,
+                  tint: context.primary,
+                  accent: context.accent,
                   enabled: _canReview,
                   badge: _canReview ? '$dueCount مستحقة' : null,
                   delay: 60,
@@ -148,8 +206,8 @@ class _StudyModeSheet extends StatelessWidget {
                   subtitle: _playSubtitle(
                     'اختبر معلوماتك من خلال أسئلة اختيار من متعدد.',
                   ),
-                  tint: AppColors.blue,
-                  accent: const Color(0xFF8FD3F4),
+                  tint: context.info,
+                  accent: Color.lerp(context.info, context.cardSurface, 0.72)!,
                   enabled: _canPlay,
                   badge: null,
                   delay: 140,
@@ -162,8 +220,12 @@ class _StudyModeSheet extends StatelessWidget {
                   subtitle: _playSubtitle(
                     'لعبة سريعة لمطابقة السؤال بالإجابة، وتحدي الوقت.',
                   ),
-                  tint: AppColors.danger,
-                  accent: const Color(0xFFFFC0A8),
+                  tint: context.danger,
+                  accent: Color.lerp(
+                    context.danger,
+                    context.cardSurface,
+                    0.72,
+                  )!,
                   enabled: _canPlay,
                   badge: null,
                   delay: 220,
@@ -176,8 +238,12 @@ class _StudyModeSheet extends StatelessWidget {
                   subtitle: _canWrite
                       ? 'اكتب الإجابة بنفسك لاختبار حفظك الحقيقي.'
                       : 'تحتاج بطاقة واحدة على الأقل في هذه المجموعة.',
-                  tint: const Color(0xFF6B5B95),
-                  accent: const Color(0xFFD5C7EE),
+                  tint: context.primary,
+                  accent: Color.lerp(
+                    context.primary,
+                    context.cardSurface,
+                    0.72,
+                  )!,
                   enabled: _canWrite,
                   badge: null,
                   delay: 300,
@@ -216,24 +282,24 @@ class _SheetHeader extends StatelessWidget {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topRight,
               end: Alignment.bottomLeft,
-              colors: <Color>[AppColors.accent, Color(0xFF63C13A)],
+              colors: <Color>[context.accent, context.accentDeep],
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.42),
+                color: context.accent.withValues(alpha: 0.42),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             CupertinoIcons.sparkles,
             size: 22,
-            color: AppColors.primary,
+            color: context.primary,
           ),
         ),
         const SizedBox(width: 12),

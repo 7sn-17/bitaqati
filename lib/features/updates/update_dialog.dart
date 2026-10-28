@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/updates/update_providers.dart';
 import '../../core/updates/update_service.dart';
@@ -196,7 +195,7 @@ class _GlowFrameState extends State<_GlowFrame>
 
   @override
   Widget build(BuildContext context) {
-    final Color surface = context.isDark ? AppColors.darkSurface : Colors.white;
+    final Color surface = context.cardSurface;
     return AnimatedBuilder(
       animation: _glow,
       builder: (BuildContext context, Widget? child) {
@@ -204,25 +203,24 @@ class _GlowFrameState extends State<_GlowFrame>
         return Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(32),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                Color(0xFF9FE870),
-                Color(0xFF4ADE80),
-                Color(0xFF38BDF8),
-                Color(0xFF9FE870),
+                context.accent,
+                context.info,
+                context.accentDeep,
+                context.accent,
               ],
             ),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.14 + 0.18 * t),
+                color: context.accent.withValues(alpha: 0.14 + 0.18 * t),
                 blurRadius: 30 + 16 * t,
                 spreadRadius: -4,
               ),
               BoxShadow(
-                color: const Color(0xFF38BDF8)
-                    .withValues(alpha: 0.08 + 0.1 * t),
+                color: context.info.withValues(alpha: 0.08 + 0.1 * t),
                 blurRadius: 44,
                 spreadRadius: -12,
                 offset: const Offset(0, 14),
@@ -289,8 +287,8 @@ class _RocketState extends State<_Rocket> with SingleTickerProviderStateMixin {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: <Color>[
-                      AppColors.accent.withValues(alpha: 0.30 - 0.10 * t),
-                      AppColors.accent.withValues(alpha: 0),
+                      context.accent.withValues(alpha: 0.30 - 0.10 * t),
+                      context.accent.withValues(alpha: 0),
                     ],
                   ),
                 ),
@@ -304,14 +302,14 @@ class _RocketState extends State<_Rocket> with SingleTickerProviderStateMixin {
           height: 78,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: <Color>[Color(0xFFB6F58C), Color(0xFF4ADE80)],
+              colors: <Color>[context.accent, context.accentDeep],
             ),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.45),
+                color: context.accent.withValues(alpha: 0.45),
                 blurRadius: 22,
                 spreadRadius: -2,
                 offset: const Offset(0, 8),
@@ -319,10 +317,10 @@ class _RocketState extends State<_Rocket> with SingleTickerProviderStateMixin {
             ],
           ),
           alignment: Alignment.center,
-          child: const Icon(
+          child: Icon(
             Icons.rocket_launch_rounded,
             size: 36,
-            color: AppColors.primary,
+            color: context.primary,
           ),
         ),
       ),
@@ -382,7 +380,7 @@ class _VersionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color fill = highlighted
         ? context.selectedFill
-        : (context.isDark ? AppColors.darkSurfaceHigh : AppColors.surface);
+        : (context.raisedSurface);
     final Color ink = highlighted ? context.onSoftAccent : context.muted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -390,7 +388,7 @@ class _VersionChip extends StatelessWidget {
         color: fill,
         borderRadius: BorderRadius.circular(999),
         border: highlighted
-            ? Border.all(color: AppColors.accent.withValues(alpha: 0.7))
+            ? Border.all(color: context.accent.withValues(alpha: 0.7))
             : null,
       ),
       child: Text(
@@ -422,8 +420,8 @@ class _Notes extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(15, 13, 15, 15),
       decoration: BoxDecoration(
         color: context.isDark
-            ? AppColors.darkSurfaceHigh.withValues(alpha: 0.55)
-            : AppColors.canvas,
+            ? context.raisedSurface.withValues(alpha: 0.55)
+            : context.canvas,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: context.hairline),
       ),
@@ -433,11 +431,7 @@ class _Notes extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Icon(
-                Icons.auto_awesome_rounded,
-                size: 15,
-                color: AppColors.accent,
-              ),
+              Icon(Icons.auto_awesome_rounded, size: 15, color: context.accent),
               const SizedBox(width: 7),
               Text(
                 'ما الجديد',
@@ -536,11 +530,11 @@ class _PrimaryButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: Ink(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
-                colors: <Color>[Color(0xFFB6F58C), Color(0xFF4ADE80)],
+                colors: <Color>[context.accent, context.accentDeep],
               ),
             ),
             child: InkWell(
@@ -551,11 +545,11 @@ class _PrimaryButton extends StatelessWidget {
                 child: Center(
                   child: Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'ReadexPro',
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: context.primary,
                     ),
                   ),
                 ),

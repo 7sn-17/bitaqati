@@ -1,7 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/image_viewer.dart';
@@ -208,9 +207,9 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                           child: IgnorePointer(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: AppColors.accent.withValues(alpha: 0.28),
+                                color: context.accent.withValues(alpha: 0.28),
                                 border: Border.all(
-                                  color: AppColors.accent,
+                                  color: context.accent,
                                   width: 1.4,
                                 ),
                                 borderRadius: BorderRadius.circular(6),
@@ -404,9 +403,9 @@ class _BoxOverlayState extends State<_BoxOverlay> {
               height: 13,
               margin: const EdgeInsets.all(1),
               decoration: BoxDecoration(
-                color: AppColors.accent,
+                color: context.accent,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary, width: 1.4),
+                border: Border.all(color: context.primary, width: 1.4),
               ),
             ),
           ),
@@ -435,11 +434,11 @@ class _BoxOverlayState extends State<_BoxOverlay> {
               onPanCancel: () => setState(() => _grip = null),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.72),
+                  color: context.primary.withValues(alpha: 0.72),
                   border: Border.all(
                     color: active
-                        ? AppColors.accent
-                        : AppColors.accent.withValues(alpha: 0.7),
+                        ? context.accent
+                        : context.accent.withValues(alpha: 0.7),
                     width: active ? 2.4 : 1.6,
                   ),
                   borderRadius: BorderRadius.circular(6),
@@ -447,8 +446,8 @@ class _BoxOverlayState extends State<_BoxOverlay> {
                 alignment: Alignment.center,
                 child: Text(
                   (widget.index + 1).toString(),
-                  style: const TextStyle(
-                    color: AppColors.accent,
+                  style: TextStyle(
+                    color: context.accent,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),

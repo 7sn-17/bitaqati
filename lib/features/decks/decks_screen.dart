@@ -49,72 +49,72 @@ class _DecksScreenState extends ConsumerState<DecksScreen> {
         slivers: <Widget>[
           SliverList.list(
             children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text('مجموعاتي', style: context.texts.headlineLarge),
-                      const SizedBox(height: 2),
-                      Text(
-                        'كل ما تدرسه، منظّم في مكان واحد',
-                        style: context.texts.bodySmall,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('مجموعاتي', style: context.texts.headlineLarge),
+                          const SizedBox(height: 2),
+                          Text(
+                            'كل ما تدرسه، منظّم في مكان واحد',
+                            style: context.texts.bodySmall,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: context.colors.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${allDecks.length} مجموعات',
-                    style: context.texts.labelMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: TextField(
-              controller: _search,
-              onChanged: (_) => setState(() {}),
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'ابحث في المجموعات والبطاقات',
-                prefixIcon: const Icon(CupertinoIcons.search, size: 19),
-                suffixIcon: query.isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () {
-                          _search.clear();
-                          setState(() {});
-                        },
-                        icon: const Icon(CupertinoIcons.xmark_circle_fill),
-                        iconSize: 18,
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
                       ),
+                      decoration: BoxDecoration(
+                        color: context.colors.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${allDecks.length} مجموعات',
+                        style: context.texts.labelMedium,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          TagFilterBar(
-            tags: ref.watch(deckTagsProvider),
-            selected: selected,
-            onChanged: (String? value) {
-              ref.read(selectedTagProvider.notifier).state = value;
-            },
-          ),
-          const SizedBox(height: 18),
+              const SizedBox(height: 18),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: TextField(
+                  controller: _search,
+                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.search,
+                  decoration: InputDecoration(
+                    hintText: 'ابحث في المجموعات والبطاقات',
+                    prefixIcon: const Icon(CupertinoIcons.search, size: 19),
+                    suffixIcon: query.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              _search.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(CupertinoIcons.xmark_circle_fill),
+                            iconSize: 18,
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TagFilterBar(
+                tags: ref.watch(deckTagsProvider),
+                selected: selected,
+                onChanged: (String? value) {
+                  ref.read(selectedTagProvider.notifier).state = value;
+                },
+              ),
+              const SizedBox(height: 18),
             ],
           ),
           if (decks.isEmpty)

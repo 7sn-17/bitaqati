@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Where a new voice note comes from.
@@ -76,7 +75,7 @@ class _AudioSourceSheet extends StatelessWidget {
                 icon: CupertinoIcons.mic_fill,
                 title: 'تسجيل صوتي جديد',
                 subtitle: 'اقرأ الإجابة بصوتك، وستُرفق بالبطاقة.',
-                tint: AppColors.danger,
+                tint: context.danger,
                 onTap: () =>
                     Navigator.of(context).pop(AudioSourceChoice.record),
               ),
@@ -85,7 +84,7 @@ class _AudioSourceSheet extends StatelessWidget {
                 icon: CupertinoIcons.folder,
                 title: 'اختيار من الملفات',
                 subtitle: 'ملف mp3 أو m4a أو wav من ذاكرة الجهاز.',
-                tint: AppColors.blue,
+                tint: context.info,
                 onTap: () => Navigator.of(context).pop(AudioSourceChoice.file),
               ),
             ],

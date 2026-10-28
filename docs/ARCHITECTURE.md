@@ -699,6 +699,57 @@ be a hard-coded paragraph listing every APK by name, so the first thing a user
 read about a new version was `bitaqati-v1.1.0-arm64-v8a.apk`. Keep each bullet
 to one line — the dialog strips markdown but does not reflow wrapped lines.
 
+## Theming
+
+The app ships four identities - Forest, Ocean, Sunset, Classic - and a single
+class owns all of them: `ThemePalette`, a `ThemeExtension` attached to the
+`ThemeData` in `AppTheme.build(id, brightness)`.
+
+A widget never names a colour. It asks the palette for a **role**: `canvas`,
+`cardSurface`, `raisedSurface`, `ink`, `muted`, `hairline`, `primary`,
+`primaryDeep`, `accent`, `onAccent`, `brandInk`, `softAccent`, `selectedFill`,
+`danger`, `onDanger`, `warningSurface`, `info`, `star`, `success`,
+`answerSurface`, `onAnswer`. `AppThemeContext` exposes each of them on
+`BuildContext`, so a screen reads `context.accent` and gets the highlight of
+whichever identity is active. There is no `AppColors` any more; the file was
+deleted and every reference migrated, because a global constant is exactly what
+makes a palette switch cosmetic.
+
+**Readability is computed, not chosen.** `ThemePalette.build` takes the
+designer's seed for every token and then walks each text colour toward black or
+white until it clears WCAG AA (4.5:1) against the surface it will sit on - 9:1
+for body ink. A palette with an unreadable pair cannot be constructed, which is
+why adding a fifth identity later only means supplying seeds.
+
+**Forest is frozen.** Its seeds are the exact hex values the app shipped with,
+and the contrast pass is a no-op on them, so an existing learner sees no change
+at all.
+
+**Switching animates.** The choice lives in `themePaletteProvider`, persisted by
+name in SharedPreferences (an unknown name falls back to Forest). `ThemeData`
+cross-fades the extension through `ThemePalette.lerp`, which mixes every token,
+so tapping a swatch dissolves the whole screen into the new identity instead of
+snapping.
+
+**Painters take colours as parameters.** `CustomPainter.paint` has no
+`BuildContext`, so a painter that needs the theme (`_LevelRingPainter`,
+`_RingPainter`, the crop chrome) receives its colours from the widget that
+builds it, and `shouldRepaint` compares them.
+
+## Global review queue
+
+The home hero counts every due card in the library, and its button starts a
+session over all of them. That is not a second study engine: routes carry a
+**scope id**, and `all` (`kAllDecksScope`) is a scope that means "every deck".
+`/review/all`, `/test/all`, `/match/all` and `/write/all` run the same screens as
+`/review/<deckId>`; only the data source changes - `studyQueue(null, ...)` and
+`watchAllCards()` instead of the deck-scoped queries. Deck ids are UUIDs, so the
+sentinel can never collide with a real one.
+
+Studying from inside a deck stays scoped to that deck. The copy says so: the
+home button reads «مراجعة جميع البطاقات المستحقة» and the sheet is titled
+«جميع المجموعات», while a deck's own button keeps the deck's name.
+
 ## Deck customisation
 
 `kDeckColors` holds 42 tones in two families — 28 deep jewel and earth tones

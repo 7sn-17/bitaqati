@@ -258,13 +258,9 @@ class AuthService {
         _log('idToken claims: malformed JWT');
         return;
       }
-      final Map<String, dynamic> claims =
-          jsonDecode(
-                utf8.decode(
-                  base64Url.decode(base64Url.normalize(parts[1])),
-                ),
-              )
-              as Map<String, dynamic>;
+      final Map<String, dynamic> claims = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      ) as Map<String, dynamic>;
       _log(
         'idToken claims: aud=${claims['aud']}, azp=${claims['azp']}, '
         'iss=${claims['iss']}, hasEmail=${claims['email'] != null}, '

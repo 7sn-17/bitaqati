@@ -3,7 +3,30 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 
-import '../theme/app_colors.dart';
+/// The colours the native crop screen is painted with.
+///
+/// The cropper runs in its own Android activity, outside the Flutter tree, so
+/// it cannot read the theme. The caller hands it the active palette instead of
+/// letting it hardcode the brand green.
+@immutable
+class CropChrome {
+  const CropChrome({
+    required this.toolbar,
+    required this.accent,
+    required this.onToolbar,
+  });
+
+  final Color toolbar;
+  final Color accent;
+  final Color onToolbar;
+}
+
+/// Forest, used only when a caller has no palette to offer.
+const CropChrome _fallbackChrome = CropChrome(
+  toolbar: Color(0xFF163300),
+  accent: Color(0xFF9FE870),
+  onToolbar: Colors.white,
+);
 
 /// Opens the platform cropping screen for [image] and returns the result.
 ///
@@ -14,7 +37,8 @@ import '../theme/app_colors.dart';
 /// When there is no cropper on the platform, or it refuses the file, the
 /// original is returned instead. Losing the picture because the crop screen
 /// failed would be a worse outcome than keeping it uncropped.
-Future<File?> cropImage(File image) async {
+Future<File?> cropImage(File image, {CropChrome? chrome}) async {
+  final CropChrome colors = chrome ?? _fallbackChrome;
   try {
     final CroppedFile? result = await ImageCropper().cropImage(
       sourcePath: image.path,
@@ -27,12 +51,12 @@ Future<File?> cropImage(File image) async {
       uiSettings: <PlatformUiSettings>[
         AndroidUiSettings(
           toolbarTitle: 'قص الصورة',
-          toolbarColor: AppColors.primary,
-          toolbarWidgetColor: Colors.white,
-          backgroundColor: AppColors.primary,
-          activeControlsWidgetColor: AppColors.accent,
-          cropFrameColor: Colors.white,
-          cropGridColor: Colors.white,
+          toolbarColor: colors.toolbar,
+          toolbarWidgetColor: colors.onToolbar,
+          backgroundColor: colors.toolbar,
+          activeControlsWidgetColor: colors.accent,
+          cropFrameColor: colors.onToolbar,
+          cropGridColor: colors.onToolbar,
           showCropGrid: true,
           hideBottomControls: false,
           lockAspectRatio: false,

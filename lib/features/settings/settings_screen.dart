@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -13,8 +14,8 @@ import '../../core/config/app_config.dart';
 import '../../core/notifications/reminder_providers.dart';
 import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_palette.dart';
 import '../../core/updates/update_providers.dart';
 import '../../core/updates/update_service.dart';
 import '../../core/user_display.dart';
@@ -84,9 +85,7 @@ class SettingsScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SurfaceCard(
-                color: context.isDark
-                    ? AppColors.darkSurfaceHigh
-                    : AppColors.primary,
+                color: context.isDark ? context.raisedSurface : context.primary,
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: <Widget>[
@@ -94,7 +93,7 @@ class SettingsScreen extends ConsumerWidget {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: AppColors.accent,
+                        color: context.accent,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       clipBehavior: Clip.antiAlias,
@@ -168,6 +167,7 @@ class SettingsScreen extends ConsumerWidget {
                     },
                   ),
                 ),
+                const _ThemeSwatches(),
               ],
             ),
             const _SectionLabel('التذكير'),
@@ -316,8 +316,8 @@ class SettingsScreen extends ConsumerWidget {
                   : OutlinedButton(
                       onPressed: () => _signOut(context, ref),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.danger,
-                        side: const BorderSide(color: AppColors.danger),
+                        foregroundColor: context.danger,
+                        side: BorderSide(color: context.danger),
                       ),
                       child: const Text('تسجيل الخروج'),
                     ),
@@ -487,7 +487,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialog).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(backgroundColor: context.danger),
             child: const Text('خروج'),
           ),
         ],
@@ -658,11 +658,11 @@ class _AccountAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget label = Text(
       initial,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'ReadexPro',
         fontSize: 24,
         fontWeight: FontWeight.w700,
-        color: AppColors.primary,
+        color: context.primary,
       ),
     );
     if (url == null) {
@@ -785,7 +785,7 @@ class _Row extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: context.isDark ? AppColors.darkSurfaceHigh : Colors.white,
+              color: context.raisedSurface,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Icon(icon, size: 18, color: context.colors.primary),
@@ -996,6 +996,182 @@ class _HelpPoint extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The four identities, as tappable swatches.
+///
+/// Each swatch draws its *own* palette rather than the active one, so the
+/// choice is made by looking at the colours instead of reading a list of
+/// names. Tapping one rebuilds the theme; MaterialApp cross-fades every token
+/// through [ThemePalette.lerp], which is why the change animates.
+class _ThemeSwatches extends ConsumerWidget {
+  const _ThemeSwatches();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AppThemeId active = ref.watch(themePaletteProvider);
+    final Brightness brightness = Theme.of(context).brightness;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                CupertinoIcons.paintbrush,
+                size: 16,
+                color: context.brandInk,
+              ),
+              const SizedBox(width: 8),
+              Text('سمة التطبيق', style: context.texts.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'بدّل هوية الألوان كاملة: البطاقات والأزرار والرسوم.',
+            style: context.texts.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: <Widget>[
+              for (final AppThemeId id in AppThemeId.values) ...<Widget>[
+                Expanded(
+                  child: _Swatch(
+                    id: id,
+                    brightness: brightness,
+                    selected: id == active,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref.read(themePaletteProvider.notifier).select(id);
+                    },
+                  ),
+                ),
+                if (id != AppThemeId.values.last) const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Swatch extends StatelessWidget {
+  const _Swatch({
+    required this.id,
+    required this.brightness,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppThemeId id;
+  final Brightness brightness;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemePalette palette = ThemePalette.of(id, brightness);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: id.label,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? context.brandInk : context.hairline,
+              width: selected ? 2.2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Container(
+                height: 54,
+                decoration: BoxDecoration(
+                  color: palette.canvas,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Container(
+                      height: 15,
+                      decoration: BoxDecoration(
+                        color: palette.primary,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Container(
+                        width: 16,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: palette.accent,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: palette.card,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Container(
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: palette.ink.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          width: 9,
+                          height: 9,
+                          decoration: BoxDecoration(
+                            color: palette.accent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                id.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.texts.labelSmall?.copyWith(
+                  fontSize: 9.5,
+                  color: selected ? context.brandInk : context.muted,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/sync_providers.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 /// A slim pill that appears while the device has no connection.
@@ -47,8 +46,8 @@ class _Pill extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 8, 16, 8),
           decoration: BoxDecoration(
             color: context.isDark
-                ? AppColors.darkSurfaceHigh
-                : AppColors.ink.withValues(alpha: 0.92),
+                ? context.raisedSurface
+                : context.ink.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(999),
             boxShadow: <BoxShadow>[
               BoxShadow(
@@ -61,11 +60,7 @@ class _Pill extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Icon(
-                CupertinoIcons.wifi_slash,
-                size: 15,
-                color: AppColors.accent,
-              ),
+              Icon(CupertinoIcons.wifi_slash, size: 15, color: context.accent),
               const SizedBox(width: 8),
               Text(
                 'بدون اتصال · المراجعة تعمل وسيُزامن لاحقاً',
@@ -73,7 +68,7 @@ class _Pill extends StatelessWidget {
                   fontFamily: 'ReadexPro',
                   fontSize: 11.5,
                   fontWeight: FontWeight.w500,
-                  color: context.isDark ? AppColors.darkInk : Colors.white,
+                  color: context.isDark ? context.ink : Colors.white,
                 ),
               ),
             ],

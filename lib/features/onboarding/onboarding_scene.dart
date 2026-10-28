@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
 /// The live scene that sits inside the onboarding illustration card.
@@ -220,11 +219,11 @@ class _OnboardingSceneState extends State<OnboardingScene>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.accent,
+                color: context.accent,
                 borderRadius: BorderRadius.circular(99),
                 boxShadow: <BoxShadow>[
                   BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.5),
+                    color: context.accent.withValues(alpha: 0.5),
                     blurRadius: 14,
                     offset: const Offset(0, 5),
                   ),
@@ -232,13 +231,13 @@ class _OnboardingSceneState extends State<OnboardingScene>
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const <Widget>[
-                  Icon(Icons.star_rounded, size: 12, color: AppColors.primary),
+                children: <Widget>[
+                  Icon(Icons.star_rounded, size: 12, color: context.primary),
                   SizedBox(width: 3),
                   Text(
                     '4.8',
                     style: TextStyle(
-                      color: AppColors.primary,
+                      color: context.primary,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       height: 1,
@@ -304,21 +303,21 @@ class _AnswerFace extends StatelessWidget {
             child: Container(
               width: 26,
               height: 26,
-              decoration: const BoxDecoration(
-                color: AppColors.accent,
+              decoration: BoxDecoration(
+                color: context.accent,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.check_rounded,
                 size: 17,
-                color: AppColors.primary,
+                color: context.primary,
               ),
             ),
           ),
           const SizedBox(height: 10),
-          const _Bar(width: 120, height: 7, color: AppColors.primary),
+          _Bar(width: 120, height: 7, color: context.primary),
           const SizedBox(height: 6),
-          const _Bar(width: 86, height: 7, color: AppColors.primary),
+          _Bar(width: 86, height: 7, color: context.primary),
         ],
       ),
     );
@@ -337,7 +336,11 @@ class _Ring extends StatelessWidget {
       width: 46,
       height: 46,
       child: CustomPaint(
-        painter: _RingPainter(progress),
+        painter: _RingPainter(
+          progress: progress,
+          track: context.primary.withValues(alpha: 0.10),
+          color: context.accent,
+        ),
         child: Center(
           child: Text(
             '$percent%',
@@ -354,9 +357,19 @@ class _Ring extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  const _RingPainter(this.progress);
+  const _RingPainter({
+    required this.progress,
+    required this.track,
+    required this.color,
+  });
 
   final double progress;
+
+  /// Unfilled part of the ring. Passed in because a painter has no context.
+  final Color track;
+
+  /// Filled part of the ring.
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -368,7 +381,7 @@ class _RingPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4
-        ..color = AppColors.primary.withValues(alpha: 0.10),
+        ..color = track,
     );
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
@@ -379,13 +392,15 @@ class _RingPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 4
         ..strokeCap = StrokeCap.round
-        ..color = AppColors.accent,
+        ..color = color,
     );
   }
 
   @override
   bool shouldRepaint(_RingPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.track != track;
 }
 
 class _Tick extends StatelessWidget {
@@ -397,21 +412,17 @@ class _Tick extends StatelessWidget {
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: AppColors.accent,
+        color: context.accent,
         shape: BoxShape.circle,
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.55),
+            color: context.accent.withValues(alpha: 0.55),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
         ],
       ),
-      child: const Icon(
-        Icons.check_rounded,
-        size: 21,
-        color: AppColors.primary,
-      ),
+      child: Icon(Icons.check_rounded, size: 21, color: context.primary),
     );
   }
 }
@@ -423,11 +434,11 @@ class _ShelfTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const List<Color> tints = <Color>[
-      AppColors.primary,
-      AppColors.blue,
-      AppColors.primaryDeep,
-      AppColors.danger,
+    final List<Color> tints = <Color>[
+      context.primary,
+      context.info,
+      context.primaryDeep,
+      context.danger,
     ];
     final Color tint = tints[index % tints.length];
     return Container(

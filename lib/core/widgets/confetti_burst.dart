@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 ///
 /// Written by hand instead of pulling in a package: the whole effect is one
 /// painter and one controller, and it lets the colours match the app instead
-/// of a rainbow preset.
+/// of a rainbow preset. Callers pass the active palette's accents so a
+/// celebration in Ocean does not rain Forest green.
 class ConfettiBurst extends StatefulWidget {
   const ConfettiBurst({
     this.pieces = 90,

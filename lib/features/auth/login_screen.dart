@@ -5,7 +5,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/legal_footer.dart';
@@ -80,7 +79,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 48,
+                ),
                 child: IntrinsicHeight(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -98,144 +99,133 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   List<Widget> _form(BuildContext context, bool canUseGoogle) {
     return <Widget>[
-              Center(
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: context.isDark ? 0.5 : 0.12,
-                        ),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(26),
-                    child: Image.asset(
-                      'assets/branding/icon.png',
-                      width: 88,
-                      height: 88,
-                      fit: BoxFit.cover,
+      Center(
+        child: Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: context.isDark ? 0.5 : 0.12,
+                ),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: Image.asset(
+              'assets/branding/icon.png',
+              width: 88,
+              height: 88,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 22),
+      Text(
+        'مرحباً بك في بطاقاتي',
+        textAlign: TextAlign.center,
+        style: context.texts.displaySmall,
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'سجّل الدخول لتنشئ مجموعاتك وبطاقاتك وتحفظ تقدّمك '
+        'في كل أجهزتك.',
+        textAlign: TextAlign.center,
+        style: context.texts.bodySmall?.copyWith(height: 1.8),
+      ),
+      const SizedBox(height: 28),
+      if (_error != null) ...<Widget>[
+        _ErrorBox(message: _error!),
+        const SizedBox(height: 14),
+      ],
+      SizedBox(
+        height: 52,
+        child: OutlinedButton(
+          onPressed: _busy || !canUseGoogle ? null : _signInWithGoogle,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: context.cardSurface,
+            side: BorderSide(color: context.colors.outlineVariant),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          child: _busy
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    const _GoogleMark(),
+                    const SizedBox(width: 10),
+                    Text(
+                      'المتابعة بحساب Google',
+                      style: context.texts.titleSmall,
                     ),
-                  ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                'مرحباً بك في بطاقاتي',
-                textAlign: TextAlign.center,
-                style: context.texts.displaySmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'سجّل الدخول لتنشئ مجموعاتك وبطاقاتك وتحفظ تقدّمك '
-                'في كل أجهزتك.',
-                textAlign: TextAlign.center,
-                style: context.texts.bodySmall?.copyWith(height: 1.8),
-              ),
-              const SizedBox(height: 28),
-              if (_error != null) ...<Widget>[
-                _ErrorBox(message: _error!),
-                const SizedBox(height: 14),
-              ],
-              SizedBox(
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: _busy || !canUseGoogle ? null : _signInWithGoogle,
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: context.isDark
-                        ? AppColors.darkSurface
-                        : Colors.white,
-                    side: BorderSide(color: context.colors.outlineVariant),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _busy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            const _GoogleMark(),
-                            const SizedBox(width: 10),
-                            Text(
-                              'المتابعة بحساب Google',
-                              style: context.texts.titleSmall,
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-              if (!canUseGoogle) ...<Widget>[
-                const SizedBox(height: 10),
-                Text(
-                  'تسجيل الدخول بجوجل غير مهيّأ في هذا البناء. '
-                  'أضف GOOGLE_WEB_CLIENT_ID وبيانات Supabase.',
-                  textAlign: TextAlign.center,
-                  style: context.texts.bodySmall?.copyWith(
-                    color: AppColors.danger,
-                    height: 1.7,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 18),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Divider(color: context.colors.outlineVariant),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: Text('أو', style: context.texts.labelSmall),
-                  ),
-                  Expanded(
-                    child: Divider(color: context.colors.outlineVariant),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: _busy ? null : _continueAsGuest,
-                  icon: const Icon(CupertinoIcons.person, size: 18),
-                  label: const Text('المتابعة كزائر'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: context.colors.onSurface,
-                    side: BorderSide(color: context.colors.outlineVariant),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    textStyle: context.texts.titleSmall,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'وضع الزائر للتصفح فقط: إنشاء المجموعات والبطاقات '
-                'يتطلب حساباً.',
-                textAlign: TextAlign.center,
-                style: context.texts.bodySmall?.copyWith(
-                  fontSize: 11,
-                  height: 1.7,
-                ),
-              ),
-              const SizedBox(height: 24),
-              LegalFooterLinks(
-                onPrivacy: () =>
-                    openLegalPage(context, const PrivacyPolicyScreen()),
-                onTerms: () =>
-                    openLegalPage(context, const TermsOfServiceScreen()),
-              ),
+        ),
+      ),
+      if (!canUseGoogle) ...<Widget>[
+        const SizedBox(height: 10),
+        Text(
+          'تسجيل الدخول بجوجل غير مهيّأ في هذا البناء. '
+          'أضف GOOGLE_WEB_CLIENT_ID وبيانات Supabase.',
+          textAlign: TextAlign.center,
+          style: context.texts.bodySmall?.copyWith(
+            color: context.danger,
+            height: 1.7,
+          ),
+        ),
+      ],
+      const SizedBox(height: 18),
+      Row(
+        children: <Widget>[
+          Expanded(child: Divider(color: context.colors.outlineVariant)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text('أو', style: context.texts.labelSmall),
+          ),
+          Expanded(child: Divider(color: context.colors.outlineVariant)),
+        ],
+      ),
+      const SizedBox(height: 18),
+      SizedBox(
+        height: 52,
+        child: OutlinedButton.icon(
+          onPressed: _busy ? null : _continueAsGuest,
+          icon: const Icon(CupertinoIcons.person, size: 18),
+          label: const Text('المتابعة كزائر'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: context.colors.onSurface,
+            side: BorderSide(color: context.colors.outlineVariant),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            textStyle: context.texts.titleSmall,
+          ),
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'وضع الزائر للتصفح فقط: إنشاء المجموعات والبطاقات '
+        'يتطلب حساباً.',
+        textAlign: TextAlign.center,
+        style: context.texts.bodySmall?.copyWith(fontSize: 11, height: 1.7),
+      ),
+      const SizedBox(height: 24),
+      LegalFooterLinks(
+        onPrivacy: () => openLegalPage(context, const PrivacyPolicyScreen()),
+        onTerms: () => openLegalPage(context, const TermsOfServiceScreen()),
+      ),
     ];
   }
 }
@@ -265,23 +255,23 @@ class _ErrorBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.1),
+        color: context.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Icon(
+          Icon(
             CupertinoIcons.exclamationmark_circle,
             size: 18,
-            color: AppColors.danger,
+            color: context.danger,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
               style: context.texts.bodySmall?.copyWith(
-                color: AppColors.danger,
+                color: context.danger,
                 height: 1.7,
               ),
             ),

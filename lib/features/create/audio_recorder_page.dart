@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Records a voice note and returns the file path, or null when the learner
@@ -256,13 +255,13 @@ class _AudioRecorderPageState extends State<AudioRecorderPage> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.warning,
+                    color: context.warningSurface,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     _error!,
                     style: context.texts.bodySmall?.copyWith(
-                      color: AppColors.warningInk,
+                      color: context.warningInk,
                       height: 1.5,
                     ),
                   ),
@@ -312,8 +311,8 @@ class _AudioRecorderPageState extends State<AudioRecorderPage> {
                       onPressed: started && !_saving ? _stopAndSave : null,
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: context.primary,
+                        foregroundColor: context.onPrimary,
                       ),
                       icon: _saving
                           ? const SizedBox(
@@ -349,7 +348,7 @@ class _StatusPill extends StatelessWidget {
     final String label = recording
         ? 'جارٍ التسجيل'
         : (paused ? 'متوقف مؤقتاً' : 'جاهز للتسجيل');
-    final Color tint = recording ? AppColors.danger : context.muted;
+    final Color tint = recording ? context.danger : context.muted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
@@ -401,7 +400,7 @@ class _LevelMeter extends StatelessWidget {
                 height: _heightAt(index),
                 decoration: BoxDecoration(
                   color: active
-                      ? AppColors.danger.withValues(alpha: 0.75)
+                      ? context.danger.withValues(alpha: 0.75)
                       : context.muted.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(2),
                 ),
@@ -446,14 +445,12 @@ class _RecordButton extends StatelessWidget {
         width: 92,
         height: 92,
         decoration: BoxDecoration(
-          color: live
-              ? AppColors.danger
-              : AppColors.danger.withValues(alpha: 0.12),
+          color: live ? context.danger : context.danger.withValues(alpha: 0.12),
           shape: BoxShape.circle,
           boxShadow: live
               ? <BoxShadow>[
                   BoxShadow(
-                    color: AppColors.danger.withValues(alpha: 0.32),
+                    color: context.danger.withValues(alpha: 0.32),
                     blurRadius: 26,
                     spreadRadius: 4,
                   ),
@@ -465,7 +462,7 @@ class _RecordButton extends StatelessWidget {
               ? Icons.pause_rounded
               : (paused ? Icons.play_arrow_rounded : Icons.mic_rounded),
           size: 38,
-          color: live ? Colors.white : AppColors.danger,
+          color: live ? Colors.white : context.danger,
         ),
       ),
     );

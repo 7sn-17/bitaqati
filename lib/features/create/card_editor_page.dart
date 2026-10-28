@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/media/image_crop.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/audio_playback.dart';
 import '../../core/widgets/card_markup.dart';
@@ -382,7 +383,17 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
       return;
     }
     if (image) {
-      await _attachPicked(_media.pickImage, toFront: toFront, image: true);
+      await _attachPicked(
+        () => _media.pickImage(
+          chrome: CropChrome(
+            toolbar: context.primary,
+            accent: context.accent,
+            onToolbar: context.onPrimary,
+          ),
+        ),
+        toFront: toFront,
+        image: true,
+      );
       return;
     }
     // Sound has two origins now, so the button asks before it acts. The sheet

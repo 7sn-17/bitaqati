@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../domain/enums.dart';
 import '../../domain/models.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 class DeckCard extends StatelessWidget {
@@ -53,7 +52,7 @@ class DeckCard extends StatelessWidget {
     final Color tileColor = deck.color;
     final Color surface = context.colors.surfaceContainerHighest;
     final Color onSurface = context.colors.onSurface;
-    final Color muted = context.texts.bodySmall?.color ?? AppColors.muted;
+    final Color muted = context.texts.bodySmall?.color ?? context.muted;
 
     return Material(
       color: surface,
@@ -123,10 +122,10 @@ class DeckCard extends StatelessWidget {
                               value: deck.progress,
                               minHeight: 5,
                               backgroundColor: context.isDark
-                                  ? AppColors.darkLine
+                                  ? context.hairline
                                   : Colors.white,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                context.isDark ? AppColors.accent : tileColor,
+                                context.isDark ? context.accent : tileColor,
                               ),
                             ),
                           ),
@@ -139,13 +138,13 @@ class DeckCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.accent,
+                              color: context.accent,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               '${deck.dueCount} مستحقة',
-                              style: const TextStyle(
-                                color: AppColors.primary,
+                              style: TextStyle(
+                                color: context.primary,
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
                                 height: 1.2,
@@ -194,8 +193,8 @@ class _RemixBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: dark
-            ? AppColors.darkSurfaceHigh
-            : AppColors.blue.withValues(alpha: 0.08),
+            ? context.raisedSurface
+            : context.info.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -204,7 +203,7 @@ class _RemixBadge extends StatelessWidget {
           Icon(
             CupertinoIcons.doc_on_doc,
             size: 10,
-            color: dark ? AppColors.darkAccent : AppColors.blue,
+            color: dark ? context.brandInk : context.info,
           ),
           const SizedBox(width: 4),
           Text(
@@ -215,7 +214,7 @@ class _RemixBadge extends StatelessWidget {
               fontFamily: 'IBMPlexSansArabic',
               fontSize: 10.5,
               fontWeight: FontWeight.w600,
-              color: dark ? AppColors.darkAccent : AppColors.blue,
+              color: dark ? context.brandInk : context.info,
             ),
           ),
         ],

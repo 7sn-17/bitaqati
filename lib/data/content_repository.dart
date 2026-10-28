@@ -569,6 +569,29 @@ ORDER BY d.position, d.created_at
     return query.watch().map(_toCards);
   }
 
+  /// Every live card in the database, deck by deck.
+  ///
+  /// This is the global queue's source: the home screen studies everything that
+  /// is due, not just the deck with the most work. Ordered by deck position
+  /// first so a session still moves through one subject before the next.
+  Stream<List<ReviewCard>> watchAllCards() {
+    final query = _db.select(_db.cards).join([
+      leftOuterJoin(
+        _db.cardStates,
+        _db.cardStates.cardId.equalsExp(_db.cards.id),
+      ),
+      leftOuterJoin(_db.decks, _db.decks.id.equalsExp(_db.cards.deckId)),
+    ]);
+    query
+      ..where(_db.cards.deletedAt.isNull())
+      ..orderBy([
+        OrderingTerm.asc(_db.decks.position),
+        OrderingTerm.asc(_db.cards.position),
+        OrderingTerm.asc(_db.cards.createdAt),
+      ]);
+    return query.watch().map(_toCards);
+  }
+
   Future<String> addCard({
     required String deckId,
     required String front,
@@ -912,20 +935,30 @@ ORDER BY d.position, d.created_at
   /// session leaves it false so a card answered ahead of schedule never
   /// distorts its own memory state.
   Future<List<ReviewCard>> studyQueue(
-    String deckId, {
+    String? deckId, {
     int newLimit = 10,
     int reviewLimit = 200,
     bool includeFuture = false,
   }) async {
+    // The deck join exists for the global queue: without it the cards of
+    // five decks interleave by their own position and the session jumps from
+    // deck to deck every card. Ordering by deck first keeps a library-wide
+    // session readable, and the extra join is free on a deck-scoped query.
     final query = _db.select(_db.cards).join([
       leftOuterJoin(
         _db.cardStates,
         _db.cardStates.cardId.equalsExp(_db.cards.id),
       ),
+      leftOuterJoin(_db.decks, _db.decks.id.equalsExp(_db.cards.deckId)),
     ]);
     query
-      ..where(_db.cards.deckId.equals(deckId) & _db.cards.deletedAt.isNull())
+      ..where(
+        deckId == null
+            ? _db.cards.deletedAt.isNull()
+            : _db.cards.deckId.equals(deckId) & _db.cards.deletedAt.isNull(),
+      )
       ..orderBy([
+        OrderingTerm.asc(_db.decks.position),
         OrderingTerm.asc(_db.cards.position),
         OrderingTerm.asc(_db.cards.createdAt),
       ]);

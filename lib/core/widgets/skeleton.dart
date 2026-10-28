@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 /// A shimmering placeholder block.
@@ -10,12 +9,7 @@ import '../theme/app_theme.dart';
 /// keeps its layout while the first frame of data arrives instead of collapsing
 /// to a centred spinner and jumping back.
 class SkeletonBox extends StatelessWidget {
-  const SkeletonBox({
-    this.width,
-    this.height = 14,
-    this.radius = 8,
-    super.key,
-  });
+  const SkeletonBox({this.width, this.height = 14, this.radius = 8, super.key});
 
   final double? width;
   final double height;
@@ -27,7 +21,7 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: context.isDark ? AppColors.darkSurfaceHigh : Colors.white,
+        color: context.raisedSurface,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -47,10 +41,10 @@ class SkeletonShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: context.isDark ? AppColors.darkSurfaceHigh : Colors.white,
+      baseColor: context.raisedSurface,
       highlightColor: context.isDark
-          ? AppColors.darkSurfaceHigh.withValues(alpha: 0.45)
-          : AppColors.accentSoft,
+          ? context.raisedSurface.withValues(alpha: 0.45)
+          : context.accentSoft,
       period: const Duration(milliseconds: 1400),
       child: child,
     );

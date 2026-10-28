@@ -5,7 +5,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/section_header.dart';
 import '../../data/content_providers.dart';
@@ -54,8 +53,12 @@ class ProgressScreen extends ConsumerWidget {
     final ProgressSummary summary = ref.watch(progressSummaryProvider);
     final List<DueForecastDay> forecast =
         ref.watch(dueForecastProvider).valueOrNull ?? const <DueForecastDay>[];
-    final DeckNode? todayDeck = ref.watch(todayReviewDeckProvider);
-    final DeckNode? startDeck = todayDeck ?? _firstDeckWithCards(ref);
+    // The dashboard speaks about the whole library, not about one deck: the
+    // count, the button and the session it opens all have to agree, and a
+    // global queue is what "today" means to someone with five decks.
+    final int totalCards = ref
+        .watch(allDecksProvider)
+        .fold<int>(0, (int sum, DeckNode deck) => sum + deck.cardCount);
     final int dueTotal = ref.watch(totalDueProvider);
     // With no review history every chart below is a row of zeros, which reads
     // as "you are doing badly" rather than "you have not started". The
@@ -70,13 +73,13 @@ class ProgressScreen extends ConsumerWidget {
         children: <Widget>[
           _Header(summary: summary),
           _LevelCard(summary: summary),
-          if (startDeck != null)
+          if (totalCards > 0)
             _StartCard(
-              deck: startDeck,
+              cardCount: totalCards,
               dueCount: dueTotal,
               firstRun: !hasActivity,
             ),
-          if (!hasActivity) _FirstRunPanel(hasDeck: startDeck != null),
+          if (!hasActivity) _FirstRunPanel(hasDeck: totalCards > 0),
           if (hasActivity) _StreakCard(summary: summary),
           _AchievementsSection(summary: summary),
           if (hasActivity) _RetentionCard(summary: summary),
@@ -86,15 +89,6 @@ class ProgressScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  DeckNode? _firstDeckWithCards(WidgetRef ref) {
-    for (final DeckNode deck in ref.watch(allDecksProvider)) {
-      if (deck.cardCount > 0) {
-        return deck;
-      }
-    }
-    return null;
   }
 }
 
@@ -174,8 +168,8 @@ class _LevelCard extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: <Color>[AppColors.primary, Color(0xFF2D5410)],
+              gradient: LinearGradient(
+                colors: <Color>[context.primary, context.primaryDeep],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -192,6 +186,8 @@ class _LevelCard extends StatelessWidget {
                       child: CustomPaint(
                         painter: _LevelRingPainter(
                           progress: summary.levelProgress * t,
+                          track: Colors.white.withValues(alpha: 0.16),
+                          color: context.accent,
                         ),
                         child: Center(
                           child: Column(
@@ -298,7 +294,7 @@ class _LevelCard extends StatelessWidget {
                           height: 8,
                           width: box.maxWidth * summary.levelProgress * t,
                           decoration: BoxDecoration(
-                            color: AppColors.accent,
+                            color: context.accent,
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
@@ -316,9 +312,19 @@ class _LevelCard extends StatelessWidget {
 }
 
 class _LevelRingPainter extends CustomPainter {
-  const _LevelRingPainter({required this.progress});
+  const _LevelRingPainter({
+    required this.progress,
+    required this.track,
+    required this.color,
+  });
 
   final double progress;
+
+  /// Unfilled part of the ring. Passed in because a painter has no context.
+  final Color track;
+
+  /// Filled part of the ring.
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -331,7 +337,7 @@ class _LevelRingPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 9
-        ..color = Colors.white.withValues(alpha: 0.16),
+        ..color = track,
     );
     if (progress <= 0) {
       return;
@@ -345,13 +351,15 @@ class _LevelRingPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 9
         ..strokeCap = StrokeCap.round
-        ..color = AppColors.accent,
+        ..color = color,
     );
   }
 
   @override
   bool shouldRepaint(_LevelRingPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.track != track;
 }
 
 /// The one action the dashboard wants from the learner right now: finish
@@ -359,12 +367,12 @@ class _LevelRingPainter extends CustomPainter {
 /// the screen never opens on a wall of zeros.
 class _StartCard extends StatelessWidget {
   const _StartCard({
-    required this.deck,
+    required this.cardCount,
     required this.dueCount,
     required this.firstRun,
   });
 
-  final DeckNode deck;
+  final int cardCount;
   final int dueCount;
   final bool firstRun;
 
@@ -416,10 +424,14 @@ class _StartCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: () => openStudyMode(context, deck),
+              onPressed: () => openGlobalStudy(
+                context,
+                cardCount: cardCount,
+                dueCount: dueCount,
+              ),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: context.primary,
+                foregroundColor: context.onPrimary,
                 minimumSize: const Size(0, 38),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 shape: RoundedRectangleBorder(
@@ -508,8 +520,8 @@ class _FirstRunPanel extends StatelessWidget {
                 icon: const Icon(CupertinoIcons.add, size: 16),
                 label: const Text('إنشاء مجموعة'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.primary,
+                  foregroundColor: context.onPrimary,
                   minimumSize: const Size(0, 40),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   shape: RoundedRectangleBorder(
@@ -544,17 +556,17 @@ class _StreakCard extends StatelessWidget {
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: <Color>[Color(0xFFFF9A3D), Color(0xFFE8590C)],
+                    gradient: LinearGradient(
+                      colors: <Color>[context.accent, context.accentDeep],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(15),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     CupertinoIcons.flame_fill,
                     size: 24,
-                    color: Colors.white,
+                    color: context.onAccent,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -731,13 +743,11 @@ class _DayCell extends StatelessWidget {
       margin: const EdgeInsets.all(2),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: active
-            ? AppColors.accent
-            : context.colors.surfaceContainerHighest,
+        color: active ? context.accent : context.colors.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
         border: isToday
             ? Border.all(
-                color: active ? AppColors.primary : context.brandInk,
+                color: active ? context.primary : context.brandInk,
                 width: 1.5,
               )
             : null,
@@ -748,7 +758,7 @@ class _DayCell extends StatelessWidget {
           fontSize: 11,
           fontWeight: active || isToday ? FontWeight.w700 : FontWeight.w500,
           color: active
-              ? AppColors.primary
+              ? context.primary
               : (isToday ? context.ink : context.muted),
         ),
       ),
@@ -1194,8 +1204,8 @@ class _ForecastBars extends StatelessWidget {
       }
     }
     final double maxY = math.max(4.0, highest * 1.2);
-    final Color strong = context.isDark ? AppColors.accent : AppColors.primary;
-    final Color soft = AppColors.accent.withValues(
+    final Color strong = context.isDark ? context.accent : context.primary;
+    final Color soft = context.accent.withValues(
       alpha: context.isDark ? 0.3 : 0.55,
     );
     final Color track = context.colors.surfaceContainerHighest;
@@ -1413,13 +1423,9 @@ Color _heatColor(BuildContext context, int step, int steps) {
   }
   final double t = math.min(1.0, step / steps);
   if (context.isDark) {
-    return Color.lerp(
-      AppColors.darkSurfaceHigh,
-      AppColors.accent,
-      0.28 + 0.72 * t,
-    )!;
+    return Color.lerp(context.raisedSurface, context.accent, 0.28 + 0.72 * t)!;
   }
-  return Color.lerp(AppColors.accentSoft, AppColors.primary, 0.3 + 0.7 * t)!;
+  return Color.lerp(context.accentSoft, context.primary, 0.3 + 0.7 * t)!;
 }
 
 /// The shared card shell for every chart section: white in light mode, a
@@ -1489,7 +1495,7 @@ Color _badgeInk(BuildContext context, Color base) =>
 
 /// The colour that means "recalled it" on charts.
 Color _goodInk(BuildContext context) =>
-    context.isDark ? AppColors.accent : AppColors.primary;
+    context.isDark ? context.accent : context.primary;
 
 String _dayLabel(List<DueForecastDay> forecast, int index) {
   if (index <= 0) {

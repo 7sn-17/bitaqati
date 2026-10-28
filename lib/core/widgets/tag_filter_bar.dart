@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 class TagChip extends StatelessWidget {
@@ -19,12 +18,12 @@ class TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color accent = color ?? AppColors.primary;
+    final Color accent = color ?? context.primary;
     final Color background = selected
-        ? (context.isDark ? AppColors.accent : accent)
+        ? (context.isDark ? context.accent : accent)
         : context.colors.surfaceContainerHighest;
     final Color foreground = selected
-        ? (context.isDark ? AppColors.primary : Colors.white)
+        ? (context.isDark ? context.primary : Colors.white)
         : context.colors.onSurface;
 
     return Semantics(

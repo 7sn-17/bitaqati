@@ -8,7 +8,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/audio/sound_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
@@ -30,16 +29,14 @@ class TestModeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final DeckNode? deck = ref.watch(deckByIdProvider(deckId));
     final List<ReviewCard>? cards = ref
-        .watch(deckCardsProvider(deckId))
+        .watch(studyCardsProvider(deckId))
         .valueOrNull;
     if (cards == null) {
       // A white flash while the cards load is the most jarring thing a dark-
       // mode user can hit on this screen, so the loading state follows the
       // theme like everything else.
       return Scaffold(
-        backgroundColor: context.isDark
-            ? AppColors.darkCanvas
-            : AppColors.canvas,
+        backgroundColor: context.canvas,
         body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
@@ -48,11 +45,11 @@ class TestModeScreen extends ConsumerWidget {
         if (plainMarkup(card.back).trim().isNotEmpty) card,
     ];
     if (usable.length < 2) {
-      return _NotEnough(deckTitle: deck?.title ?? '');
+      return _NotEnough(deckTitle: deck?.title ?? 'جميع المجموعات');
     }
     return _TestSession(
       deckId: deckId,
-      deckTitle: deck?.title ?? 'اختبار',
+      deckTitle: deck?.title ?? 'جميع المجموعات',
       cards: usable,
     );
   }
@@ -238,9 +235,7 @@ class _TestSessionState extends ConsumerState<_TestSession> {
         : (_index + (_answered ? 1 : 0)) / _questions.length;
 
     return Scaffold(
-      backgroundColor: (context.isDark
-          ? AppColors.darkCanvas
-          : AppColors.canvas),
+      backgroundColor: (context.canvas),
       body: SafeArea(
         bottom: false,
         child: AnimatedSwitcher(
@@ -413,11 +408,11 @@ class _SessionBar extends StatelessWidget {
                         alignment: AlignmentDirectional.centerStart,
                         widthFactor: value.clamp(0.0, 1.0),
                         child: Container(
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: <Color>[
-                                AppColors.accent,
-                                Color(0xFF63C13A),
+                                context.accent,
+                                context.accentDeep,
                               ],
                             ),
                           ),
@@ -466,12 +461,7 @@ class _QuestionView extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
-                  colors: context.isDark
-                      ? <Color>[
-                          AppColors.darkSurfaceHigh,
-                          AppColors.darkSurface,
-                        ]
-                      : <Color>[Colors.white, const Color(0xFFF3F7EE)],
+                  colors: <Color>[context.cardSurface, context.raisedSurface],
                 ),
                 borderRadius: BorderRadius.circular(26),
                 border: Border.all(color: context.hairline),
@@ -661,14 +651,14 @@ class _OptionTileState extends State<_OptionTile>
     final bool muted = state == _OptionState.muted;
 
     final Color border = correct
-        ? AppColors.accent
+        ? context.accent
         : wrong
-        ? AppColors.danger
+        ? context.danger
         : context.hairline;
     final Color fill = correct
         ? context.softAccent
         : wrong
-        ? AppColors.danger.withValues(alpha: 0.09)
+        ? context.danger.withValues(alpha: 0.09)
         : context.cardSurface;
 
     return AnimatedBuilder(
@@ -697,9 +687,8 @@ class _OptionTileState extends State<_OptionTile>
                   boxShadow: correct || wrong
                       ? <BoxShadow>[
                           BoxShadow(
-                            color:
-                                (correct ? AppColors.accent : AppColors.danger)
-                                    .withValues(alpha: 0.35),
+                            color: (correct ? context.accent : context.danger)
+                                .withValues(alpha: 0.35),
                             blurRadius: 20,
                             spreadRadius: 1,
                             offset: const Offset(0, 6),
@@ -724,9 +713,9 @@ class _OptionTileState extends State<_OptionTile>
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: correct
-                            ? AppColors.accent
+                            ? context.accent
                             : wrong
-                            ? AppColors.danger
+                            ? context.danger
                             : context.raisedSurface,
                         shape: BoxShape.circle,
                       ),
@@ -734,9 +723,9 @@ class _OptionTileState extends State<_OptionTile>
                         widget.letter,
                         style: TextStyle(
                           color: correct
-                              ? AppColors.primary
+                              ? context.onAccent
                               : wrong
-                              ? Colors.white
+                              ? context.onDanger
                               : context.muted,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -751,7 +740,7 @@ class _OptionTileState extends State<_OptionTile>
                           color: correct
                               ? context.onSoftAccent
                               : wrong
-                              ? AppColors.danger
+                              ? context.danger
                               : context.ink,
                           fontSize: 13.5,
                           height: 1.5,
@@ -768,9 +757,7 @@ class _OptionTileState extends State<_OptionTile>
                             ? CupertinoIcons.checkmark_circle_fill
                             : CupertinoIcons.xmark_circle_fill,
                         size: 20,
-                        color: correct
-                            ? context.onSoftAccent
-                            : AppColors.danger,
+                        color: correct ? context.onSoftAccent : context.danger,
                       ).animate().scale(
                         begin: const Offset(0.4, 0.4),
                         end: const Offset(1, 1),
@@ -900,9 +887,9 @@ class _TruthButtonState extends State<_TruthButton>
     final bool muted = state == _OptionState.muted;
 
     final Color tint = correct
-        ? AppColors.accent
+        ? context.accent
         : wrong
-        ? AppColors.danger
+        ? context.danger
         : context.hairline;
 
     return AnimatedBuilder(
@@ -925,7 +912,7 @@ class _TruthButtonState extends State<_TruthButton>
                   color: correct
                       ? context.softAccent
                       : wrong
-                      ? AppColors.danger.withValues(alpha: 0.09)
+                      ? context.danger.withValues(alpha: 0.09)
                       : context.cardSurface,
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
@@ -952,7 +939,7 @@ class _TruthButtonState extends State<_TruthButton>
                       color: correct
                           ? context.onSoftAccent
                           : wrong
-                          ? AppColors.danger
+                          ? context.danger
                           : context.muted,
                     ),
                     const SizedBox(height: 6),
@@ -965,7 +952,7 @@ class _TruthButtonState extends State<_TruthButton>
                         color: correct
                             ? context.onSoftAccent
                             : wrong
-                            ? AppColors.danger
+                            ? context.danger
                             : context.ink,
                       ),
                     ),
@@ -1023,29 +1010,41 @@ class _ResultView extends StatelessWidget {
 
     return Stack(
       children: <Widget>[
-        const Positioned.fill(
+        Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: <Color>[AppColors.primary, AppColors.primaryDeep],
+                colors: <Color>[context.primary, context.primaryDeep],
               ),
             ),
           ),
         ),
-        const Positioned(
+        Positioned(
           top: -60,
           left: -40,
-          child: _Blob(color: AppColors.accent, size: 220),
+          child: _Blob(color: context.accent, size: 220),
         ),
-        const Positioned(
+        Positioned(
           bottom: -80,
           right: -50,
-          child: _Blob(color: AppColors.blue, size: 260),
+          child: _Blob(color: context.info, size: 260),
         ),
         if (great)
-          const Positioned.fill(child: IgnorePointer(child: ConfettiBurst())),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ConfettiBurst(
+                colors: <Color>[
+                  context.accent,
+                  context.primary,
+                  context.info,
+                  context.star,
+                  context.accentDeep,
+                ],
+              ),
+            ),
+          ),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(22, 12, 22, 22),
@@ -1118,8 +1117,8 @@ class _ResultView extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: onRetry,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.primary,
+                      backgroundColor: context.accent,
+                      foregroundColor: context.onAccent,
                       minimumSize: const Size(52, 56),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -1139,7 +1138,7 @@ class _ResultView extends StatelessWidget {
                 TextButton(
                   onPressed: onClose,
                   style: TextButton.styleFrom(
-                    foregroundColor: Colors.white.withValues(alpha: 0.75),
+                    foregroundColor: context.onPrimary.withValues(alpha: 0.75),
                   ),
                   child: const Text('إنهاء'),
                 ),
@@ -1192,7 +1191,11 @@ class _ScoreRing extends StatelessWidget {
           width: 208,
           height: 208,
           child: CustomPaint(
-            painter: _RingPainter(value),
+            painter: _RingPainter(
+              value: value,
+              start: context.accent,
+              end: Color.lerp(context.accent, context.primary, 0.55)!,
+            ),
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1227,9 +1230,18 @@ class _ScoreRing extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  const _RingPainter(this.value);
+  const _RingPainter({
+    required this.value,
+    required this.start,
+    required this.end,
+  });
 
   final double value;
+
+  /// Gradient ends of the score arc. Passed in because a painter has no
+  /// context to read the palette from.
+  final Color start;
+  final Color end;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1250,8 +1262,8 @@ class _RingPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 13
       ..strokeCap = StrokeCap.round
-      ..shader = const SweepGradient(
-        colors: <Color>[AppColors.accent, Color(0xFF5FD13A)],
+      ..shader = SweepGradient(
+        colors: <Color>[start, end],
         transform: GradientRotation(-math.pi / 2),
       ).createShader(rect);
     canvas.drawArc(
@@ -1264,7 +1276,10 @@ class _RingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingPainter oldDelegate) => oldDelegate.value != value;
+  bool shouldRepaint(_RingPainter oldDelegate) =>
+      oldDelegate.value != value ||
+      oldDelegate.start != start ||
+      oldDelegate.end != end;
 }
 
 class _RoundIcon extends StatelessWidget {
@@ -1316,9 +1331,7 @@ class _NotEnough extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: (context.isDark
-          ? AppColors.darkCanvas
-          : AppColors.canvas),
+      backgroundColor: (context.canvas),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

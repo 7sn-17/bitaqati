@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 /// Floating, blurred tab bar with a raised centre "+" button.
@@ -69,10 +68,10 @@ class GlassTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isDark = context.isDark;
-    final Color inactive = isDark ? AppColors.darkMuted : AppColors.muted;
-    final Color active = isDark ? AppColors.accent : AppColors.primary;
+    final Color inactive = isDark ? context.muted : context.muted;
+    final Color active = isDark ? context.accent : context.primary;
     final Color barColor = isDark
-        ? AppColors.darkSurface.withValues(alpha: 0.76)
+        ? context.cardSurface.withValues(alpha: 0.76)
         : Colors.white.withValues(alpha: 0.74);
     final Color border = isDark
         ? Colors.white.withValues(alpha: 0.12)
@@ -197,7 +196,7 @@ class _TabItem extends StatelessWidget {
                       height: 15,
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.danger,
+                        color: context.danger,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       alignment: Alignment.center,
@@ -242,8 +241,8 @@ class _CreateButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isDark = context.isDark;
-    final Color background = isDark ? AppColors.accent : AppColors.primary;
-    final Color foreground = isDark ? AppColors.primary : AppColors.accent;
+    final Color background = isDark ? context.accent : context.primary;
+    final Color foreground = isDark ? context.primary : context.accent;
     return Semantics(
       button: true,
       label: 'إنشاء',

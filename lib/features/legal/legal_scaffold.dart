@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
 /// One numbered clause of a legal page.
@@ -41,8 +40,8 @@ class LegalScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool dark = context.isDark;
-    final Color muted = dark ? AppColors.darkMuted : AppColors.muted;
-    final Color heading = dark ? AppColors.darkInk : AppColors.ink;
+    final Color muted = dark ? context.muted : context.muted;
+    final Color heading = dark ? context.ink : context.ink;
 
     return Scaffold(
       body: SafeArea(
@@ -63,7 +62,7 @@ class LegalScaffold extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: dark ? AppColors.darkSurfaceHigh : AppColors.primary,
+                color: dark ? context.raisedSurface : context.primary,
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Column(
@@ -75,25 +74,25 @@ class LegalScaffold extends StatelessWidget {
                         width: 34,
                         height: 34,
                         decoration: BoxDecoration(
-                          color: AppColors.accent,
+                          color: context.accent,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         alignment: Alignment.center,
-                        child: const Icon(
+                        child: Icon(
                           CupertinoIcons.doc_text,
                           size: 17,
-                          color: AppColors.primary,
+                          color: context.primary,
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'آخر تحديث · $updatedOn',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'ReadexPro',
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.accent,
+                            color: context.accent,
                           ),
                         ),
                       ),
@@ -161,8 +160,8 @@ class _SectionBlock extends StatelessWidget {
                 height: 26,
                 decoration: BoxDecoration(
                   color: context.isDark
-                      ? AppColors.darkSurfaceHigh
-                      : AppColors.accentSoft,
+                      ? context.raisedSurface
+                      : context.accentSoft,
                   borderRadius: BorderRadius.circular(9),
                 ),
                 alignment: Alignment.center,
@@ -172,9 +171,7 @@ class _SectionBlock extends StatelessWidget {
                     fontFamily: 'ReadexPro',
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: context.isDark
-                        ? AppColors.darkAccent
-                        : AppColors.primary,
+                    color: context.isDark ? context.brandInk : context.primary,
                   ),
                 ),
               ),
@@ -220,8 +217,8 @@ class _SectionBlock extends StatelessWidget {
                       height: 5,
                       decoration: BoxDecoration(
                         color: context.isDark
-                            ? AppColors.darkAccent
-                            : AppColors.accent,
+                            ? context.brandInk
+                            : context.accent,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -263,14 +260,14 @@ class _BackButton extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurfaceHigh : AppColors.surface,
+            color: context.raisedSurface,
             borderRadius: BorderRadius.circular(14),
           ),
           alignment: Alignment.center,
           child: Icon(
             CupertinoIcons.chevron_forward,
             size: 18,
-            color: context.isDark ? AppColors.darkInk : AppColors.ink,
+            color: context.ink,
           ),
         ),
       ),

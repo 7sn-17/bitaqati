@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
 enum AppMessageKind { success, error, info }
@@ -110,17 +109,15 @@ class _TopMessageState extends State<_TopMessage>
   @override
   Widget build(BuildContext context) {
     final bool isDark = context.isDark;
-    final Color surface = isDark
-        ? AppColors.darkSurfaceHigh
-        : AppColors.primary;
+    final Color surface = isDark ? context.raisedSurface : context.primary;
     final Color badge = switch (widget.kind) {
-      AppMessageKind.success => AppColors.accent,
-      AppMessageKind.error => AppColors.danger,
-      AppMessageKind.info => AppColors.accentSoft,
+      AppMessageKind.success => context.accent,
+      AppMessageKind.error => context.danger,
+      AppMessageKind.info => context.accentSoft,
     };
     final Color badgeIcon = widget.kind == AppMessageKind.error
         ? Colors.white
-        : AppColors.primary;
+        : context.primary;
     final IconData icon = switch (widget.kind) {
       AppMessageKind.success => CupertinoIcons.checkmark_alt,
       AppMessageKind.error => CupertinoIcons.exclamationmark,

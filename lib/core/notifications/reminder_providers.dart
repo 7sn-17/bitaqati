@@ -70,10 +70,7 @@ class ReminderCoordinator {
     final int due = _ref.read(totalDueProvider);
     final int slots = enabled ? ReminderService.slotsFor(due) : 0;
     final DeckNode? deck = _ref.read(todayReviewDeckProvider);
-    final ({int slots, String? deckId}) next = (
-      slots: slots,
-      deckId: deck?.id,
-    );
+    final ({int slots, String? deckId}) next = (slots: slots, deckId: deck?.id);
     if (_last == next) {
       return;
     }

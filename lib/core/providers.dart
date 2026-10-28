@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'theme/theme_palette.dart';
+
 final Provider<SharedPreferences> sharedPreferencesProvider =
     Provider<SharedPreferences>(
       (Ref ref) => throw UnimplementedError('Override in main()'),
@@ -114,6 +116,39 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
   Future<void> toggleDark() async {
     await setMode(state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+  }
+}
+
+/// The visual identity chosen in Settings.
+///
+/// Persisted by name, so adding a palette later never renumbers the saved
+/// value, and an unknown string (a downgrade, a typo) falls back to Forest
+/// instead of throwing.
+final NotifierProvider<ThemePaletteNotifier, AppThemeId> themePaletteProvider =
+    NotifierProvider<ThemePaletteNotifier, AppThemeId>(
+      ThemePaletteNotifier.new,
+    );
+
+class ThemePaletteNotifier extends Notifier<AppThemeId> {
+  static const String _key = 'theme_palette';
+
+  @override
+  AppThemeId build() {
+    final String? saved = ref.watch(sharedPreferencesProvider).getString(_key);
+    for (final AppThemeId id in AppThemeId.values) {
+      if (id.name == saved) {
+        return id;
+      }
+    }
+    return AppThemeId.forest;
+  }
+
+  Future<void> select(AppThemeId id) async {
+    if (state == id) {
+      return;
+    }
+    state = id;
+    await ref.read(sharedPreferencesProvider).setString(_key, id.name);
   }
 }
 

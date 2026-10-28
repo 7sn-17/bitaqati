@@ -12,6 +12,7 @@ import 'core/notifications/reminder_service.dart';
 import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_palette.dart';
 import 'data/sync_providers.dart';
 
 class BitaqatiApp extends ConsumerStatefulWidget {
@@ -122,6 +123,7 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
   @override
   Widget build(BuildContext context) {
     final ThemeMode themeMode = ref.watch(themeModeProvider);
+    final AppThemeId paletteId = ref.watch(themePaletteProvider);
     final Locale locale = ref.watch(languageProvider);
     final router = ref.watch(routerProvider);
     final bool isArabic = locale.languageCode == 'ar';
@@ -129,9 +131,14 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
     return MaterialApp.router(
       title: isArabic ? AppConfig.appNameAr : AppConfig.appNameEn,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
+      theme: AppTheme.light(paletteId),
+      darkTheme: AppTheme.dark(paletteId),
       themeMode: themeMode,
+      // A swatch tap is a change of identity, not a redraw. ThemeData.lerp
+      // cross-fades the attached ThemePalette token by token, so the whole
+      // screen dissolves from one identity into the next instead of snapping.
+      themeAnimationDuration: const Duration(milliseconds: 420),
+      themeAnimationCurve: Curves.easeInOutCubic,
       locale: locale,
       supportedLocales: const <Locale>[Locale('ar'), Locale('en')],
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[

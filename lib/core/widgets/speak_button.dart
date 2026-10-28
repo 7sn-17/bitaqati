@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../tts/tts_service.dart';
 import 'card_markup.dart';
@@ -74,8 +73,7 @@ class _SpeakButtonState extends State<SpeakButton>
   @override
   Widget build(BuildContext context) {
     final Color tint =
-        widget.tint ??
-        (context.isDark ? AppColors.darkAccent : AppColors.primary);
+        widget.tint ?? (context.isDark ? context.brandInk : context.primary);
     final bool enabled = _hasText;
 
     return Semantics(

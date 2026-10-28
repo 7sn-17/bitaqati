@@ -36,13 +36,36 @@ final StreamProviderFamily<List<ReviewCard>, String> deckCardsProvider =
           ref.watch(contentRepositoryProvider).watchCards(deckId),
     );
 
+/// The scope id that means "every deck".
+///
+/// Routes carry a deck id, so the global session needs an id of its own rather
+/// than a second route shape. Deck ids are UUIDs, so this can never collide
+/// with a real one.
+const String kAllDecksScope = 'all';
+
+/// True when [scope] asks for the whole library instead of one deck.
+bool isAllDecksScope(String scope) => scope == kAllDecksScope;
+
+/// Cards for a study mode, scoped to one deck or to everything.
+///
+/// The study screens take a scope id, not a deck, so "review all due cards"
+/// runs through exactly the same code as "review this deck".
+final StreamProviderFamily<List<ReviewCard>, String> studyCardsProvider =
+    StreamProvider.family<List<ReviewCard>, String>((Ref ref, String scope) {
+      final ContentRepository repository = ref.watch(contentRepositoryProvider);
+      return isAllDecksScope(scope)
+          ? repository.watchAllCards()
+          : repository.watchCards(scope);
+    });
+
 /// Which queue a review session wants.
 ///
 /// [all] builds a "review everything" session that also pulls in cards
 /// scheduled for later, which is what the empty state offers once the day's
-/// work is done. A record is used as the family key because records compare by
-/// value, so Riverpod caches the two queues separately.
-typedef StudyQuery = ({String deckId, bool all});
+/// work is done. A null [deckId] is the global queue. A record is used as the
+/// family key because records compare by value, so Riverpod caches the queues
+/// separately.
+typedef StudyQuery = ({String? deckId, bool all});
 
 /// The cards a review session should show. Loaded once per session.
 final AutoDisposeFutureProviderFamily<List<ReviewCard>, StudyQuery>

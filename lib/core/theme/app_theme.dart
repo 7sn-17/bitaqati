@@ -1,39 +1,46 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
-import 'app_colors.dart';
+import 'theme_palette.dart';
 
+/// Builds the two [ThemeData] instances the app runs on, from one palette.
+///
+/// The palette is attached as a [ThemeExtension], which does two things at
+/// once: every widget can read the active identity through the context, and
+/// MaterialApp cross-fades it — [ThemePalette.lerp] is what turns a tap on a
+/// swatch into an animated change instead of a flash.
 abstract final class AppTheme {
-  static ThemeData light() => _build(Brightness.light);
+  static ThemeData light([AppThemeId id = AppThemeId.forest]) =>
+      build(id, Brightness.light);
 
-  static ThemeData dark() => _build(Brightness.dark);
+  static ThemeData dark([AppThemeId id = AppThemeId.forest]) =>
+      build(id, Brightness.dark);
 
-  static ThemeData _build(Brightness brightness) {
-    final bool isDark = brightness == Brightness.dark;
-    final Color ink = isDark ? AppColors.darkInk : AppColors.ink;
-    final Color muted = isDark ? AppColors.darkMuted : AppColors.muted;
-    final Color page = isDark ? AppColors.darkCanvas : AppColors.canvas;
-    final Color card = isDark ? AppColors.darkSurface : Colors.white;
-    final Color raised = isDark ? AppColors.darkSurfaceHigh : AppColors.surface;
-    final Color hairline = isDark ? AppColors.darkLine : AppColors.line;
+  static ThemeData build(AppThemeId id, Brightness brightness) {
+    final ThemePalette palette = ThemePalette.of(id, brightness);
+    final bool isDark = palette.isDark;
+    final Color ink = palette.ink;
+    final Color muted = palette.muted;
+    final Color page = palette.canvas;
+    final Color card = palette.card;
+    final Color raised = palette.raised;
+    final Color hairline = palette.hairline;
 
     final ColorScheme scheme =
         ColorScheme.fromSeed(
-          seedColor: AppColors.primary,
+          seedColor: palette.primary,
           brightness: brightness,
         ).copyWith(
-          primary: isDark ? AppColors.darkAccent : AppColors.primary,
-          onPrimary: isDark ? AppColors.primary : Colors.white,
-          primaryContainer: isDark
-              ? AppColors.darkSurfaceHigh
-              : AppColors.accentSoft,
-          onPrimaryContainer: isDark ? AppColors.darkAccent : AppColors.primary,
-          secondary: isDark ? AppColors.darkAccent : AppColors.primaryDeep,
-          onSecondary: isDark ? AppColors.primary : Colors.white,
+          primary: isDark ? palette.brandInk : palette.primary,
+          onPrimary: isDark ? palette.primary : palette.onPrimary,
+          primaryContainer: isDark ? palette.raised : palette.accentSoft,
+          onPrimaryContainer: isDark ? palette.brandInk : palette.onSoftAccent,
+          secondary: isDark ? palette.brandInk : palette.primaryDeep,
+          onSecondary: isDark ? palette.primary : palette.onPrimary,
           secondaryContainer: raised,
           onSecondaryContainer: ink,
-          tertiary: isDark ? AppColors.accent : AppColors.blue,
-          onTertiary: isDark ? AppColors.primary : Colors.white,
+          tertiary: isDark ? palette.accent : palette.info,
+          onTertiary: isDark ? palette.primary : palette.onAccent,
           surface: page,
           onSurface: ink,
           onSurfaceVariant: muted,
@@ -44,8 +51,8 @@ abstract final class AppTheme {
           surfaceContainerHighest: raised,
           outline: hairline,
           outlineVariant: hairline,
-          error: isDark ? AppColors.darkDanger : AppColors.danger,
-          onError: isDark ? AppColors.darkCanvas : Colors.white,
+          error: palette.danger,
+          onError: palette.onPrimary,
         );
 
     final TextTheme textTheme = _textTheme(ink, muted);
@@ -54,6 +61,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
+      extensions: <ThemeExtension<dynamic>>[palette],
       scaffoldBackgroundColor: page,
       canvasColor: page,
       cardColor: card,
@@ -81,8 +89,8 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: isDark ? AppColors.darkAccent : AppColors.primary,
-          foregroundColor: isDark ? AppColors.primary : Colors.white,
+          backgroundColor: isDark ? palette.brandInk : palette.primary,
+          foregroundColor: isDark ? palette.primary : palette.onPrimary,
           disabledBackgroundColor: raised,
           disabledForegroundColor: muted,
           minimumSize: const Size(52, 52),
@@ -97,11 +105,11 @@ abstract final class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: isDark ? AppColors.darkAccent : AppColors.primary,
+          foregroundColor: isDark ? palette.brandInk : palette.primary,
           disabledForegroundColor: muted,
           minimumSize: const Size(52, 50),
           side: BorderSide(
-            color: isDark ? AppColors.darkLine : AppColors.primary,
+            color: isDark ? palette.hairline : palette.primary,
             width: 1.2,
           ),
           textStyle: const TextStyle(
@@ -114,7 +122,7 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: isDark ? AppColors.darkAccent : AppColors.primary,
+          foregroundColor: isDark ? palette.brandInk : palette.primary,
           disabledForegroundColor: muted,
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
@@ -142,7 +150,7 @@ abstract final class AppTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: isDark ? AppColors.darkSurfaceHigh : Colors.white,
+        backgroundColor: isDark ? raised : card,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: textTheme.headlineSmall,
         contentTextStyle: textTheme.bodyMedium,
@@ -155,9 +163,9 @@ abstract final class AppTheme {
         elevation: 0,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? AppColors.darkSurfaceHigh : AppColors.ink,
+        backgroundColor: isDark ? raised : ink,
         contentTextStyle: TextStyle(
-          color: isDark ? AppColors.darkInk : Colors.white,
+          color: isDark ? ink : page,
           fontFamily: 'IBMPlexSansArabic',
           fontSize: 13,
         ),
@@ -166,7 +174,7 @@ abstract final class AppTheme {
       ),
       dividerTheme: DividerThemeData(color: hairline, thickness: 0.7, space: 1),
       listTileTheme: ListTileThemeData(
-        iconColor: isDark ? AppColors.darkMuted : AppColors.muted,
+        iconColor: muted,
         textColor: ink,
         titleTextStyle: textTheme.titleMedium,
         subtitleTextStyle: textTheme.bodySmall,
@@ -183,14 +191,12 @@ abstract final class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (Set<WidgetState> states) => states.contains(WidgetState.selected)
-              ? (isDark ? AppColors.primary : Colors.white)
-              : (isDark ? AppColors.darkMuted : Colors.white),
+          (Set<WidgetState> states) => Colors.white,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (Set<WidgetState> states) => states.contains(WidgetState.selected)
-              ? (isDark ? AppColors.darkAccent : AppColors.primary)
-              : (isDark ? AppColors.darkLine : AppColors.line),
+              ? (isDark ? palette.brandInk : palette.primary)
+              : hairline,
         ),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
@@ -311,59 +317,120 @@ abstract final class AppTheme {
   }
 }
 
-/// Theme-aware colours. Widgets should read from here instead of reaching for
-/// the raw palette, which is what made dark mode unreadable.
+/// Theme-aware colours. Widgets read roles from here — never a literal — so a
+/// palette switch reaches every corner of the product.
 extension AppThemeContext on BuildContext {
   ColorScheme get colors => Theme.of(this).colorScheme;
   TextTheme get texts => Theme.of(this).textTheme;
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
   bool get isArabic => Localizations.localeOf(this).languageCode == 'ar';
 
-  /// Primary text colour for the current theme.
-  Color get ink => isDark ? AppColors.darkInk : AppColors.ink;
+  /// The active identity. Falls back to Forest if a widget is built outside
+  /// the app's theme (a bare test harness, a preview), so nothing throws.
+  ThemePalette get palette {
+    final ThemePalette? active = Theme.of(this).extension<ThemePalette>();
+    if (active != null) {
+      return active;
+    }
+    return ThemePalette.of(
+      AppThemeId.forest,
+      isDark ? Brightness.dark : Brightness.light,
+    );
+  }
 
-  /// Secondary text colour for the current theme.
-  Color get muted => isDark ? AppColors.darkMuted : AppColors.muted;
+  /// Page background.
+  Color get canvas => palette.canvas;
 
-  /// Brand colour that stays legible: dark green on light, lime on dark.
-  Color get brandInk => isDark ? AppColors.darkAccent : AppColors.primary;
+  /// Deep brand fill.
+  Color get primary => palette.primary;
+
+  /// Darker step of the brand fill.
+  Color get primaryDeep => palette.primaryDeep;
+
+  /// Text on [primary].
+  Color get onPrimary => palette.onPrimary;
+
+  /// Bright highlight.
+  Color get accent => palette.accent;
+
+  /// A deeper step of [accent] for two-stop gradients.
+  ///
+  /// Forest used to hard-code a mid-green here, which made every gradient in
+  /// the app end in the same leaf colour whatever the identity. Mixing the
+  /// highlight toward the deep brand fill keeps the same visual weight while
+  /// letting Ocean, Sunset and Classic own their own gradients.
+  Color get accentDeep =>
+      Color.lerp(palette.accent, palette.primaryDeep, 0.35)!;
+
+  /// Text on [accent].
+  Color get onAccent => palette.onAccent;
+
+  /// Pale wash of [accent].
+  Color get accentSoft => palette.accentSoft;
+
+  /// Brand colour that stays legible as text: deep on light, bright on dark.
+  Color get brandInk => palette.brandInk;
 
   /// Solid card background for the current theme.
-  Color get cardSurface => isDark ? AppColors.darkSurface : Colors.white;
+  Color get cardSurface => palette.card;
 
   /// Inputs, chips and selected tabs inside a card.
-  Color get raisedSurface =>
-      isDark ? AppColors.darkSurfaceHigh : AppColors.surface;
+  Color get raisedSurface => palette.raised;
 
   /// Soft brand wash used behind icons and highlights.
-  Color get softAccent =>
-      isDark ? AppColors.accent.withValues(alpha: 0.16) : AppColors.accentSoft;
+  Color get softAccent => palette.softAccent;
 
   /// Foreground for anything drawn on [softAccent].
-  ///
-  /// The light palette pairs the pale wash with dark green ink; on a dark
-  /// surface the same dark green disappears, so the pair flips to lime. Every
-  /// "selected" chip, badge and privacy row must use both getters together --
-  /// using [AppColors.primary] on [softAccent] is what made dark mode
-  /// unreadable.
-  Color get onSoftAccent => isDark ? AppColors.darkAccent : AppColors.primary;
+  Color get onSoftAccent => palette.onSoftAccent;
 
-  /// Stronger brand fill for a selected row: lime on dark, deep green on
-  /// light, always with a foreground that clears 4.5:1.
-  Color get selectedFill =>
-      isDark ? AppColors.accent.withValues(alpha: 0.22) : AppColors.accentSoft;
+  /// Stronger brand fill for a selected row.
+  Color get selectedFill => palette.selectedFill;
 
-  /// Danger colour that stays legible on both themes.
-  Color get dangerInk => isDark ? AppColors.darkDanger : AppColors.danger;
+  /// Danger colour, safe as a fill and as text on [cardSurface].
+  Color get danger => palette.danger;
+
+  /// Danger colour tuned for text on the current surface.
+  Color get dangerInk => palette.dangerInk;
+
+  /// Text and icons drawn on a [danger] fill.
+  Color get onDanger =>
+      ThemePalette.readable(const Color(0xFFFFFFFF), palette.danger);
+
+  /// Background of a warning strip.
+  Color get warningSurface => palette.warning;
+
+  /// Text on [warningSurface].
+  Color get warningInk => palette.warningInk;
+
+  /// Informational accent (the old "blue").
+  Color get info => palette.info;
+
+  /// Gold used for ratings and rewards.
+  Color get star => palette.star;
+
+  /// Positive-result colour.
+  Color get success => palette.success;
+
+  /// Background of a review card once the answer is revealed.
+  Color get answerSurface => palette.answerSurface;
+
+  /// Text on [answerSurface].
+  Color get onAnswer => palette.onAnswer;
+
+  /// Primary text colour for the current theme.
+  Color get ink => palette.ink;
+
+  /// Secondary text colour for the current theme.
+  Color get muted => palette.muted;
 
   /// A fixed colour made readable as *text* on this theme's surface.
   ///
   /// Stat tiles and subject chips take a brand colour each — deep green, blue,
   /// amber, pastel — and the deep ones vanish on a dark card while the pastels
   /// vanish on a light one. This is the single rule for that, shared with
-  /// [deckInk] so a deck colour behaves the same everywhere it is drawn.
+  /// deckInk so a deck colour behaves the same everywhere it is drawn.
   Color legible(Color color) => deckInk(color, dark: isDark);
 
   /// Hairline colour for borders.
-  Color get hairline => isDark ? AppColors.darkLine : AppColors.line;
+  Color get hairline => palette.hairline;
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import '../theme/theme_palette.dart';
 
 /// The one empty state used across the app.
 ///
@@ -28,7 +28,7 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color accent = tint ?? AppColors.accent;
+    final Color accent = tint ?? context.accent;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
       child: Column(
@@ -45,7 +45,7 @@ class EmptyState extends StatelessWidget {
             child: Icon(
               icon,
               size: 40,
-              color: context.isDark ? accent : AppColors.primaryDeep,
+              color: context.isDark ? accent : context.primaryDeep,
             ),
           ),
           const SizedBox(height: 18),
@@ -63,11 +63,7 @@ class EmptyState extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.6,
-              color: context.muted,
-            ),
+            style: TextStyle(fontSize: 13, height: 1.6, color: context.muted),
           ),
           if (actionLabel != null && onAction != null) ...<Widget>[
             const SizedBox(height: 18),
@@ -78,7 +74,9 @@ class EmptyState extends StatelessWidget {
                 onPressed: onAction,
                 style: FilledButton.styleFrom(
                   backgroundColor: accent,
-                  foregroundColor: AppColors.primary,
+                  // [tint] can be any brand colour, so the label is made
+                  // readable against whatever it actually is.
+                  foregroundColor: ThemePalette.readable(Colors.white, accent),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 26,
                     vertical: 13,

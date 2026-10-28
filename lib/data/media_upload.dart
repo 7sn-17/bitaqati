@@ -60,7 +60,7 @@ class MediaUploadService {
   /// compression decides how many bytes travel, and both have to happen before
   /// anything is sent. Uploading first would leave the full frame at full
   /// resolution in storage forever.
-  Future<PickedMedia?> pickImage() async {
+  Future<PickedMedia?> pickImage({CropChrome? chrome}) async {
     final XFile? picked = await _picker.pickImage(
       source: ImageSource.gallery,
       // No maxWidth here: the picker would downscale before the crop, and the
@@ -70,7 +70,7 @@ class MediaUploadService {
     if (picked == null) {
       return null;
     }
-    final File? cropped = await cropImage(File(picked.path));
+    final File? cropped = await cropImage(File(picked.path), chrome: chrome);
     if (cropped == null) {
       // Backed out of the cropper: nothing is attached.
       return null;

@@ -170,7 +170,8 @@ class FsrsEngine {
     // A row that claims to be in review without real numbers would make the
     // scheduler dereference null, so it is treated as a brand new card.
     final FsrsMemory? known =
-        memory != null && (memory.phase == FsrsPhase.learning || memory.isSchedulable)
+        memory != null &&
+            (memory.phase == FsrsPhase.learning || memory.isSchedulable)
         ? memory
         : null;
 
@@ -222,9 +223,7 @@ class FsrsEngine {
       elapsedDays: elapsedDays,
       scheduledDays: _days(next.due.difference(nowUtc)),
       retrievability: retrievability,
-      lapsed: known != null &&
-          known.phase == FsrsPhase.review &&
-          rating == 1,
+      lapsed: known != null && known.phase == FsrsPhase.review && rating == 1,
       previous: previous,
       next: _snapshot(next, null),
     );
@@ -238,7 +237,8 @@ class FsrsEngine {
     final DateTime nowUtc = now.toUtc();
     final fsrs.Scheduler scheduler = _scheduler(fuzz: false);
     final FsrsMemory? known =
-        memory != null && (memory.phase == FsrsPhase.learning || memory.isSchedulable)
+        memory != null &&
+            (memory.phase == FsrsPhase.learning || memory.isSchedulable)
         ? memory
         : null;
     final Map<int, Duration> out = <int, Duration>{};
@@ -247,7 +247,11 @@ class FsrsEngine {
           ? fsrs.Card(cardId: 0, due: nowUtc)
           : known.toCard(cardId: 0);
       final fsrs.Card next = scheduler
-          .reviewCard(card, fsrs.Rating.fromValue(rating), reviewDateTime: nowUtc)
+          .reviewCard(
+            card,
+            fsrs.Rating.fromValue(rating),
+            reviewDateTime: nowUtc,
+          )
           .card;
       final Duration gap = next.due.difference(nowUtc);
       out[rating] = gap.isNegative ? Duration.zero : gap;
@@ -279,7 +283,10 @@ class FsrsEngine {
     return days < 0 ? 0 : days;
   }
 
-  static Map<String, Object?> _snapshot(fsrs.Card card, double? retrievability) {
+  static Map<String, Object?> _snapshot(
+    fsrs.Card card,
+    double? retrievability,
+  ) {
     return <String, Object?>{
       'state': card.state.name,
       'step': card.step,

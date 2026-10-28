@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/auth/auth_providers.dart';
-import '../core/user_display.dart';
 import 'library_providers.dart';
 import 'local/database_provider.dart';
 import 'profile_repository.dart';
@@ -34,9 +33,7 @@ final StreamProvider<String> chosenDisplayNameProvider = StreamProvider<String>(
 /// userFirstName directly, which is what makes a rename show up in the header,
 /// Settings and the library at the same moment.
 final NotifierProvider<DisplayNameController, String> displayNameProvider =
-    NotifierProvider<DisplayNameController, String>(
-      DisplayNameController.new,
-    );
+    NotifierProvider<DisplayNameController, String>(DisplayNameController.new);
 
 class DisplayNameController extends Notifier<String> {
   @override

@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_providers.dart';
 import '../../core/guest_guard.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
@@ -224,7 +223,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     child: _MiniStat(
                       value: '${deck.dueNew}',
                       label: 'جديدة',
-                      color: AppColors.blue,
+                      color: context.info,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -232,7 +231,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     child: _MiniStat(
                       value: '${deck.dueLearning}',
                       label: 'تعلّم',
-                      color: AppColors.danger,
+                      color: context.danger,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -240,7 +239,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                     child: _MiniStat(
                       value: '${deck.dueReview}',
                       label: 'مراجعة',
-                      color: AppColors.primary,
+                      color: context.primary,
                     ),
                   ),
                 ],
@@ -260,16 +259,16 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                         ? null
                         : () => _installPreview(context, deck),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.accent,
+                      backgroundColor: context.primary,
+                      foregroundColor: context.accent,
                     ),
                     child: _installing
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.2,
-                              color: AppColors.accent,
+                              color: context.accent,
                             ),
                           )
                         : Text(studyLabel),
@@ -339,10 +338,12 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: canStudy ? () => _openStudyModes(deck) : null,
+                    onPressed: canStudy
+                        ? () => openStudyMode(context, deck)
+                        : null,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.primary,
+                      backgroundColor: context.accent,
+                      foregroundColor: context.onAccent,
                       minimumSize: const Size(0, 50),
                       textStyle: const TextStyle(
                         fontFamily: 'ReadexPro',
@@ -552,7 +553,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurface : Colors.white,
+            color: context.cardSurface,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Column(
@@ -787,28 +788,9 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
   }
 
   /// Opens the mode chooser, then pushes the screen that was picked.
-  Future<void> _openStudyModes(DeckNode deck) async {
-    final StudyMode? mode = await showStudyModeSheet(
-      context,
-      deckTitle: deck.title,
-      cardCount: deck.cardCount,
-      dueCount: deck.dueCount,
-    );
-    if (mode == null || !mounted) {
-      return;
-    }
-    switch (mode) {
-      case StudyMode.review:
-        await context.push('/review/${deck.id}');
-      case StudyMode.test:
-        await context.push('/test/${deck.id}');
-      case StudyMode.match:
-        await context.push('/match/${deck.id}');
-      case StudyMode.write:
-        await context.push('/write/${deck.id}');
-    }
-  }
-
+  ///
+  /// The routing lives in study_mode_sheet.dart so a deck session and the
+  /// global session cannot drift apart.
   void _showActions(BuildContext screenContext, DeckNode deck) {
     showModalBottomSheet<void>(
       context: screenContext,
@@ -819,7 +801,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurface : Colors.white,
+            color: context.cardSurface,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Column(
@@ -988,7 +970,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
           margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurface : Colors.white,
+            color: context.cardSurface,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Column(
@@ -1494,7 +1476,7 @@ class _Tabs extends StatelessWidget {
                           ? FontWeight.w600
                           : FontWeight.w400,
                       color: selected == index
-                          ? (context.isDark ? AppColors.primary : Colors.white)
+                          ? (context.isDark ? context.primary : Colors.white)
                           : context.texts.bodySmall?.color,
                     ),
                   ),
@@ -1541,7 +1523,7 @@ class _SelectableCardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _CardStatusInfo status = _statusFor(card);
+    final _CardStatusInfo status = _statusFor(context, card);
     final String front = _cardPreviewText(card.front, fallback: 'بدون نص');
     final String back = _cardPreviewText(card.back);
     final bool hasBack = back.isNotEmpty;
@@ -1719,45 +1701,45 @@ class _SelectableCardRow extends StatelessWidget {
     );
   }
 
-  _CardStatusInfo _statusFor(ReviewCard card) {
+  _CardStatusInfo _statusFor(BuildContext context, ReviewCard card) {
     if (card.suspended) {
-      return const _CardStatusInfo(
+      return _CardStatusInfo(
         label: 'معلّقة',
-        color: Color(0xFF7C6AAE),
+        color: context.muted,
         icon: CupertinoIcons.pause_circle,
       );
     }
     if (card.isLeech) {
-      return const _CardStatusInfo(
+      return _CardStatusInfo(
         label: 'تحتاج تركيزاً',
-        color: AppColors.danger,
+        color: context.danger,
         icon: CupertinoIcons.exclamationmark_triangle,
       );
     }
     if (card.phase == CardPhase.newCard) {
-      return const _CardStatusInfo(
+      return _CardStatusInfo(
         label: 'جديدة',
-        color: AppColors.blue,
+        color: context.info,
         icon: CupertinoIcons.sparkles,
       );
     }
     if (card.isDue) {
-      return const _CardStatusInfo(
+      return _CardStatusInfo(
         label: 'مستحقة',
-        color: AppColors.accent,
+        color: context.accent,
         icon: CupertinoIcons.clock,
       );
     }
     if (card.phase == CardPhase.learning) {
-      return const _CardStatusInfo(
+      return _CardStatusInfo(
         label: 'قيد التعلّم',
-        color: AppColors.danger,
+        color: context.danger,
         icon: CupertinoIcons.flame,
       );
     }
-    return const _CardStatusInfo(
+    return _CardStatusInfo(
       label: 'راسخة',
-      color: AppColors.primary,
+      color: context.primary,
       icon: CupertinoIcons.checkmark_seal,
     );
   }
@@ -1803,7 +1785,7 @@ class _SelectionMark extends StatelessWidget {
               selected ? CupertinoIcons.checkmark_alt : CupertinoIcons.circle,
               size: 14,
               color: selected
-                  ? (context.isDark ? AppColors.primary : Colors.white)
+                  ? (context.isDark ? context.primary : Colors.white)
                   : context.texts.bodySmall?.color,
             )
           : Text(
@@ -1908,7 +1890,7 @@ class _BulkActionBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.darkSurfaceHigh : Colors.white,
+            color: context.raisedSurface,
             borderRadius: BorderRadius.circular(26),
             boxShadow: <BoxShadow>[
               BoxShadow(
@@ -1942,7 +1924,7 @@ class _BulkActionBar extends StatelessWidget {
               _BulkAction(
                 icon: CupertinoIcons.trash,
                 label: 'حذف',
-                color: AppColors.danger,
+                color: context.danger,
                 onTap: onDelete,
               ),
             ],
@@ -2024,10 +2006,10 @@ class _PreviewPanel extends StatelessWidget {
                 if (deck.rating != null)
                   Text(
                     '${deck.rating!.toStringAsFixed(1)} ★',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.accent,
+                      color: context.accent,
                     ),
                   ),
               ],
@@ -2136,7 +2118,7 @@ class _DeckRatingBarState extends ConsumerState<_DeckRatingBar> {
                             : CupertinoIcons.star,
                         size: 18,
                         color: star <= mine
-                            ? AppColors.accent
+                            ? context.accent
                             : context.colors.outlineVariant,
                       ),
                     ),
@@ -2219,8 +2201,8 @@ class _DeckStatisticsTab extends ConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: <Color>[AppColors.primary, Color(0xFF2D5410)],
+                  gradient: LinearGradient(
+                    colors: <Color>[context.primary, context.primaryDeep],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -2240,8 +2222,8 @@ class _DeckStatisticsTab extends ConsumerWidget {
                             backgroundColor: Colors.white.withValues(
                               alpha: 0.18,
                             ),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppColors.accent,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              context.accent,
                             ),
                           ),
                           Center(
@@ -2301,32 +2283,32 @@ class _DeckStatisticsTab extends ConsumerWidget {
                   _StatBox(
                     value: '${value.totalCards}',
                     label: 'إجمالي البطاقات',
-                    color: AppColors.primary,
+                    color: context.primary,
                   ),
                   _StatBox(
                     value: '${value.newCards}',
                     label: 'جديدة',
-                    color: AppColors.blue,
+                    color: context.info,
                   ),
                   _StatBox(
                     value: '${value.learningCards}',
                     label: 'قيد التعلّم',
-                    color: AppColors.danger,
+                    color: context.danger,
                   ),
                   _StatBox(
                     value: '${value.dueCards}',
                     label: 'مستحقة الآن',
-                    color: AppColors.accent,
+                    color: context.accent,
                   ),
                   _StatBox(
                     value: '${value.matureCards}',
                     label: 'ناضجة',
-                    color: const Color(0xFF4E7A2A),
+                    color: context.success,
                   ),
                   _StatBox(
                     value: '${value.maturityPercent.round()}%',
                     label: 'اكتمال النضج',
-                    color: const Color(0xFF6B5B95),
+                    color: context.info,
                   ),
                 ],
               ),
@@ -2386,7 +2368,7 @@ class _DeckSocialSection extends ConsumerWidget {
                 icon: CupertinoIcons.arrow_down_circle_fill,
                 value: '${social.installCount}',
                 label: 'عدد التنزيلات',
-                color: AppColors.blue,
+                color: context.info,
               ),
             ),
             const SizedBox(width: 10),
@@ -2397,7 +2379,7 @@ class _DeckSocialSection extends ConsumerWidget {
                     ? social.averageRating!.toStringAsFixed(1)
                     : '—',
                 label: social.hasRating ? 'متوسط التقييم' : 'لا تقييمات',
-                color: const Color(0xFFE0A200),
+                color: context.star,
               ),
             ),
           ],
@@ -2654,7 +2636,7 @@ class _ReviewComposerState extends ConsumerState<_ReviewComposer> {
                           : CupertinoIcons.star,
                       size: 25,
                       color: star <= _stars
-                          ? const Color(0xFFE0A200)
+                          ? context.star
                           : context.colors.outlineVariant,
                     ),
                   ),
@@ -2697,8 +2679,8 @@ class _ReviewComposerState extends ConsumerState<_ReviewComposer> {
             child: FilledButton(
               onPressed: _saving ? null : _submit,
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: context.primary,
+                foregroundColor: context.onPrimary,
                 minimumSize: const Size(0, 42),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(13),
@@ -2771,7 +2753,7 @@ class _ReviewRow extends StatelessWidget {
                         : CupertinoIcons.star,
                     size: 12,
                     color: star <= review.rating
-                        ? const Color(0xFFE0A200)
+                        ? context.star
                         : context.colors.outlineVariant,
                   ),
               ],
@@ -3064,7 +3046,7 @@ class _PrivacyOption extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
-                  ? AppColors.accent
+                  ? context.accent
                   : context.colors.outlineVariant.withValues(alpha: 0.55),
             ),
           ),
@@ -3223,7 +3205,7 @@ class _AttributionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String author = (deck.originalAuthorName ?? '').trim();
-    final Color tint = context.isDark ? AppColors.darkAccent : AppColors.blue;
+    final Color tint = context.isDark ? context.brandInk : context.info;
     final String title = author.isEmpty ? 'مجموعة مقتبسة' : 'مقتبسة من $author';
     return SurfaceCard(
       child: Row(

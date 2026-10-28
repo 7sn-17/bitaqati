@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/guest_guard.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_palette.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
 import '../../core/widgets/image_viewer.dart';
@@ -34,24 +34,35 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   @override
   Widget build(BuildContext context) {
     final String deckId = widget.deckId;
-    final DeckNode? found = ref.watch(deckByIdProvider(deckId));
+    // The route carries a scope: a deck id, or the sentinel that means every
+    // deck. Everything below treats "all" as a deck that happens to contain
+    // the whole library, so the session code stays identical.
+    final bool global = isAllDecksScope(deckId);
+    final DeckNode? found = global ? null : ref.watch(deckByIdProvider(deckId));
     final bool listReady = ref.watch(deckListProvider).hasValue;
     final List<ReviewCard>? queue = ref
-        .watch(studyQueueProvider((deckId: deckId, all: _all)))
+        .watch(studyQueueProvider((deckId: global ? null : deckId, all: _all)))
         .valueOrNull;
-    if ((found == null && !listReady) || queue == null) {
-      return const Scaffold(
-        backgroundColor: AppColors.primary,
-        body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
+    if ((!global && found == null && !listReady) || queue == null) {
+      return Scaffold(
+        backgroundColor: context.primary,
+        body: Center(child: CircularProgressIndicator(color: context.accent)),
       );
     }
     final DeckNode deck =
-        found ?? DeckNode(id: deckId, title: '', color: AppColors.primary);
+        found ??
+        DeckNode(
+          id: deckId,
+          title: global ? 'جميع المجموعات' : '',
+          color: context.primary,
+        );
     final bool canStudyAll =
-        !_all && queue.isEmpty && found != null && deck.cardCount > 0;
+        !_all &&
+        queue.isEmpty &&
+        (global || (found != null && deck.cardCount > 0));
     return _ReviewSession(
       deck: deck,
-      cards: found == null ? const <ReviewCard>[] : queue,
+      cards: (!global && found == null) ? const <ReviewCard>[] : queue,
       allowEarly: _all,
       onStudyAll: canStudyAll
           ? () {
@@ -364,7 +375,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   Widget build(BuildContext context) {
     if (_cards.isEmpty) {
       return Scaffold(
-        backgroundColor: AppColors.primary,
+        backgroundColor: context.primary,
         body: SafeArea(
           child: Center(
             child: Padding(
@@ -372,11 +383,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  const Icon(
-                    CupertinoIcons.tray,
-                    size: 44,
-                    color: AppColors.accent,
-                  ),
+                  Icon(CupertinoIcons.tray, size: 44, color: context.accent),
                   const SizedBox(height: 14),
                   const Text(
                     'لا توجد بطاقات للمراجعة',
@@ -404,8 +411,8 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                         icon: const Icon(CupertinoIcons.forward_end, size: 17),
                         label: const Text('راجع الكل الآن'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.accent,
-                          foregroundColor: AppColors.primary,
+                          backgroundColor: context.accent,
+                          foregroundColor: context.onAccent,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 22,
                             vertical: 13,
@@ -438,7 +445,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                       }
                     },
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.white.withValues(alpha: 0.8),
+                      foregroundColor: context.onAnswer.withValues(alpha: 0.8),
                     ),
                     child: const Text('رجوع'),
                   ),
@@ -476,7 +483,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
     final ReviewCard card = _current!;
 
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: context.primary,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -502,9 +509,9 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                       child: LinearProgressIndicator(
                         value: progress,
                         minHeight: 8,
-                        backgroundColor: AppColors.primaryDeep,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.accent,
+                        backgroundColor: context.primaryDeep,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          context.accent,
                         ),
                       ),
                     ),
@@ -554,7 +561,11 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                       bottom: 0,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFCFE0C4),
+                          color: Color.lerp(
+                            context.accentSoft,
+                            context.ink,
+                            0.12,
+                          ),
                           borderRadius: BorderRadius.circular(28),
                         ),
                       ),
@@ -566,7 +577,11 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                       bottom: 0,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFDCECD0),
+                          color: Color.lerp(
+                            context.accentSoft,
+                            context.cardSurface,
+                            0.35,
+                          ),
                           borderRadius: BorderRadius.circular(28),
                         ),
                       ),
@@ -576,14 +591,12 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
                         decoration: BoxDecoration(
                           color: _revealed
-                              ? AppColors.answerSurface
-                              : Colors.white,
+                              ? context.answerSurface
+                              : context.cardSurface,
                           borderRadius: BorderRadius.circular(28),
                           border: _revealed
                               ? Border.all(
-                                  color: AppColors.accent.withValues(
-                                    alpha: 0.35,
-                                  ),
+                                  color: context.accent.withValues(alpha: 0.35),
                                   width: 1.2,
                                 )
                               : null,
@@ -643,8 +656,8 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                   child: FilledButton(
                     onPressed: _reveal,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.primary,
+                      backgroundColor: context.accent,
+                      foregroundColor: context.onAccent,
                       minimumSize: const Size(52, 54),
                     ),
                     child: const Text('أظهر الإجابة'),
@@ -725,24 +738,19 @@ class _CardBody extends StatelessWidget {
   final bool favorite;
   final VoidCallback onToggleFavorite;
 
-  /// Gold is legible on the white question card and on the dark green answer
-  /// card. The brand lime was not, which is why a starred card still looked
-  /// unstarred to anyone who tapped it.
-  static const Color _starInk = Color(0xFFE0A200);
-
   @override
   Widget build(BuildContext context) {
-    // The card itself is a light island on the green page in both themes, so
-    // its contents use the fixed light palette. Theme-aware colours here would
-    // paint near-white text on a white card in dark mode.
-    final Color ink = revealed ? Colors.white : AppColors.ink;
+    // The card is its own surface: it follows the palette's card colour in
+    // the question state and the palette's answer colour once revealed, so the
+    // text has to follow those two surfaces rather than the page behind them.
+    final Color ink = revealed ? context.onAnswer : context.ink;
     final Color muted = revealed
         ? Colors.white.withValues(alpha: 0.62)
-        : AppColors.muted;
+        : context.muted;
 
     return Column(
       children: <Widget>[
-        _header(muted),
+        _header(context, muted),
         const SizedBox(height: 6),
         // The card is a fixed-size island: the content is centred in whatever
         // height is left over, and scrolls only when it is genuinely taller
@@ -763,19 +771,19 @@ class _CardBody extends StatelessWidget {
     );
   }
 
-  Widget _header(Color muted) {
+  Widget _header(BuildContext context, Color muted) {
     return Row(
       children: <Widget>[
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: revealed ? AppColors.primaryDeep : AppColors.accentSoft,
+            color: revealed ? context.primaryDeep : context.accentSoft,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
             deck.title,
             style: TextStyle(
-              color: revealed ? AppColors.accent : AppColors.primary,
+              color: revealed ? context.accent : context.primary,
               fontSize: 10.5,
               fontWeight: FontWeight.w600,
             ),
@@ -793,7 +801,7 @@ class _CardBody extends StatelessWidget {
           icon: Icon(
             favorite ? CupertinoIcons.star_fill : CupertinoIcons.star,
             size: 21,
-            color: favorite ? _starInk : muted,
+            color: favorite ? context.star : muted,
           ),
         ),
       ],
@@ -810,7 +818,7 @@ class _CardBody extends StatelessWidget {
             _SideLabel(
               label: 'السؤال',
               text: prompt,
-              tint: AppColors.primary,
+              tint: context.primary,
               color: muted,
             ),
             const SizedBox(height: 10),
@@ -858,7 +866,7 @@ class _CardBody extends StatelessWidget {
           textHeader: _SideLabel(
             label: 'السؤال',
             text: card.front,
-            tint: AppColors.primary,
+            tint: context.primary,
             color: muted,
           ),
           style: TextStyle(
@@ -872,7 +880,7 @@ class _CardBody extends StatelessWidget {
         ),
         if (card.hint != null && hintVisible) ...<Widget>[
           const SizedBox(height: 16),
-          _hint(card.hint!),
+          _hint(context, card.hint!),
         ],
       ],
     );
@@ -892,9 +900,9 @@ class _CardBody extends StatelessWidget {
               text: occlusionPrompt(card.back),
               alignment: CrossAxisAlignment.center,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'ReadexPro',
-                color: Colors.white70,
+                color: context.onAnswer.withValues(alpha: 0.72),
                 fontSize: 17,
                 height: 1.5,
                 fontWeight: FontWeight.w600,
@@ -920,12 +928,12 @@ class _CardBody extends StatelessWidget {
             textHeader: _SideLabel(
               label: 'الإجابة',
               text: card.back,
-              tint: AppColors.accent,
-              color: AppColors.accent,
+              tint: context.accent,
+              color: context.accent,
             ),
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'ReadexPro',
-              color: Colors.white,
+              color: context.onAnswer,
               fontSize: 29,
               height: 1.45,
               fontWeight: FontWeight.w800,
@@ -951,8 +959,8 @@ class _CardBody extends StatelessWidget {
                   ),
                   child: Text(
                     tag,
-                    style: const TextStyle(
-                      color: AppColors.accent,
+                    style: TextStyle(
+                      color: context.accent,
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -963,7 +971,7 @@ class _CardBody extends StatelessWidget {
         ],
         if (card.hint != null && hintVisible) ...<Widget>[
           const SizedBox(height: 14),
-          _hint(card.hint!),
+          _hint(context, card.hint!),
         ],
         if (card.note != null) ...<Widget>[
           const SizedBox(height: 14),
@@ -977,10 +985,10 @@ class _CardBody extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text(
+                Text(
                   'ملاحظة',
                   style: TextStyle(
-                    color: AppColors.accent,
+                    color: context.accent,
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1002,28 +1010,24 @@ class _CardBody extends StatelessWidget {
     );
   }
 
-  Widget _hint(String hint) {
+  Widget _hint(BuildContext context, String hint) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.warning,
+        color: context.warningSurface,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Icon(
-            CupertinoIcons.lightbulb,
-            size: 14,
-            color: AppColors.warningInk,
-          ),
+          Icon(CupertinoIcons.lightbulb, size: 14, color: context.warningInk),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
               hint,
-              style: const TextStyle(
-                color: AppColors.warningInk,
+              style: TextStyle(
+                color: context.warningInk,
                 fontSize: 12,
                 height: 1.6,
               ),
@@ -1051,22 +1055,22 @@ class _RatingBar extends StatelessWidget {
       _RatingSpec(
         label: 'نسيتها',
         interval: _intervalLabel(intervals[1]),
-        color: AppColors.danger,
+        kind: _RatingKind.again,
       ),
       _RatingSpec(
         label: 'صعبة',
         interval: _intervalLabel(intervals[2]),
-        color: Colors.white,
+        kind: _RatingKind.hard,
       ),
       _RatingSpec(
         label: 'جيدة',
         interval: _intervalLabel(intervals[3]),
-        color: AppColors.accent,
+        kind: _RatingKind.good,
       ),
       _RatingSpec(
         label: 'سهلة',
         interval: _intervalLabel(intervals[4]),
-        color: const Color(0xFF054D28),
+        kind: _RatingKind.easy,
       ),
     ];
 
@@ -1094,17 +1098,21 @@ class _RatingButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool light = spec.color == Colors.white;
-    final bool dark = spec.color == const Color(0xFF054D28);
-    final bool danger = spec.color == AppColors.danger;
-    final Color background = light ? Colors.white : spec.color;
-    final Color foreground = light
-        ? AppColors.primary
-        : dark
-        ? AppColors.accent
-        : danger
-        ? Colors.white
-        : AppColors.primary;
+    // Four roles, four answers: a warning red, the plain card, the highlight,
+    // and the deep brand. Each pair is measured so the label never disappears.
+    final Color background = switch (spec.kind) {
+      _RatingKind.again => context.danger,
+      _RatingKind.hard => context.cardSurface,
+      _RatingKind.good => context.accent,
+      _RatingKind.easy => context.primaryDeep,
+    };
+    final Color foreground = switch (spec.kind) {
+      _RatingKind.again => ThemePalette.readable(Colors.white, background),
+      _RatingKind.hard => context.ink,
+      _RatingKind.good => context.onAccent,
+      _RatingKind.easy => ThemePalette.readable(Colors.white, background),
+    };
+    final bool outlined = spec.kind == _RatingKind.hard;
 
     return GestureDetector(
       onTap: onTap,
@@ -1113,8 +1121,8 @@ class _RatingButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: background,
           borderRadius: BorderRadius.circular(999),
-          border: light
-              ? Border.all(color: AppColors.accent.withValues(alpha: 0.6))
+          border: outlined
+              ? Border.all(color: context.hairline, width: 1.2)
               : null,
         ),
         alignment: Alignment.center,
@@ -1193,13 +1201,13 @@ class _Summary extends ConsumerWidget {
               child: Container(
                 width: 94,
                 height: 94,
-                decoration: const BoxDecoration(
-                  color: AppColors.accent,
+                decoration: BoxDecoration(
+                  color: context.accent,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   CupertinoIcons.checkmark,
-                  color: AppColors.primary,
+                  color: context.primary,
                   size: 46,
                 ),
               ),
@@ -1253,22 +1261,22 @@ class _Summary extends ConsumerWidget {
                   children: <Widget>[
                     Expanded(
                       flex: again == 0 ? 1 : again,
-                      child: const ColoredBox(color: AppColors.danger),
+                      child: ColoredBox(color: context.danger),
                     ),
                     const SizedBox(width: 3),
                     Expanded(
                       flex: hard == 0 ? 1 : hard,
-                      child: const ColoredBox(color: AppColors.muted),
+                      child: ColoredBox(color: context.muted),
                     ),
                     const SizedBox(width: 3),
                     Expanded(
                       flex: good == 0 ? 1 : good,
-                      child: const ColoredBox(color: AppColors.accent),
+                      child: ColoredBox(color: context.accent),
                     ),
                     const SizedBox(width: 3),
                     Expanded(
                       flex: easy == 0 ? 1 : easy,
-                      child: const ColoredBox(color: AppColors.primary),
+                      child: ColoredBox(color: context.primary),
                     ),
                   ],
                 ),
@@ -1288,16 +1296,12 @@ class _Summary extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: context.primary,
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Row(
                 children: <Widget>[
-                  const Icon(
-                    CupertinoIcons.flame,
-                    color: AppColors.accent,
-                    size: 22,
-                  ),
+                  Icon(CupertinoIcons.flame, color: context.accent, size: 22),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -1331,8 +1335,8 @@ class _Summary extends ConsumerWidget {
             FilledButton(
               onPressed: onClose,
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.primary,
+                backgroundColor: context.accent,
+                foregroundColor: context.onAccent,
               ),
               child: const Text('العودة إلى المجموعات'),
             ),
@@ -1406,9 +1410,9 @@ class _Legend extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.only(bottom: 3),
       decoration: active
-          ? const BoxDecoration(
+          ? BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: AppColors.accent, width: 2),
+                bottom: BorderSide(color: context.accent, width: 2),
               ),
             )
           : null,
@@ -1486,7 +1490,7 @@ class _DarkRoundButton extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.primaryDeep,
+            color: context.primaryDeep,
             borderRadius: BorderRadius.circular(15),
           ),
           child: Icon(icon, size: 18, color: Colors.white),
@@ -1496,16 +1500,23 @@ class _DarkRoundButton extends StatelessWidget {
   }
 }
 
+/// Which of the four answers a rating button stands for.
+///
+/// The button colour comes from the palette by role rather than being stored
+/// on the spec: a stored colour cannot follow the active identity, and the old
+/// version identified "hard" by comparing a colour to white.
+enum _RatingKind { again, hard, good, easy }
+
 class _RatingSpec {
   const _RatingSpec({
     required this.label,
     required this.interval,
-    required this.color,
+    required this.kind,
   });
 
   final String label;
   final String interval;
-  final Color color;
+  final _RatingKind kind;
 }
 
 String _formatDuration(Duration duration) {

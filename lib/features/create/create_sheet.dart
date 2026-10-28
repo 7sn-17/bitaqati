@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_providers.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../data/content_providers.dart';
@@ -30,9 +29,7 @@ class _CreateSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Color surface = context.isDark
-        ? AppColors.darkSurfaceHigh
-        : Colors.white;
+    final Color surface = context.raisedSurface;
     return SafeArea(
       top: false,
       child: Padding(
@@ -164,7 +161,7 @@ class _CreateSheet extends ConsumerWidget {
             margin: const EdgeInsets.all(12),
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
             decoration: BoxDecoration(
-              color: context.isDark ? AppColors.darkSurface : Colors.white,
+              color: context.cardSurface,
               borderRadius: BorderRadius.circular(26),
             ),
             child: Column(

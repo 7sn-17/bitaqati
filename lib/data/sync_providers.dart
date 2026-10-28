@@ -16,7 +16,9 @@ final Provider<SyncService> syncServiceProvider = Provider<SyncService>(
 ///
 /// Kept here because the sync controller is the only other thing that cares,
 /// and two subscriptions to the same platform channel would be wasteful.
-final StreamProvider<bool> networkStatusProvider = StreamProvider<bool>((Ref ref) {
+final StreamProvider<bool> networkStatusProvider = StreamProvider<bool>((
+  Ref ref,
+) {
   return Connectivity().onConnectivityChanged
       .map(
         (List<ConnectivityResult> results) => results.any(
@@ -63,21 +65,21 @@ class SyncController extends Notifier<SyncState> {
     // Studying works entirely from the local database, so the app can sit
     // offline indefinitely. The moment the radio comes back we drain the queue
     // in the background, without the user having to ask for it.
-    _network = Connectivity().onConnectivityChanged.listen(
-      (List<ConnectivityResult> results) {
-        final bool online = results.any(
-          (ConnectivityResult result) => result != ConnectivityResult.none,
-        );
-        if (!online) {
-          _wasOffline = true;
-          return;
-        }
-        if (_wasOffline) {
-          _wasOffline = false;
-          unawaited(Future<void>.microtask(syncNow));
-        }
-      },
-    );
+    _network = Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
+      final bool online = results.any(
+        (ConnectivityResult result) => result != ConnectivityResult.none,
+      );
+      if (!online) {
+        _wasOffline = true;
+        return;
+      }
+      if (_wasOffline) {
+        _wasOffline = false;
+        unawaited(Future<void>.microtask(syncNow));
+      }
+    });
     ref.onDispose(() => _network?.cancel());
 
     // No timer. A study session's writes are pushed on the three moments that
@@ -85,20 +87,19 @@ class SyncController extends Notifier<SyncState> {
     // foreground, and when the user asks. An idle app therefore never wakes the
     // radio, which is both kinder to the battery and cheaper than polling a
     // queue that is usually empty.
-    ref.listen<AsyncValue<User?>>(
-      currentUserProvider,
-      (AsyncValue<User?>? previous, AsyncValue<User?> next) {
-        final User? user = next.valueOrNull;
-        if (user != null && previous?.valueOrNull?.id != user.id) {
-          // Deferred: the listener can fire while build() is still running,
-          // and a notifier may not touch its own state during that window.
-          // Forced, because a sign-in must pull immediately even if the app
-          // just resumed.
-          unawaited(Future<void>.microtask(() => syncNow(force: true)));
-        }
-      },
-      fireImmediately: true,
-    );
+    ref.listen<AsyncValue<User?>>(currentUserProvider, (
+      AsyncValue<User?>? previous,
+      AsyncValue<User?> next,
+    ) {
+      final User? user = next.valueOrNull;
+      if (user != null && previous?.valueOrNull?.id != user.id) {
+        // Deferred: the listener can fire while build() is still running,
+        // and a notifier may not touch its own state during that window.
+        // Forced, because a sign-in must pull immediately even if the app
+        // just resumed.
+        unawaited(Future<void>.microtask(() => syncNow(force: true)));
+      }
+    }, fireImmediately: true);
     return const SyncState();
   }
 

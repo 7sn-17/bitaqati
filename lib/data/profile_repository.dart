@@ -40,10 +40,9 @@ class ProfileRepository {
   }
 
   Future<String> readDisplayName(String userId) async {
-    final ProfileRow? row =
-        await (_db.select(_db.profiles)
-              ..where((Profiles p) => p.userId.equals(userId)))
-            .getSingleOrNull();
+    final ProfileRow? row = await (_db.select(
+      _db.profiles,
+    )..where((Profiles p) => p.userId.equals(userId))).getSingleOrNull();
     return row?.displayName ?? '';
   }
 
@@ -54,17 +53,17 @@ class ProfileRepository {
   Future<void> setDisplayName(String userId, String name) async {
     final String clean = name.trim().replaceAll(RegExp(r'\s+'), ' ');
     if (clean.length < minNameLength || clean.length > maxNameLength) {
-      throw const ProfileFailure(
-        'الاسم يجب أن يكون بين حرفين و40 حرفاً.',
-      );
+      throw const ProfileFailure('الاسم يجب أن يكون بين حرفين و40 حرفاً.');
     }
-    await (_db.into(_db.profiles).insertOnConflictUpdate(
-      ProfilesCompanion.insert(
-        userId: userId,
-        displayName: Value<String>(clean),
-        updatedAt: Value<DateTime>(_clock()),
-      ),
-    ));
+    await (_db
+        .into(_db.profiles)
+        .insertOnConflictUpdate(
+          ProfilesCompanion.insert(
+            userId: userId,
+            displayName: Value<String>(clean),
+            updatedAt: Value<DateTime>(_clock()),
+          ),
+        ));
     try {
       await pushToCloud(userId);
     } catch (_) {
@@ -78,10 +77,9 @@ class ProfileRepository {
     if (!AppConfig.hasSupabase) {
       return;
     }
-    final ProfileRow? row =
-        await (_db.select(_db.profiles)
-              ..where((Profiles p) => p.userId.equals(userId)))
-            .getSingleOrNull();
+    final ProfileRow? row = await (_db.select(
+      _db.profiles,
+    )..where((Profiles p) => p.userId.equals(userId))).getSingleOrNull();
     final String name = row?.displayName.trim() ?? '';
     if (name.isEmpty) {
       return;
@@ -102,10 +100,9 @@ class ProfileRepository {
     if (!AppConfig.hasSupabase) {
       return false;
     }
-    final ProfileRow? local =
-        await (_db.select(_db.profiles)
-              ..where((Profiles p) => p.userId.equals(userId)))
-            .getSingleOrNull();
+    final ProfileRow? local = await (_db.select(
+      _db.profiles,
+    )..where((Profiles p) => p.userId.equals(userId))).getSingleOrNull();
     final String name = local?.displayName.trim() ?? '';
     if (name.isEmpty) {
       return false;
@@ -163,10 +160,9 @@ class ProfileRepository {
     if (name.isEmpty) {
       return false;
     }
-    final ProfileRow? local =
-        await (_db.select(_db.profiles)
-              ..where((Profiles p) => p.userId.equals(userId)))
-            .getSingleOrNull();
+    final ProfileRow? local = await (_db.select(
+      _db.profiles,
+    )..where((Profiles p) => p.userId.equals(userId))).getSingleOrNull();
     if (local != null && local.displayName == name) {
       return false;
     }
@@ -179,13 +175,15 @@ class ProfileRepository {
         !remoteUpdated.isAfter(local.updatedAt)) {
       return false;
     }
-    await (_db.into(_db.profiles).insertOnConflictUpdate(
-      ProfilesCompanion.insert(
-        userId: userId,
-        displayName: Value<String>(name),
-        updatedAt: Value<DateTime>(remoteUpdated ?? _clock()),
-      ),
-    ));
+    await (_db
+        .into(_db.profiles)
+        .insertOnConflictUpdate(
+          ProfilesCompanion.insert(
+            userId: userId,
+            displayName: Value<String>(name),
+            updatedAt: Value<DateTime>(remoteUpdated ?? _clock()),
+          ),
+        ));
     return true;
   }
 }

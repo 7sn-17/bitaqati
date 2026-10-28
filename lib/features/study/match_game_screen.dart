@@ -8,7 +8,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/audio/sound_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
@@ -32,16 +31,14 @@ class MatchGameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final DeckNode? deck = ref.watch(deckByIdProvider(deckId));
     final List<ReviewCard>? cards = ref
-        .watch(deckCardsProvider(deckId))
+        .watch(studyCardsProvider(deckId))
         .valueOrNull;
     if (cards == null) {
       // A white flash while the cards load is the most jarring thing a dark-
       // mode user can hit on this screen, so the loading state follows the
       // theme like everything else.
       return Scaffold(
-        backgroundColor: context.isDark
-            ? AppColors.darkCanvas
-            : AppColors.canvas,
+        backgroundColor: context.canvas,
         body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
@@ -59,11 +56,14 @@ class MatchGameScreen extends ConsumerWidget {
     ];
     if (usable.length < 2) {
       return _NotEnough(
-        deckTitle: deck?.title ?? '',
+        deckTitle: deck?.title ?? 'جميع المجموعات',
         deckHasCards: cards.isNotEmpty,
       );
     }
-    return _MatchGame(deckTitle: deck?.title ?? 'المطابقة', cards: usable);
+    return _MatchGame(
+      deckTitle: deck?.title ?? 'جميع المجموعات',
+      cards: usable,
+    );
   }
 }
 
@@ -317,7 +317,7 @@ class _MatchGameState extends ConsumerState<_MatchGame> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.isDark ? AppColors.darkCanvas : AppColors.canvas,
+      backgroundColor: context.canvas,
       body: SafeArea(
         bottom: false,
         child: Stack(
@@ -495,9 +495,7 @@ class _Stopwatch extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: context.isDark
-                  ? <Color>[AppColors.darkSurfaceHigh, AppColors.darkSurface]
-                  : <Color>[Colors.white, const Color(0xFFF1F5EC)],
+              colors: <Color>[context.cardSurface, context.raisedSurface],
             ),
             borderRadius: BorderRadius.circular(99),
             border: Border.all(color: context.hairline),
@@ -684,11 +682,11 @@ class _TileViewState extends State<_TileView> with TickerProviderStateMixin {
     final bool question = widget.tile.isQuestion;
     final bool on = widget.selected;
 
-    final Color base = question ? AppColors.primary : context.cardSurface;
-    final Color deep = question ? AppColors.primaryDeep : context.softAccent;
-    final Color ink = question ? Colors.white : context.ink;
+    final Color base = question ? context.primary : context.cardSurface;
+    final Color deep = question ? context.primaryDeep : context.softAccent;
+    final Color ink = question ? context.onPrimary : context.ink;
     final Color sub = question
-        ? AppColors.accent.withValues(alpha: 0.9)
+        ? context.accent.withValues(alpha: 0.9)
         : context.muted;
 
     return AnimatedBuilder(
@@ -741,18 +739,18 @@ class _TileViewState extends State<_TileView> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: on
-                    ? AppColors.accent
+                    ? context.accent
                     : widget.wrong
-                    ? AppColors.danger
+                    ? context.danger
                     : question
-                    ? AppColors.primaryDeep
+                    ? context.primaryDeep
                     : context.hairline,
                 width: on ? 2 : 1.2,
               ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
                   color: on
-                      ? AppColors.accent.withValues(alpha: 0.5)
+                      ? context.accent.withValues(alpha: 0.5)
                       : Colors.black.withValues(
                           alpha: context.isDark ? 0.4 : 0.07,
                         ),
@@ -834,7 +832,17 @@ class _Victory extends StatelessWidget {
         Positioned.fill(
           child: ColoredBox(
             color: Colors.black.withValues(alpha: 0.62),
-            child: const IgnorePointer(child: ConfettiBurst()),
+            child: IgnorePointer(
+              child: ConfettiBurst(
+                colors: <Color>[
+                  context.accent,
+                  context.primary,
+                  context.info,
+                  context.star,
+                  context.accentDeep,
+                ],
+              ),
+            ),
           ),
         ),
         Center(
@@ -861,29 +869,27 @@ class _Victory extends StatelessWidget {
                             width: 74,
                             height: 74,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
+                              gradient: LinearGradient(
                                 begin: Alignment.topRight,
                                 end: Alignment.bottomLeft,
                                 colors: <Color>[
-                                  AppColors.accent,
-                                  Color(0xFF63C13A),
+                                  context.accent,
+                                  context.accentDeep,
                                 ],
                               ),
                               shape: BoxShape.circle,
                               boxShadow: <BoxShadow>[
                                 BoxShadow(
-                                  color: AppColors.accent.withValues(
-                                    alpha: 0.5,
-                                  ),
+                                  color: context.accent.withValues(alpha: 0.5),
                                   blurRadius: 24,
                                   offset: const Offset(0, 10),
                                 ),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               CupertinoIcons.rosette,
                               size: 34,
-                              color: AppColors.primary,
+                              color: context.primary,
                             ),
                           ).animate().scale(
                             begin: const Offset(0.5, 0.5),
@@ -937,8 +943,8 @@ class _Victory extends StatelessWidget {
                             child: FilledButton(
                               onPressed: onReplay,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: AppColors.accent,
+                                backgroundColor: context.primary,
+                                foregroundColor: context.accent,
                                 minimumSize: const Size(52, 52),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
@@ -1037,7 +1043,7 @@ class _NotEnough extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.isDark ? AppColors.darkCanvas : AppColors.canvas,
+      backgroundColor: context.canvas,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

@@ -8,7 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/auth/auth_providers.dart';
 import '../../core/config/app_config.dart';
 import '../../core/providers.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/user_display.dart';
 import '../../core/widgets/deck_card.dart';
@@ -63,7 +62,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       (int sum, DeckNode deck) => sum + deck.cardCount,
     );
     final DueTotals due = ref.watch(dueTotalsProvider);
-    final DeckNode? reviewDeck = ref.watch(todayReviewDeckProvider);
     final int streak = ref.watch(streakProvider).valueOrNull ?? 0;
 
     return SafeArea(
@@ -78,7 +76,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _DailyReviewHero(
               due: due,
               streak: streak,
-              reviewDeck: reviewDeck,
+              totalCards: totalCards,
             ),
           ),
           const SizedBox(height: 20),
@@ -148,7 +146,7 @@ class _HomeHeader extends ConsumerWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: context.primary,
                 borderRadius: BorderRadius.circular(16),
               ),
               clipBehavior: Clip.antiAlias,
@@ -203,9 +201,9 @@ class _HeaderAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget label = Text(
       initial,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'ReadexPro',
-        color: AppColors.accent,
+        color: context.accent,
         fontSize: 21,
         fontWeight: FontWeight.w700,
       ),
@@ -230,15 +228,15 @@ class _DailyReviewHero extends StatelessWidget {
   const _DailyReviewHero({
     required this.due,
     required this.streak,
-    required this.reviewDeck,
+    required this.totalCards,
   });
 
   final DueTotals due;
   final int streak;
 
-  /// The deck the hero button studies. Carried whole rather than by id so the
-  /// mode sheet can show its title and how much work is inside it.
-  final DeckNode? reviewDeck;
+  /// Every card in the library. The hero studies the whole library, so the
+  /// sheet it opens needs the library's size, not one deck's.
+  final int totalCards;
 
   @override
   Widget build(BuildContext context) {
@@ -246,7 +244,7 @@ class _DailyReviewHero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: context.primary,
         borderRadius: BorderRadius.circular(28),
       ),
       child: Column(
@@ -254,11 +252,11 @@ class _DailyReviewHero extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Expanded(
+              Expanded(
                 child: Text(
                   'مراجعة اليوم',
                   style: TextStyle(
-                    color: Color(0xFFCFE8C0),
+                    color: context.accentSoft,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -270,21 +268,17 @@ class _DailyReviewHero extends StatelessWidget {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF054D28),
+                  color: context.primaryDeep,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
                   children: <Widget>[
-                    const Icon(
-                      CupertinoIcons.flame,
-                      color: AppColors.accent,
-                      size: 14,
-                    ),
+                    Icon(CupertinoIcons.flame, color: context.accent, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       streak == 0 ? 'ابدأ سلسلتك' : '$streak يوماً',
                       style: TextStyle(
-                        color: AppColors.accent.withValues(alpha: 0.95),
+                        color: context.accent.withValues(alpha: 0.95),
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -301,9 +295,9 @@ class _DailyReviewHero extends StatelessWidget {
             children: <Widget>[
               Text(
                 '${due.total}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'ReadexPro',
-                  color: AppColors.accent,
+                  color: context.accent,
                   fontSize: 60,
                   height: 1.1,
                   fontWeight: FontWeight.w700,
@@ -326,27 +320,27 @@ class _DailyReviewHero extends StatelessWidget {
             child: SizedBox(
               height: 8,
               child: due.total == 0
-                  ? const ColoredBox(color: Color(0xFF054D28))
+                  ? ColoredBox(color: context.primaryDeep)
                   : Row(
                       children: <Widget>[
                         if (due.fresh > 0)
                           Expanded(
                             flex: due.fresh,
-                            child: const ColoredBox(color: AppColors.accent),
+                            child: ColoredBox(color: context.accent),
                           ),
                         if (due.fresh > 0 && due.learning + due.review > 0)
                           const SizedBox(width: 3),
                         if (due.learning > 0)
                           Expanded(
                             flex: due.learning,
-                            child: const ColoredBox(color: Color(0xFFE2F6D5)),
+                            child: ColoredBox(color: context.accentSoft),
                           ),
                         if (due.learning > 0 && due.review > 0)
                           const SizedBox(width: 3),
                         if (due.review > 0)
                           Expanded(
                             flex: due.review,
-                            child: const ColoredBox(color: Color(0xFF054D28)),
+                            child: ColoredBox(color: context.primaryDeep),
                           ),
                       ],
                     ),
@@ -355,15 +349,15 @@ class _DailyReviewHero extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: <Widget>[
-              _LegendDot(color: AppColors.accent, label: 'جديدة ${due.fresh}'),
+              _LegendDot(color: context.accent, label: 'جديدة ${due.fresh}'),
               const SizedBox(width: 14),
               _LegendDot(
-                color: const Color(0xFFE2F6D5),
+                color: context.accentSoft,
                 label: 'تعلّم ${due.learning}',
               ),
               const SizedBox(width: 14),
               _LegendDot(
-                color: const Color(0xFF054D28),
+                color: context.primaryDeep,
                 label: 'مراجعة ${due.review}',
               ),
             ],
@@ -372,21 +366,25 @@ class _DailyReviewHero extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: reviewDeck == null
+              onPressed: due.total == 0
                   ? null
-                  : () => openStudyMode(context, reviewDeck!),
+                  : () => openGlobalStudy(
+                      context,
+                      cardCount: totalCards,
+                      dueCount: due.total,
+                    ),
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: AppColors.primary,
-                disabledBackgroundColor: AppColors.accent.withValues(
-                  alpha: 0.3,
-                ),
-                disabledForegroundColor: AppColors.primary.withValues(
-                  alpha: 0.5,
+                backgroundColor: context.accent,
+                foregroundColor: context.onAccent,
+                disabledBackgroundColor: context.accent.withValues(alpha: 0.3),
+                disabledForegroundColor: context.onPrimary.withValues(
+                  alpha: 0.45,
                 ),
               ),
               child: Text(
-                reviewDeck == null ? 'لا توجد بطاقات مستحقة' : 'ابدأ المراجعة',
+                due.total == 0
+                    ? 'لا توجد بطاقات مستحقة'
+                    : 'مراجعة جميع البطاقات المستحقة',
               ),
             ),
           ),
@@ -414,8 +412,8 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 5),
         Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFFCFE8C0),
+          style: TextStyle(
+            color: context.accentSoft,
             fontSize: 10.5,
             fontWeight: FontWeight.w500,
           ),
@@ -436,11 +434,9 @@ class _LibraryBanner extends StatelessWidget {
     // flips: a lime mark with green ink on it, which is the same contrast
     // the light theme gets from green on lime.
     final bool dark = context.isDark;
-    final Color background = dark
-        ? AppColors.darkSurfaceHigh
-        : AppColors.accentSoft;
-    final Color markFill = dark ? AppColors.accent : AppColors.primary;
-    final Color markInk = dark ? AppColors.primary : AppColors.accent;
+    final Color background = dark ? context.raisedSurface : context.accentSoft;
+    final Color markFill = dark ? context.accent : context.primary;
+    final Color markInk = dark ? context.primary : context.accent;
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(

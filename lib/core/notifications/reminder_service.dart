@@ -209,8 +209,7 @@ class ReminderService {
   /// blocked request must not stop the reminder: an inexact alarm that wakes
   /// the device from doze still arrives within the hour.
   Future<AndroidScheduleMode> _scheduleMode() async {
-    final bool exact =
-        await _android?.canScheduleExactNotifications() ?? false;
+    final bool exact = await _android?.canScheduleExactNotifications() ?? false;
     return exact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;

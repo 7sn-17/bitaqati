@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/deck_card.dart';
@@ -207,7 +206,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: context.primary,
                   borderRadius: BorderRadius.circular(26),
                 ),
                 child: Row(
@@ -238,11 +237,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Icon(
-                      CupertinoIcons.book,
-                      color: AppColors.accent,
-                      size: 38,
-                    ),
+                    Icon(CupertinoIcons.book, color: context.accent, size: 38),
                   ],
                 ),
               ),
@@ -578,17 +573,17 @@ class _AddButton extends StatelessWidget {
         style: FilledButton.styleFrom(
           padding: EdgeInsets.zero,
           minimumSize: const Size(52, 30),
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.accent,
+          backgroundColor: context.primary,
+          foregroundColor: context.accent,
           textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
         ),
         child: loading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: AppColors.accent,
+                  color: context.accent,
                 ),
               )
             : const Text('أضف'),

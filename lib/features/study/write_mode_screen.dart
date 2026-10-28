@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/audio/sound_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
 import '../../core/widgets/card_markup.dart';
@@ -28,13 +27,11 @@ class WriteModeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final DeckNode? deck = ref.watch(deckByIdProvider(deckId));
     final List<ReviewCard>? cards = ref
-        .watch(deckCardsProvider(deckId))
+        .watch(studyCardsProvider(deckId))
         .valueOrNull;
     if (cards == null) {
       return Scaffold(
-        backgroundColor: context.isDark
-            ? AppColors.darkCanvas
-            : AppColors.canvas,
+        backgroundColor: context.canvas,
         body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
@@ -46,10 +43,10 @@ class WriteModeScreen extends ConsumerWidget {
           card,
     ];
     if (usable.isEmpty) {
-      return _NotEnough(deckTitle: deck?.title ?? '');
+      return _NotEnough(deckTitle: deck?.title ?? 'جميع المجموعات');
     }
     return _WriteSession(
-      deckTitle: deck?.title ?? 'وضع الكتابة',
+      deckTitle: deck?.title ?? 'جميع المجموعات',
       cards: usable,
     );
   }
@@ -206,7 +203,7 @@ class _WriteSessionState extends ConsumerState<_WriteSession> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.isDark ? AppColors.darkCanvas : AppColors.canvas,
+      backgroundColor: context.canvas,
       body: SafeArea(
         bottom: false,
         child: AnimatedSwitcher(
@@ -264,8 +261,8 @@ class _WriteSessionState extends ConsumerState<_WriteSession> {
                   child: FilledButton(
                     onPressed: _check,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: context.primary,
+                      foregroundColor: context.onPrimary,
                       minimumSize: const Size(0, 50),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -410,11 +407,11 @@ class _WriteTopBar extends StatelessWidget {
                         alignment: AlignmentDirectional.centerStart,
                         widthFactor: value.clamp(0.0, 1.0),
                         child: Container(
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: <Color>[
-                                AppColors.accent,
-                                Color(0xFF63C13A),
+                                context.accent,
+                                context.accentDeep,
                               ],
                             ),
                           ),
@@ -447,9 +444,7 @@ class _PromptCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
-          colors: context.isDark
-              ? <Color>[AppColors.darkSurfaceHigh, AppColors.darkSurface]
-              : <Color>[Colors.white, const Color(0xFFF3F7EE)],
+          colors: <Color>[context.cardSurface, context.raisedSurface],
         ),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: context.hairline),
@@ -607,7 +602,7 @@ class _Feedback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color tint = correct ? AppColors.accent : AppColors.danger;
+    final Color tint = correct ? context.accent : context.danger;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -627,8 +622,8 @@ class _Feedback extends StatelessWidget {
                     : CupertinoIcons.xmark_circle_fill,
                 size: 20,
                 color: correct
-                    ? (context.isDark ? AppColors.accent : AppColors.primary)
-                    : AppColors.danger,
+                    ? (context.isDark ? context.accent : context.primary)
+                    : context.danger,
               ),
               const SizedBox(width: 8),
               Text(
@@ -638,8 +633,8 @@ class _Feedback extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: correct
-                      ? (context.isDark ? AppColors.accent : AppColors.primary)
-                      : AppColors.danger,
+                      ? (context.isDark ? context.accent : context.primary)
+                      : context.danger,
                 ),
               ),
             ],
@@ -682,8 +677,8 @@ class _Feedback extends StatelessWidget {
               child: FilledButton(
                 onPressed: onNext,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.primary,
+                  foregroundColor: context.onPrimary,
                   minimumSize: const Size(0, 46),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -728,8 +723,8 @@ class _Feedback extends StatelessWidget {
                   child: FilledButton(
                     onPressed: onNext,
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: context.primary,
+                      foregroundColor: context.onPrimary,
                       minimumSize: const Size(0, 46),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -789,14 +784,14 @@ class _WriteResult extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: <Color>[AppColors.accent, Color(0xFF63C13A)],
+              gradient: LinearGradient(
+                colors: <Color>[context.accent, context.accentDeep],
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
               ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.4),
+                  color: context.accent.withValues(alpha: 0.4),
                   blurRadius: 30,
                   offset: const Offset(0, 12),
                 ),
@@ -807,11 +802,11 @@ class _WriteResult extends StatelessWidget {
               children: <Widget>[
                 Text(
                   '${(score * 100).round()}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'ReadexPro',
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
+                    color: context.primary,
                   ),
                 ),
                 Text(
@@ -820,7 +815,7 @@ class _WriteResult extends StatelessWidget {
                     fontFamily: 'ReadexPro',
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary.withValues(alpha: 0.7),
+                    color: context.primary.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -848,8 +843,8 @@ class _WriteResult extends StatelessWidget {
             child: FilledButton(
               onPressed: onRetry,
               style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: context.primary,
+                foregroundColor: context.onPrimary,
                 minimumSize: const Size(0, 50),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -902,7 +897,7 @@ class _NotEnough extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.isDark ? AppColors.darkCanvas : AppColors.canvas,
+      backgroundColor: context.canvas,
       body: SafeArea(
         child: Center(
           child: Padding(
