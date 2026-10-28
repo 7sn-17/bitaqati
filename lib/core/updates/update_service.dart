@@ -593,8 +593,10 @@ class UpdateService {
 
   /// Reads the text of the first [tag] element, handling CDATA.
   static String _xmlText(String xml, String tag) {
-    final RegExpMatch? match = RegExp('<$tag[^>]*>([\s\S]*?)</$tag>')
-        .firstMatch(xml);
+    final RegExpMatch? match = RegExp(
+      '<$tag[^>]*>(.*?)</$tag>',
+      dotAll: true,
+    ).firstMatch(xml);
     if (match == null) {
       return '';
     }
