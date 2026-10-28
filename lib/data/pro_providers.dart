@@ -98,6 +98,15 @@ final StreamProvider<ProStatus> proStatusProvider = StreamProvider<ProStatus>((
   Ref ref,
 ) {
   final String scope = ref.watch(profileScopeProvider);
+  if (scope != 'guest' && AppConfig.hasSupabase) {
+    // One pull when the stream starts. Pro can be granted from the dashboard
+    // while the app is closed, and the local row would otherwise keep saying
+    // "free" until something else happened to ask — which is why the status
+    // used to appear only after tapping through to the paywall.
+    unawaited(
+      Future<void>.microtask(() => ref.read(proServiceProvider).refresh()),
+    );
+  }
   return ref
       .watch(profileRepositoryProvider)
       .watchProfile(scope)

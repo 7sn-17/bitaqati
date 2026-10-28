@@ -36,15 +36,26 @@ class ActiveIconController extends Notifier<AppIconOption> {
     if (option.alias == state.alias) {
       return true;
     }
-    final bool applied = await DynamicIconService.apply(option.alias);
-    if (!applied) {
-      return false;
-    }
+    final AppIconOption previous = state;
+    // Written before the platform call on purpose. Disabling the alias this
+    // task was launched from can finish the task, and a preference saved after
+    // that call would never be written: the next launch would read the old
+    // alias, decide the launcher had drifted, and put the old icon back. That
+    // is the "it restarts and nothing changes" report, exactly.
     await DynamicIconService.remember(
       ref.read(sharedPreferencesProvider),
       option.alias,
     );
     state = option;
+    final bool applied = await DynamicIconService.apply(option.alias);
+    if (!applied) {
+      await DynamicIconService.remember(
+        ref.read(sharedPreferencesProvider),
+        previous.alias,
+      );
+      state = previous;
+      return false;
+    }
     return true;
   }
 

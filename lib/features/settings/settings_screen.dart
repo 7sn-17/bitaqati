@@ -1698,10 +1698,11 @@ class _IconTile extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: <Widget>[
-                // The launcher's own preview: the composed adaptive layer,
-                // masked to the same circle Android uses. The artwork sits at
-                // 70% inside its own field, so the ring hugs the image with no
-                // gap: what the tile shows is what the home screen shows.
+                // The artwork itself, masked to a circle. The adaptive layer
+                // was the wrong file to show here: it carries the artwork at
+                // 70% on its own field, so the tile drew a small square inside
+                // a ring — the composition the launcher builds, not the icon a
+                // person sees on the home screen.
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 62,
@@ -1719,7 +1720,7 @@ class _IconTile extends StatelessWidget {
                   ),
                   child: ClipOval(
                     child: Image.asset(
-                      option.adaptiveAsset,
+                      option.asset,
                       width: 62,
                       height: 62,
                       fit: BoxFit.cover,
