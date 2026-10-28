@@ -290,7 +290,7 @@ class UpdateService {
         releaseUrl: _string(decoded['html_url']),
       );
     } catch (error) {
-      failures.add('api $(_describe(error))');
+      failures.add('api ${_describe(error)}');
       _log('api error: $error');
       return null;
     }
@@ -319,9 +319,8 @@ class UpdateService {
       final int end = body.indexOf('</entry>', start);
       final String entry = body.substring(start, end < 0 ? body.length : end);
 
-      final RegExpMatch? link = RegExp(
-        r'href="([^"]*/releases/tag/[^"]+)"',
-      ).firstMatch(entry);
+      final RegExpMatch? link = RegExp(r'href="([^"]*/releases/tag/[^"]+)"')
+          .firstMatch(entry);
       if (link == null) {
         failures.add('atom entry has no release link');
         return null;
@@ -338,16 +337,13 @@ class UpdateService {
       return _build(
         current: current,
         tag: tag,
-        notes: _cleanNotes(
-          _plainFromHtml(_xmlText(entry, 'content')),
-          title,
-        ),
+        notes: _cleanNotes(_plainFromHtml(_xmlText(entry, 'content')), title),
         assetUrl: null,
         publishedAt: DateTime.tryParse(_xmlText(entry, 'updated')),
         releaseUrl: href,
       );
     } catch (error) {
-      failures.add('atom $(_describe(error))');
+      failures.add('atom ${_describe(error)}');
       _log('atom error: $error');
       return null;
     }
@@ -377,7 +373,8 @@ class UpdateService {
         _log('redirect body could not be drained: $error');
       }
       final String location = response.headers['location'] ?? '';
-      final List<String> segments = Uri.tryParse(location)?.pathSegments ?? const <String>[];
+      final List<String> segments =
+          Uri.tryParse(location)?.pathSegments ?? const <String>[];
       final int index = segments.indexOf('tag');
       if (index < 0 || index + 1 >= segments.length) {
         failures.add('redirect HTTP ${response.statusCode} without a tag');
@@ -395,7 +392,7 @@ class UpdateService {
         releaseUrl: releasePage,
       );
     } catch (error) {
-      failures.add('redirect $(_describe(error))');
+      failures.add('redirect ${_describe(error)}');
       _log('redirect error: $error');
       return null;
     }
@@ -411,15 +408,15 @@ class UpdateService {
   }) {
     final String latest = normaliseVersion(tag);
     final bool newer = isNewer(latest, current);
-    _log(
-      'compare · latest=$latest vs current=$current · newer=$newer',
-    );
+    _log('compare · latest=$latest vs current=$current · newer=$newer');
     return UpdateInfo(
       hasUpdate: newer,
       currentVersion: current,
       latestVersion: latest,
       releaseNotes: notes,
-      downloadUrl: assetUrl == null || assetUrl.isEmpty ? downloadUrl : assetUrl,
+      downloadUrl: assetUrl == null || assetUrl.isEmpty
+          ? downloadUrl
+          : assetUrl,
       publishedAt: publishedAt,
       releaseUrl: releaseUrl == null || releaseUrl.isEmpty ? null : releaseUrl,
       checkedAt: _clock(),
@@ -596,9 +593,8 @@ class UpdateService {
 
   /// Reads the text of the first [tag] element, handling CDATA.
   static String _xmlText(String xml, String tag) {
-    final RegExpMatch? match = RegExp(
-      '<' + tag + r'[^>]*>([\s\S]*?)</' + tag + '>',
-    ).firstMatch(xml);
+    final RegExpMatch? match = RegExp('<$tag[^>]*>([\s\S]*?)</$tag>')
+        .firstMatch(xml);
     if (match == null) {
       return '';
     }
