@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:photo_view/photo_view.dart';
 
-/// Opens a card attachment full screen on a black backdrop, with pinch zoom.
+/// Opens a card attachment full screen on a black backdrop, with pinch zoom
+/// and panning.
 ///
 /// A review card crops pictures to keep the card a card, which is the right
 /// call for a photo and the wrong one for a diagram with a caption in the
@@ -50,14 +52,39 @@ class _ImageViewer extends StatelessWidget {
       body: Stack(
         children: <Widget>[
           Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).pop(),
-              child: InteractiveViewer(
-                minScale: 1,
-                maxScale: 5,
-                child: Center(child: _picture(context)),
+            // PhotoView, not InteractiveViewer: it keeps the picture inside
+            // its own bounds while zooming, snaps back when it is dragged past
+            // the edge, and gives a double tap a real meaning.
+            child: PhotoView(
+              imageProvider: _provider(),
+              backgroundDecoration: const BoxDecoration(
+                color: Colors.transparent,
               ),
+              minScale: PhotoViewComputedScale.contained,
+              initialScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 3,
+              basePosition: Alignment.center,
+              filterQuality: FilterQuality.medium,
+              gestureDetectorBehavior: HitTestBehavior.opaque,
+              onTapUp:
+                  (
+                    BuildContext context,
+                    TapUpDetails details,
+                    PhotoViewControllerValue value,
+                  ) {
+                    Navigator.of(context).pop();
+                  },
+              loadingBuilder: (context, progress) => const Center(
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
+              errorBuilder: (context, error, stack) => _failed(context),
             ),
           ),
           PositionedDirectional(
@@ -81,7 +108,7 @@ class _ImageViewer extends StatelessWidget {
             bottom: 12,
             child: SafeArea(
               child: Text(
-                'اسحب للتكبير',
+                'اقرص للتكبير · اسحب للتحريك · اضغط للإغلاق',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.55),
@@ -95,43 +122,22 @@ class _ImageViewer extends StatelessWidget {
     );
   }
 
-  Widget _picture(BuildContext context) {
+  ImageProvider _provider() {
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      final int decodeWidth =
-          (MediaQuery.sizeOf(context).width *
-                  MediaQuery.devicePixelRatioOf(context))
-              .round();
-      return CachedNetworkImage(
-        imageUrl: url,
-        fit: BoxFit.contain,
-        memCacheWidth: decodeWidth * 2,
-        fadeInDuration: const Duration(milliseconds: 180),
-        placeholder: (BuildContext context, String url) => const SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        errorWidget: (BuildContext context, String url, Object error) =>
-            _failed(context),
-      );
+      // The grid, the card and this viewer all decode the same URL; sharing
+      // one cache entry is what makes opening it feel instant.
+      return CachedNetworkImageProvider(url);
     }
     final String path = url.startsWith('file://')
         ? Uri.parse(url).toFilePath()
         : url;
-    if (path.isEmpty) {
-      return _failed(context);
-    }
-    return Image.file(
-      File(path),
-      fit: BoxFit.contain,
-      errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
-          _failed(context),
-    );
+    return FileImage(File(path));
   }
 
   Widget _failed(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
         const Icon(
           Icons.broken_image_outlined,

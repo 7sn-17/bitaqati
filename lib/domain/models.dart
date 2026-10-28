@@ -351,7 +351,12 @@ class DeckNode {
   int get dueCount => dueNew + dueLearning + dueReview;
 
   /// True when the deck can be found by its share code.
-  bool get isShareable => (shareCode ?? '').isNotEmpty;
+  ///
+  /// A private deck keeps the code it was given in case it is published again,
+  /// so the code alone is not permission to show it: going private has to hide
+  /// every trace of it, or "خاصة" would still hand out a working key.
+  bool get isShareable =>
+      privacy != DeckPrivacy.private && (shareCode ?? '').isNotEmpty;
 
   /// A deck that came from the public library or a share link.
   bool get isPreview => author != null;

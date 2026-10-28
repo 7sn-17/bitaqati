@@ -22,6 +22,7 @@ class DeckReview {
     required this.rating,
     this.comment = '',
     this.createdAt,
+    this.avatarUrl,
   });
 
   final String userId;
@@ -29,6 +30,9 @@ class DeckReview {
   final int rating;
   final String comment;
   final DateTime? createdAt;
+
+  /// The reviewer's profile picture, when their account has one.
+  final String? avatarUrl;
 
   bool get hasComment => comment.trim().isNotEmpty;
 }
@@ -420,28 +424,37 @@ class LibraryRepository {
           ids.add(id);
         }
       }
-      final Map<String, String> names = <String, String>{};
+      // Names and pictures live in the profiles table, which the client cannot
+      // embed without a foreign key it does not own, so they are fetched in
+      // one second round trip keyed by the ids that actually appear.
+      final Map<String, Map<String, String?>> people =
+          <String, Map<String, String?>>{};
       if (ids.isNotEmpty) {
         final List<Map<String, dynamic>> profiles = await _client
             .from('profiles')
-            .select('id,display_name')
+            .select('id,display_name,avatar_url')
             .inFilter('id', ids.toList());
         for (final Map<String, dynamic> profile in profiles) {
           final String? id = _string(profile['id']);
-          final String? name = _string(profile['display_name'])?.trim();
-          if (id != null && name != null && name.isNotEmpty) {
-            names[id] = name;
+          if (id == null) {
+            continue;
           }
+          final String? avatar = _string(profile['avatar_url'])?.trim();
+          people[id] = <String, String?>{
+            'name': _string(profile['display_name'])?.trim(),
+            'avatar': avatar == null || avatar.isEmpty ? null : avatar,
+          };
         }
       }
       return <DeckReview>[
         for (final Map<String, dynamic> row in rows)
           DeckReview(
             userId: _string(row['user_id']) ?? '',
-            authorName: names[_string(row['user_id'])] ?? 'مستخدم',
+            authorName: people[_string(row['user_id'])]?['name'] ?? 'مستخدم',
             rating: _int(row['rating']),
             comment: _string(row['review']) ?? '',
             createdAt: _date(row['created_at']),
+            avatarUrl: people[_string(row['user_id'])]?['avatar'],
           ),
       ];
     } catch (_) {

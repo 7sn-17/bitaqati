@@ -141,6 +141,55 @@ occlusion, tags — and returns the edited `CardDraft` instead of persisting it.
 Saving the batch goes through `ContentRepository.addCards`, one transaction and
 one queue row per card, so a failure cannot leave half a deck behind.
 
+## Images: pick, crop, upload
+
+Every picture in the app goes through `MediaUploadService.pickImage`, and that
+one function owns the whole path: picker, cropper, upload.
+
+```text
+ImagePicker.pickImage  ->  cropImage(File)  ->  storage.uploadBinary  ->  PickedMedia
+```
+
+Cropping sits between the pick and the upload on purpose. The crop decides both
+how the picture sits on the card and how many bytes reach the bucket; uploading
+first would leave the full frame in storage forever, and cropping after the
+upload would need a second round trip to replace it.
+
+`lib/core/media/image_crop.dart` returns null when the learner backs out — a
+cancel means "do not attach this", not "attach it uncropped" — and returns the
+original file when the platform has no cropper or refuses the file, because
+losing the picture is worse than keeping it uncropped. Output is capped at
+2400px on the long edge and re-encoded as JPEG at quality 90, which keeps a
+photographed page readable when zoomed without shipping a twelve-megapixel file.
+
+The occlusion editor uses the same path, so the canvas always draws on the
+cropped picture and the boxes are stored against it.
+
+## Image occlusion
+
+An occlusion card stores its picture in `front` (as `![تغطية](url)`) and its
+question in `back`, which is what the editor field labelled «السؤال» writes.
+The answers are not text on the card: each box in `occlusion.boxes` carries its
+own `a` label, drawn against the same normalised geometry the editor used.
+
+The review shows the question above the picture, masks every box, and calls out
+the label of the box the learner taps — a bubble above it, flipped below when
+the box sits too close to the top edge. A label squeezed inside a twenty-pixel
+box would be unreadable, which is why the bubble exists.
+
+Moving and resizing are separate gestures on separate widgets: the body drags
+the box, four corner grips resize it, and the grips only appear once the box is
+large enough that they do not cover it. The previous version guessed the intent
+from how close to a corner the touch started, so a box smaller than twice the
+touch radius could only be resized and never moved.
+
+## The full-screen viewer
+
+`showImageViewer` opens any attachment with `photo_view`: pinch to zoom, drag
+to pan, tap to close. Cards crop their pictures to keep the card a card, which
+is right for a photo and wrong for a diagram with a caption in the corner, so
+every attachment that is visible is also one that can be opened.
+
 ## Deleting a deck
 
 `ContentRepository.deleteDeck` removes the deck, its cards, their
@@ -183,6 +232,12 @@ stores whatever the server settled on, so the two can never disagree.
 `(id, title, card_count)` and only for `public` or `unlisted` decks. It never
 leaks the owner, the settings, or a private deck.
 
+A code is only shown while the deck is not private. Going private keeps the
+stored code — republishing should not mint a new one — which is why the client
+cannot treat "has a code" as "may be shared": `DeckNode.isShareable` also
+requires `privacy != private`, and every surface (the top bar, the actions
+sheet, the privacy card) reads that one getter.
+
 ## Public library and remixes
 
 `public_decks` is a flat view: one row per published deck, joined to
@@ -194,9 +249,11 @@ star average and the review count. It also carries `install_count`, bumped by
 `review` comment, unique on `(deck_id, user_id)`. Ratings are public to read;
 writing requires the signed-in owner, and only for a deck that is currently
 public. The statistics tab reads them through `LibraryRepository.fetchReviews`,
-which fetches the rows first and then resolves display names from `profiles` in
-a second query, because `deck_ratings` references profiles by user id and an
-embedded select would depend on a foreign key the client does not own.
+which fetches the rows first and then resolves display names and avatars from
+`profiles` in a second query, because `deck_ratings` references profiles by user
+id and an embedded select would depend on a foreign key the client does not own.
+The review row shows the Google picture when there is one and falls back to the
+initial only when the account has no avatar.
 
 Installing a deck deep-copies it: new deck id, new card ids, positions
 renumbered from zero, and scheduling state deliberately left empty so the
@@ -362,6 +419,18 @@ answer can absorb a couple of slips. A multi-word answer also passes when every
 word is present in any order. Anything the matcher still gets wrong is what the
 override button is for.
 
+### Sound and touch feedback
+
+`lib/core/audio/sound_service.dart` owns both cues and one player: a second cue
+replaces the first instead of layering over it, and a fast run of correct
+answers never spawns a player per answer. A missing audio route or a failed
+decode is logged and swallowed — feedback must never interrupt a session.
+
+| Outcome | Sound | Touch |
+|---|---|---|
+| Correct answer, cleared pair | rising three-note chime | heavy impact |
+| Wrong answer | low double buzz | heavy impact, then vibrate |
+
 ## The progress dashboard
 
 `lib/domain/gamification.dart` holds the pure maths; `progressSummaryProvider` in
@@ -394,6 +463,12 @@ keeps its identity in both themes.
 
 Charts use `fl_chart`. The forecast bars draw a `backDrawRodData` track behind every
 day so a zero day still reads as "nothing due" instead of an empty slot.
+
+Before the first review the charts are a wall of zeros, which reads as failure
+rather than as a beginning. When `totalReviews` is zero the streak, retention,
+forecast and heatmap panels are replaced by one explanation, and a learner who
+owns no decks at all gets a button that opens the create sheet instead of advice
+they cannot act on.
 
 ## Reminders
 

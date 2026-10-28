@@ -34,6 +34,20 @@ String occlusionImageUrl(String front) {
   return match?.group(2) ?? '';
 }
 
+/// The question an occlusion card asks, from the stored back field.
+///
+/// Older cards stored "the answer or a comment" there, and the editor wrote
+/// a placeholder when the writer left it blank. Both would read as a question
+/// at the top of the card, so the placeholder is filtered out and an empty
+/// string means "this card has no prompt".
+String occlusionPrompt(String back) {
+  final String text = back.trim();
+  if (text == 'تغطية بصرية') {
+    return '';
+  }
+  return text;
+}
+
 /// Strips every marker so lists and search results show clean text.
 String plainMarkup(String markup) {
   return markup
@@ -784,6 +798,7 @@ class OcclusionView extends StatefulWidget {
     required this.boxes,
     this.masked = true,
     this.height = 220,
+    this.onOpenImage,
     super.key,
   });
 
@@ -792,12 +807,22 @@ class OcclusionView extends StatefulWidget {
   final bool masked;
   final double height;
 
+  /// Opens the picture full screen. Tapping the picture itself is the only
+  /// gesture left that does not belong to a mask, so it is the natural place
+  /// for "let me see this properly".
+  final VoidCallback? onOpenImage;
+
   @override
   State<OcclusionView> createState() => _OcclusionViewState();
 }
 
 class _OcclusionViewState extends State<OcclusionView> {
+  /// Boxes the learner has tapped open, by index.
   final Set<int> _revealed = <int>{};
+
+  /// The box whose label is currently called out. One at a time: two pills on
+  /// a small picture would cover the very region they describe.
+  int? _active;
 
   double _aspect = 4 / 3;
 
@@ -813,6 +838,7 @@ class _OcclusionViewState extends State<OcclusionView> {
     if (oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.boxes.length != widget.boxes.length) {
       _revealed.clear();
+      _active = null;
     }
     if (oldWidget.imageUrl != widget.imageUrl) {
       _resolveAspect();
@@ -823,6 +849,21 @@ class _OcclusionViewState extends State<OcclusionView> {
     resolveImageAspect(widget.imageUrl, (double ratio) {
       if (mounted && ratio != _aspect) {
         setState(() => _aspect = ratio);
+      }
+    });
+  }
+
+  void _tap(int index) {
+    if (!widget.masked) {
+      return;
+    }
+    setState(() {
+      if (_active == index) {
+        _revealed.remove(index);
+        _active = null;
+      } else {
+        _revealed.add(index);
+        _active = index;
       }
     });
   }
@@ -841,6 +882,24 @@ class _OcclusionViewState extends State<OcclusionView> {
           builder: (BuildContext context, BoxConstraints constraints) {
             final Size size = Size(constraints.maxWidth, widget.height);
             final Rect frame = containRect(size, _aspect);
+            final List<Widget> masks = <Widget>[];
+            for (int index = 0; index < widget.boxes.length; index++) {
+              final OcclusionBox box = widget.boxes[index];
+              final Rect rect = box.toRect(frame);
+              masks.add(
+                Positioned.fromRect(
+                  rect: rect,
+                  child: _OcclusionMask(
+                    box: box,
+                    rect: rect,
+                    frame: frame,
+                    revealed: !widget.masked || _revealed.contains(index),
+                    callout: widget.masked && _active == index,
+                    onTap: () => _tap(index),
+                  ),
+                ),
+              );
+            }
             return Stack(
               fit: StackFit.expand,
               children: <Widget>[
@@ -849,21 +908,9 @@ class _OcclusionViewState extends State<OcclusionView> {
                   height: widget.height,
                   radius: 0,
                   fit: BoxFit.contain,
+                  onTap: widget.onOpenImage,
                 ),
-                if (widget.masked)
-                  for (int index = 0; index < widget.boxes.length; index++)
-                    Positioned.fromRect(
-                      rect: widget.boxes[index].toRect(frame),
-                      child: _OcclusionMask(
-                        box: widget.boxes[index],
-                        revealed: _revealed.contains(index),
-                        onTap: () => setState(() {
-                          if (!_revealed.remove(index)) {
-                            _revealed.add(index);
-                          }
-                        }),
-                      ),
-                    ),
+                ...masks,
               ],
             );
           },
@@ -876,13 +923,32 @@ class _OcclusionViewState extends State<OcclusionView> {
 class _OcclusionMask extends StatelessWidget {
   const _OcclusionMask({
     required this.box,
+    required this.rect,
+    required this.frame,
     required this.revealed,
+    required this.callout,
     required this.onTap,
   });
 
   final OcclusionBox box;
+
+  /// Where the mask sits on screen, in pixels.
+  final Rect rect;
+
+  /// The rectangle the picture itself covers. The callout flips below a box
+  /// that sits too close to the top edge to hold a bubble above it.
+  final Rect frame;
+
   final bool revealed;
+
+  /// True for the one box whose label is being called out.
+  final bool callout;
+
   final VoidCallback onTap;
+
+  /// How tall the label bubble is, including its gap. Used to decide whether
+  /// there is room for it above the box.
+  static const double _calloutRoom = 34;
 
   @override
   Widget build(BuildContext context) {
@@ -912,44 +978,94 @@ class _OcclusionMask extends StatelessWidget {
     }
 
     final bool hasAnswer = box.answer.trim().isNotEmpty;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: AppColors.accent, width: 1.8),
-          borderRadius: BorderRadius.circular(6),
-          color: AppColors.accent.withValues(alpha: 0.12),
-        ),
-        padding: const EdgeInsets.all(3),
-        alignment: Alignment.center,
-        child: hasAnswer
-            ? FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
+    final Widget face = Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.accent, width: 1.8),
+        borderRadius: BorderRadius.circular(6),
+        color: AppColors.accent.withValues(alpha: 0.12),
+      ),
+      padding: const EdgeInsets.all(3),
+      alignment: Alignment.center,
+      // The bubble carries the label whenever there is one, so the box itself
+      // stays a clean outline instead of squeezing text into a few pixels.
+      child: hasAnswer && !callout
+          ? FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? AppColors.darkAnswerSurface
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  box.answer,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: context.isDark
-                        ? AppColors.darkAnswerSurface
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    box.answer,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: context.isDark
-                          ? AppColors.darkInk
-                          : AppColors.primary,
-                    ),
+                        ? AppColors.darkInk
+                        : AppColors.primary,
                   ),
                 ),
-              )
-            : const SizedBox.shrink(),
+              ),
+            )
+          : const SizedBox.shrink(),
+    );
+
+    if (!callout || !hasAnswer) {
+      return GestureDetector(onTap: onTap, child: face);
+    }
+
+    final bool above = rect.top - _calloutRoom >= frame.top;
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: <Widget>[
+          Positioned.fill(child: face),
+          Positioned(
+            left: -120,
+            right: -120,
+            top: above ? null : rect.height + 6,
+            bottom: above ? rect.height + 6 : null,
+            child: Center(child: _bubble(context)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _bubble(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 230),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: context.isDark ? AppColors.darkAnswerSurface : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.accent, width: 1.2),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Text(
+        box.answer,
+        textAlign: TextAlign.center,
+        maxLines: 4,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: 'ReadexPro',
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          height: 1.5,
+          color: context.isDark ? AppColors.darkInk : AppColors.primary,
+        ),
       ),
     );
   }

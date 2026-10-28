@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/config/app_config.dart';
+import '../core/media/image_crop.dart';
 
 /// Public bucket that holds card images and audio.
 const String kCardMediaBucket = 'card-media';
@@ -43,25 +44,37 @@ class MediaUploadService {
   final ImagePicker _picker = ImagePicker();
   final Uuid _uuid = const Uuid();
 
+  /// Picks a picture, lets the learner crop it, then uploads the crop.
+  ///
+  /// The crop happens here, between the picker and the upload, because it
+  /// decides both how the picture sits on the card and how many bytes reach
+  /// the bucket. Uploading first and cropping later would leave the original
+  /// full-frame file in storage forever.
   Future<PickedMedia?> pickImage() async {
-    final XFile? file = await _picker.pickImage(
+    final XFile? picked = await _picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 1800,
-      maxHeight: 1800,
-      imageQuality: 85,
+      // No maxWidth here: the picker would downscale before the crop, and the
+      // crop is exactly the step that decides the final size.
+      imageQuality: 100,
     );
-    if (file == null) {
+    if (picked == null) {
       return null;
     }
-    final Uint8List bytes = await file.readAsBytes();
-    final String extension = _extensionOf(file.name, fallback: 'jpg');
-    final String name = _shortName(file.name, 'صورة');
+    final File original = File(picked.path);
+    final File? cropped = await cropImage(original);
+    if (cropped == null) {
+      // Backed out of the cropper: nothing is attached.
+      return null;
+    }
+    final Uint8List bytes = await cropped.readAsBytes();
+    final String extension = _extensionOf(cropped.path, fallback: 'jpg');
+    final String name = _shortName(picked.name, 'صورة');
     return _upload(
       bytes: bytes,
       fileName: name,
       extension: extension,
       isImage: true,
-      localPath: file.path,
+      localPath: cropped.path,
     );
   }
 
@@ -209,9 +222,9 @@ class MediaUploadService {
         return;
       }
       final String path = url.substring(index + kCardMediaBucket.length + 1);
-      await Supabase.instance.client.storage
-          .from(kCardMediaBucket)
-          .remove(<String>[path]);
+      await Supabase.instance.client.storage.from(kCardMediaBucket).remove(
+        <String>[path],
+      );
     } catch (_) {
       // Orphaned files are cheap; a failed delete must never surface.
     }

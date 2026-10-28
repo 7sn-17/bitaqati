@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/audio/sound_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
@@ -166,10 +167,16 @@ class _TestSessionState extends ConsumerState<_TestSession> {
         _correct++;
       }
     });
+    // Sound and touch together: a right answer chimes and lands heavy, a wrong
+    // one buzzes low and fires the longest haptic the platform offers. Medium
+    // was indistinguishable from a tab switch in the hand.
     if (right) {
-      HapticFeedback.mediumImpact();
-    } else {
+      unawaited(SoundService.instance.correct());
       HapticFeedback.heavyImpact();
+    } else {
+      unawaited(SoundService.instance.wrong());
+      HapticFeedback.heavyImpact();
+      HapticFeedback.vibrate();
     }
     // A test answer is genuine evidence about memory, so it moves the card's
     // FSRS schedule: right is Good, wrong is Again. It is written off the

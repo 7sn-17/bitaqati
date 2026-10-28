@@ -2,9 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../domain/models.dart';
 
 /// The four ways a learner can spend a session on a deck.
 enum StudyMode { review, test, match, write }
@@ -32,6 +34,34 @@ Future<StudyMode?> showStudyModeSheet(
       dueCount: dueCount,
     ),
   );
+}
+
+/// Asks which mode to study [deck] in, then opens it.
+///
+/// Every "start studying" button in the app goes through here — the deck
+/// screen, the home hero and the progress tab. Home used to push the flashcard
+/// route directly, so the other three modes were only reachable from inside a
+/// deck.
+Future<void> openStudyMode(BuildContext context, DeckNode deck) async {
+  final StudyMode? mode = await showStudyModeSheet(
+    context,
+    deckTitle: deck.title,
+    cardCount: deck.cardCount,
+    dueCount: deck.dueCount,
+  );
+  if (mode == null || !context.mounted) {
+    return;
+  }
+  switch (mode) {
+    case StudyMode.review:
+      await context.push('/review/${deck.id}');
+    case StudyMode.test:
+      await context.push('/test/${deck.id}');
+    case StudyMode.match:
+      await context.push('/match/${deck.id}');
+    case StudyMode.write:
+      await context.push('/write/${deck.id}');
+  }
 }
 
 class _StudyModeSheet extends StatelessWidget {

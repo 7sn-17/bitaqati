@@ -192,11 +192,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           'مجموعات جاهزة من متعلّمين حول العالم',
                           style: context.texts.bodySmall,
                         ),
-                        const SizedBox(height: 6),
-                        _ShareCodeLink(onTap: _enterShareCode),
                       ],
                     ),
                   ),
+                  _ShareCodeButton(onTap: _enterShareCode),
+                  const SizedBox(width: 8),
                   _RefreshButton(busy: catalog.isLoading, onTap: _refresh),
                 ],
               ),
@@ -712,9 +712,8 @@ class _LibraryState extends StatelessWidget {
 
 /// Round action in the library header that pulls the catalog again.
 ///
-/// Replaces the old hashtag button: the share-code entry point moved to a
-/// text link under the subtitle, where it reads as an action instead of an
-/// unexplained icon.
+/// Sits beside the share-code button: the two actions a reader can take on
+/// the catalogue itself, both reachable with one thumb.
 class _RefreshButton extends StatelessWidget {
   const _RefreshButton({required this.busy, required this.onTap});
 
@@ -751,37 +750,35 @@ class _RefreshButton extends StatelessWidget {
   }
 }
 
-/// The only way into the "I have a code" flow, since the header icon is now
-/// refresh.
-class _ShareCodeLink extends StatelessWidget {
-  const _ShareCodeLink({required this.onTap});
+/// Entry point for "I have a share code".
+///
+/// It used to be a text link under the subtitle, which pushed the catalogue
+/// down and read as a footnote. It belongs in the header row beside refresh:
+/// both act on the catalogue rather than describe it.
+class _ShareCodeButton extends StatelessWidget {
+  const _ShareCodeButton({required this.onTap});
 
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              CupertinoIcons.number,
-              size: 12,
-              color: context.colors.primary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'لديك رمز مشاركة؟',
-              style: context.texts.bodySmall?.copyWith(
-                color: context.colors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+    return Semantics(
+      button: true,
+      label: 'إدخال رمز مشاركة',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: context.colors.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            CupertinoIcons.number,
+            size: 20,
+            color: context.colors.onPrimary,
+          ),
         ),
       ),
     );

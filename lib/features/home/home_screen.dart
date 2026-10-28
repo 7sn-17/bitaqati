@@ -18,6 +18,7 @@ import '../../core/widgets/tag_filter_bar.dart';
 import '../../data/content_providers.dart';
 import '../../data/profile_providers.dart';
 import '../../domain/models.dart';
+import '../study/study_mode_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -77,7 +78,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: _DailyReviewHero(
               due: due,
               streak: streak,
-              reviewDeckId: reviewDeck?.id,
+              reviewDeck: reviewDeck,
             ),
           ),
           const SizedBox(height: 20),
@@ -229,12 +230,15 @@ class _DailyReviewHero extends StatelessWidget {
   const _DailyReviewHero({
     required this.due,
     required this.streak,
-    required this.reviewDeckId,
+    required this.reviewDeck,
   });
 
   final DueTotals due;
   final int streak;
-  final String? reviewDeckId;
+
+  /// The deck the hero button studies. Carried whole rather than by id so the
+  /// mode sheet can show its title and how much work is inside it.
+  final DeckNode? reviewDeck;
 
   @override
   Widget build(BuildContext context) {
@@ -368,9 +372,9 @@ class _DailyReviewHero extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: reviewDeckId == null
+              onPressed: reviewDeck == null
                   ? null
-                  : () => context.push('/review/$reviewDeckId'),
+                  : () => openStudyMode(context, reviewDeck!),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: AppColors.primary,
@@ -382,9 +386,7 @@ class _DailyReviewHero extends StatelessWidget {
                 ),
               ),
               child: Text(
-                reviewDeckId == null
-                    ? 'لا توجد بطاقات مستحقة'
-                    : 'ابدأ المراجعة',
+                reviewDeck == null ? 'لا توجد بطاقات مستحقة' : 'ابدأ المراجعة',
               ),
             ),
           ),

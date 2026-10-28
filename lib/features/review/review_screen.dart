@@ -802,11 +802,47 @@ class _CardBody extends StatelessWidget {
 
   Widget _question(BuildContext context, Color ink, Color muted) {
     if (card.type == 'occlusion') {
-      return OcclusionView(
-        imageUrl: occlusionImageUrl(card.front),
-        boxes: occlusionBoxes(card.occlusion),
-        masked: true,
-        height: 250,
+      final String prompt = occlusionPrompt(card.back);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          if (prompt.isNotEmpty) ...<Widget>[
+            _SideLabel(
+              label: 'السؤال',
+              text: prompt,
+              tint: AppColors.primary,
+              color: muted,
+            ),
+            const SizedBox(height: 10),
+            CardMarkup(
+              text: prompt,
+              alignment: CrossAxisAlignment.center,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'ReadexPro',
+                fontSize: 22,
+                height: 1.55,
+                fontWeight: FontWeight.w700,
+                color: ink,
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+          OcclusionView(
+            imageUrl: occlusionImageUrl(card.front),
+            boxes: occlusionBoxes(card.occlusion),
+            masked: true,
+            height: 250,
+            onOpenImage: () =>
+                showImageViewer(context, occlusionImageUrl(card.front)),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'اضغط على أي تغطية لكشف إجابتها.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: muted, fontSize: 11),
+          ),
+        ],
       );
     }
     return Column(
@@ -851,35 +887,51 @@ class _CardBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         if (card.type == 'occlusion') ...<Widget>[
+          if (occlusionPrompt(card.back).isNotEmpty) ...<Widget>[
+            CardMarkup(
+              text: occlusionPrompt(card.back),
+              alignment: CrossAxisAlignment.center,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'ReadexPro',
+                color: Colors.white70,
+                fontSize: 17,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           OcclusionView(
             imageUrl: occlusionImageUrl(card.front),
             boxes: occlusionBoxes(card.occlusion),
             masked: false,
             height: 230,
+            onOpenImage: () =>
+                showImageViewer(context, occlusionImageUrl(card.front)),
           ),
-          const SizedBox(height: 14),
-        ],
-        CardMarkup(
-          text: card.back,
-          mediaFirst: true,
-          alignment: CrossAxisAlignment.center,
-          textAlign: TextAlign.center,
-          onTapImage: (String url) => showImageViewer(context, url),
-          textHeader: _SideLabel(
-            label: 'الإجابة',
+        ] else
+          CardMarkup(
             text: card.back,
-            tint: AppColors.accent,
-            color: AppColors.accent,
+            mediaFirst: true,
+            alignment: CrossAxisAlignment.center,
+            textAlign: TextAlign.center,
+            onTapImage: (String url) => showImageViewer(context, url),
+            textHeader: _SideLabel(
+              label: 'الإجابة',
+              text: card.back,
+              tint: AppColors.accent,
+              color: AppColors.accent,
+            ),
+            style: const TextStyle(
+              fontFamily: 'ReadexPro',
+              color: Colors.white,
+              fontSize: 29,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+            ),
+            mediaHeight: 220,
           ),
-          style: const TextStyle(
-            fontFamily: 'ReadexPro',
-            color: Colors.white,
-            fontSize: 29,
-            height: 1.45,
-            fontWeight: FontWeight.w800,
-          ),
-          mediaHeight: 220,
-        ),
         if (card.tags.isNotEmpty) ...<Widget>[
           const SizedBox(height: 16),
           Wrap(

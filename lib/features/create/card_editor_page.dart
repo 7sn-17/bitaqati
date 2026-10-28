@@ -835,7 +835,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
         return 'اكتب النص، حدّد الكلمة المهمة، ثم اضغط «فراغ» لتصبح '
             '{{c1::الكلمة}} وتُخفى أثناء المراجعة.';
       case _CardKind.occlusion:
-        return 'ارفع صورة وارسم مستطيلات فوق الأجزاء التي تريد اختبارها.';
+        return 'ارفع صورة، واكتب السؤال، ثم ارسم مستطيلات فوق الأجزاء المخفية.';
     }
   }
 
@@ -998,10 +998,33 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
 
   Widget _occlusionSection(BuildContext context) {
     return _FieldCard(
-      label: 'صورة التغطية',
+      label: 'بطاقة التغطية',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          Text('السؤال', style: context.texts.labelLarge),
+          const SizedBox(height: 4),
+          Text(
+            'يظهر في أعلى البطاقة أثناء المراجعة. أمّا الإجابات فهي وسوم '
+            'التغطيات المرسومة على الصورة.',
+            style: context.texts.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _back,
+            focusNode: _backFocus,
+            minLines: 2,
+            maxLines: 5,
+            style: context.texts.bodyLarge?.copyWith(height: 1.7),
+            decoration: editorDecoration(
+              context,
+              hint: 'ما السؤال الذي تطرحه هذه الصورة؟',
+              multiline: true,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text('صورة التغطية', style: context.texts.labelLarge),
+          const SizedBox(height: 8),
           if (_imageUrl == null)
             InkWell(
               onTap: _uploading
@@ -1067,7 +1090,7 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '${index + 1}',
+                          (index + 1).toString(),
                           style: context.texts.labelSmall?.copyWith(
                             color: context.brandInk,
                             fontWeight: FontWeight.w700,
@@ -1090,6 +1113,15 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
                             _boxes = next;
                           },
                         ),
+                      ),
+                      const SizedBox(width: 2),
+                      IconButton(
+                        onPressed: () => _removeBox(index),
+                        tooltip: 'حذف التغطية',
+                        visualDensity: VisualDensity.compact,
+                        iconSize: 18,
+                        color: Theme.of(context).colorScheme.error,
+                        icon: const Icon(CupertinoIcons.trash),
                       ),
                     ],
                   ),
@@ -1118,24 +1150,17 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               ],
             ),
           ],
-          const SizedBox(height: 14),
-          Text('الإجابة أو التعليق', style: context.texts.labelLarge),
-          const SizedBox(height: 7),
-          TextField(
-            controller: _back,
-            focusNode: _backFocus,
-            minLines: 2,
-            maxLines: 5,
-            style: context.texts.bodyLarge?.copyWith(height: 1.7),
-            decoration: editorDecoration(
-              context,
-              hint: 'ما الذي يجب أن يتذكره المتعلّم؟',
-              multiline: true,
-            ),
-          ),
         ],
       ),
     );
+  }
+
+  /// Drops one coverage box and its label together.
+  void _removeBox(int index) {
+    setState(() {
+      _boxes = <OcclusionBox>[..._boxes]..removeAt(index);
+      _syncBoxControllers();
+    });
   }
 
   Widget _previewSection(BuildContext context) {
@@ -1179,10 +1204,25 @@ class _CardEditorPageState extends ConsumerState<CardEditorPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 if (_kind == _CardKind.occlusion && _imageUrl != null)
-                  OcclusionView(
-                    imageUrl: _imageUrl!,
-                    boxes: _boxes,
-                    height: 170,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      if (_back.text.trim().isNotEmpty) ...<Widget>[
+                        CardMarkup(
+                          text: _back.text,
+                          style: context.texts.bodyMedium!.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.6,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                      OcclusionView(
+                        imageUrl: _imageUrl!,
+                        boxes: _boxes,
+                        height: 170,
+                      ),
+                    ],
                   )
                 else if (previewFront.trim().isEmpty)
                   Text(

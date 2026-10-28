@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/audio/sound_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
@@ -44,14 +45,23 @@ class MatchGameScreen extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
+    // Only plain two-sided cards can become a pair of tiles. An occlusion card
+    // is a picture and a cloze card hides its answer inside its own question,
+    // so neither has a front and a back to match — counting them as "cards in
+    // the deck" is what used to produce a game that refused to start on a
+    // deck the library showed as having cards.
     final List<ReviewCard> usable = <ReviewCard>[
       for (final ReviewCard card in cards)
-        if (plainMarkup(card.front).trim().isNotEmpty &&
+        if (card.type == 'basic' &&
+            plainMarkup(card.front).trim().isNotEmpty &&
             plainMarkup(card.back).trim().isNotEmpty)
           card,
     ];
     if (usable.length < 2) {
-      return _NotEnough(deckTitle: deck?.title ?? '');
+      return _NotEnough(
+        deckTitle: deck?.title ?? '',
+        deckHasCards: cards.isNotEmpty,
+      );
     }
     return _MatchGame(deckTitle: deck?.title ?? 'المطابقة', cards: usable);
   }
@@ -235,7 +245,8 @@ class _MatchGameState extends ConsumerState<_MatchGame> {
   }
 
   void _clear(_MatchTile a, _MatchTile b) {
-    HapticFeedback.mediumImpact();
+    unawaited(SoundService.instance.correct());
+    HapticFeedback.heavyImpact();
     _record(a.pairId, good: true);
     setState(() {
       _selected = null;
@@ -1014,9 +1025,14 @@ class _VictoryStat extends StatelessWidget {
 }
 
 class _NotEnough extends StatelessWidget {
-  const _NotEnough({required this.deckTitle});
+  const _NotEnough({required this.deckTitle, required this.deckHasCards});
 
   final String deckTitle;
+
+  /// True when the deck has cards, just none this game can use. The two cases
+  /// need different words: one is "write something", the other is "these
+  /// cards are not tiles".
+  final bool deckHasCards;
 
   @override
   Widget build(BuildContext context) {
@@ -1050,7 +1066,8 @@ class _NotEnough extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'تحتاج بطاقتين على الأقل',
+              'تحتاج بطاقتين نصيتين على الأقل',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'ReadexPro',
                 color: context.ink,
@@ -1060,9 +1077,12 @@ class _NotEnough extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              deckTitle.isEmpty
-                  ? 'أضف بطاقات إلى هذه المجموعة ثم أعد المحاولة.'
-                  : 'أضف بطاقات إلى «$deckTitle» ثم أعد المحاولة.',
+              deckHasCards
+                  ? 'بطاقات تغطية الصور وملء الفراغات لا تظهر في هذه اللعبة. '
+                        'أضف بطاقتين نصيتين إلى «$deckTitle» ثم أعد المحاولة.'
+                  : deckTitle.isEmpty
+                  ? 'أضف بطاقتين نصيتين إلى هذه المجموعة ثم أعد المحاولة.'
+                  : 'أضف بطاقتين نصيتين إلى «$deckTitle» ثم أعد المحاولة.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: context.muted,

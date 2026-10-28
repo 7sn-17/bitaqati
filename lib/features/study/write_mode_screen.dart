@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/audio/sound_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_message.dart';
@@ -112,10 +113,13 @@ class _WriteSessionState extends ConsumerState<_WriteSession> {
     _focus.unfocus();
     setState(() => _phase = check.correct ? _Phase.correct : _Phase.wrong);
     if (!check.correct) {
+      unawaited(SoundService.instance.wrong());
       HapticFeedback.heavyImpact();
+      HapticFeedback.vibrate();
       return;
     }
-    HapticFeedback.mediumImpact();
+    unawaited(SoundService.instance.correct());
+    HapticFeedback.heavyImpact();
     _advanceTimer = Timer(
       const Duration(milliseconds: 1150),
       () => _advance(good: true),

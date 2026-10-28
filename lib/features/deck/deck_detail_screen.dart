@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -2737,7 +2738,6 @@ class _ReviewRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String name = review.authorName.trim();
-    final String initial = name.isEmpty ? '؟' : name.substring(0, 1);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Container(
@@ -2752,24 +2752,7 @@ class _ReviewRow extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: context.softAccent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    initial,
-                    style: TextStyle(
-                      fontFamily: 'ReadexPro',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: context.onSoftAccent,
-                    ),
-                  ),
-                ),
+                _ReviewAvatar(name: name, url: review.avatarUrl),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -2812,6 +2795,60 @@ class _ReviewRow extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A reviewer's face, or their initial when they have no picture.
+///
+/// The letter is a fallback, not the design: every Google account has an
+/// avatar in its profile row, and showing "ح" for a person who set a photo
+/// made the review list look like a placeholder.
+class _ReviewAvatar extends StatelessWidget {
+  const _ReviewAvatar({required this.name, required this.url});
+
+  final String name;
+  final String? url;
+
+  static const double _size = 30;
+
+  @override
+  Widget build(BuildContext context) {
+    final String trimmed = name.trim();
+    final String initial = trimmed.isEmpty ? '؟' : trimmed.substring(0, 1);
+    final Widget fallback = Container(
+      width: _size,
+      height: _size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: context.softAccent,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontFamily: 'ReadexPro',
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: context.onSoftAccent,
+        ),
+      ),
+    );
+    final String? link = url;
+    if (link == null || link.isEmpty) {
+      return fallback;
+    }
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: link,
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        fadeInDuration: const Duration(milliseconds: 160),
+        placeholder: (BuildContext context, String value) => fallback,
+        errorWidget: (BuildContext context, String value, Object error) =>
+            fallback,
       ),
     );
   }

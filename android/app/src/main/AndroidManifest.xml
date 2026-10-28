@@ -62,6 +62,13 @@
                 android:name="flutter_deeplinking_enabled"
                 android:value="false" />
         </activity>
+        <!-- uCrop, the native cropper behind image_cropper. It has to be
+             declared by the host app or cropping crashes the moment it opens.
+             The AppCompat theme is what uCrop's own activity expects. -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
         <!-- Delivers a reminder whose moment has arrived. -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"

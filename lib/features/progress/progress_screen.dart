@@ -4,7 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -12,6 +11,7 @@ import '../../core/widgets/section_header.dart';
 import '../../data/content_providers.dart';
 import '../../domain/gamification.dart';
 import '../../domain/models.dart';
+import '../create/create_sheet.dart';
 import '../study/study_mode_sheet.dart';
 
 const List<String> _months = <String>[
@@ -57,6 +57,11 @@ class ProgressScreen extends ConsumerWidget {
     final DeckNode? todayDeck = ref.watch(todayReviewDeckProvider);
     final DeckNode? startDeck = todayDeck ?? _firstDeckWithCards(ref);
     final int dueTotal = ref.watch(totalDueProvider);
+    // With no review history every chart below is a row of zeros, which reads
+    // as "you are doing badly" rather than "you have not started". The
+    // panels are replaced by one explanation until there is something real to
+    // draw.
+    final bool hasActivity = summary.totalReviews > 0;
 
     return SafeArea(
       bottom: false,
@@ -69,13 +74,14 @@ class ProgressScreen extends ConsumerWidget {
             _StartCard(
               deck: startDeck,
               dueCount: dueTotal,
-              firstRun: summary.totalReviews == 0,
+              firstRun: !hasActivity,
             ),
-          _StreakCard(summary: summary),
+          if (!hasActivity) _FirstRunPanel(hasDeck: startDeck != null),
+          if (hasActivity) _StreakCard(summary: summary),
           _AchievementsSection(summary: summary),
-          _RetentionCard(summary: summary),
-          _ForecastCard(forecast: forecast),
-          _HeatmapCard(summary: summary),
+          if (hasActivity) _RetentionCard(summary: summary),
+          if (hasActivity) _ForecastCard(forecast: forecast),
+          if (hasActivity) _HeatmapCard(summary: summary),
           const SizedBox(height: 10),
         ],
       ),
@@ -410,7 +416,7 @@ class _StartCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: () => _startStudy(context, deck),
+              onPressed: () => openStudyMode(context, deck),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -429,6 +435,89 @@ class _StartCard extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// What the dashboard says before there is anything to measure.
+///
+/// Two different empty states live here: a reader with decks and no sessions,
+/// and a reader with no decks at all. The second one gets a button, because
+/// telling someone to study when they own nothing is a dead end.
+class _FirstRunPanel extends StatelessWidget {
+  const _FirstRunPanel({required this.hasDeck});
+
+  final bool hasDeck;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: _Panel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: context.softAccent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    hasDeck
+                        ? CupertinoIcons.chart_bar_alt_fill
+                        : CupertinoIcons.rectangle_stack_badge_plus,
+                    size: 20,
+                    color: context.onSoftAccent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    hasDeck ? 'رحلتك تبدأ بأول مراجعة' : 'أنشئ مجموعتك الأولى',
+                    style: context.texts.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              hasDeck
+                  ? 'لم تُسجّل أي مراجعة بعد، لذا لا توجد سلسلة أيام ولا نسبة '
+                        'تثبيت بعد. أنجز جلسة واحدة وستمتلئ هذه الصفحة بأرقامك '
+                        'الحقيقية: نقاط الخبرة، وسلسلة الأيام، وخطة الأسبوع.'
+                  : 'تحتاج مجموعة فيها بطاقات قبل أن تبدأ. أنشئ مجموعة، أضف '
+                        'بطاقاتك، ثم عُد إلى هنا لمتابعة تقدّمك.',
+              style: context.texts.bodySmall?.copyWith(
+                fontSize: 11.5,
+                height: 1.7,
+              ),
+            ),
+            if (!hasDeck) ...<Widget>[
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => showCreateSheet(context),
+                icon: const Icon(CupertinoIcons.add, size: 16),
+                label: const Text('إنشاء مجموعة'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1410,26 +1499,4 @@ String _dayLabel(List<DueForecastDay> forecast, int index) {
     return 'غداً';
   }
   return _weekdays[forecast[index].day.weekday % 7];
-}
-
-Future<void> _startStudy(BuildContext context, DeckNode deck) async {
-  final StudyMode? mode = await showStudyModeSheet(
-    context,
-    deckTitle: deck.title,
-    cardCount: deck.cardCount,
-    dueCount: deck.dueCount,
-  );
-  if (mode == null || !context.mounted) {
-    return;
-  }
-  switch (mode) {
-    case StudyMode.review:
-      await context.push('/review/${deck.id}');
-    case StudyMode.test:
-      await context.push('/test/${deck.id}');
-    case StudyMode.match:
-      await context.push('/match/${deck.id}');
-    case StudyMode.write:
-      await context.push('/write/${deck.id}');
-  }
 }

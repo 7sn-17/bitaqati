@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -10,9 +11,14 @@ ImageProvider imageProviderFor(String url) => imageProviderForUrl(url);
 
 /// Interactive canvas for image occlusion.
 ///
-/// Drag on empty image space to draw a box. Drag a box to move it, drag its
-/// corner handle to resize it, and tap the × to delete it. Geometry is stored
-/// normalised (0..1) so the same card renders correctly at any size.
+/// Drag on empty image space to draw a box, drag a box to move it, and drag a
+/// corner grip to resize it. Geometry is stored normalised (0..1) so the same
+/// card renders correctly at any size.
+///
+/// Moving and resizing are separate gestures on separate widgets. The old
+/// version guessed which one you meant from how close to a corner the touch
+/// started, which meant a box smaller than twice the touch radius could never
+/// be moved at all — the single most common complaint about this screen.
 class OcclusionCanvas extends StatefulWidget {
   const OcclusionCanvas({
     required this.imageUrl,
@@ -78,6 +84,17 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
     );
   }
 
+  /// True when [position] lands on a box, so the drag belongs to that box and
+  /// must not also start drawing a new one underneath it.
+  bool _onBox(Offset position, Rect frame) {
+    for (final OcclusionBox box in widget.boxes) {
+      if (box.toRect(frame).inflate(4).contains(position)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void _finish(Rect frame) {
     final Offset? start = _start;
     final Offset? end = _current;
@@ -131,13 +148,26 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                 final Rect frame = containRect(size, _aspect);
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onPanStart: (DragStartDetails details) => setState(() {
-                    _start = _clamp(details.localPosition, frame);
-                    _current = _start;
-                  }),
-                  onPanUpdate: (DragUpdateDetails details) => setState(() {
-                    _current = _clamp(details.localPosition, frame);
-                  }),
+                  dragStartBehavior: DragStartBehavior.down,
+                  onPanStart: (DragStartDetails details) {
+                    // A drag that starts on a box is that box's move or
+                    // resize, never a new rectangle.
+                    if (_onBox(details.localPosition, frame)) {
+                      return;
+                    }
+                    setState(() {
+                      _start = _clamp(details.localPosition, frame);
+                      _current = _start;
+                    });
+                  },
+                  onPanUpdate: (DragUpdateDetails details) {
+                    if (_start == null) {
+                      return;
+                    }
+                    setState(() {
+                      _current = _clamp(details.localPosition, frame);
+                    });
+                  },
                   onPanEnd: (DragEndDetails details) => _finish(frame),
                   onPanCancel: () => setState(() {
                     _start = null;
@@ -165,29 +195,26 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
                       ),
                       for (int index = 0; index < widget.boxes.length; index++)
                         _BoxOverlay(
+                          key: ValueKey<int>(index),
                           rect: widget.boxes[index].toRect(frame),
                           canvas: frame.size,
                           box: widget.boxes[index],
                           index: index,
                           onChanged: (OcclusionBox box) => _replace(index, box),
-                          onRemove: () {
-                            final List<OcclusionBox> next = <OcclusionBox>[
-                              ...widget.boxes,
-                            ]..removeAt(index);
-                            widget.onChanged(next);
-                          },
                         ),
                       if (_start != null && _current != null)
                         Positioned.fromRect(
                           rect: Rect.fromPoints(_start!, _current!),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.28),
-                              border: Border.all(
-                                color: AppColors.accent,
-                                width: 1.4,
+                          child: IgnorePointer(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.28),
+                                border: Border.all(
+                                  color: AppColors.accent,
+                                  width: 1.4,
+                                ),
+                                borderRadius: BorderRadius.circular(6),
                               ),
-                              borderRadius: BorderRadius.circular(6),
                             ),
                           ),
                         ),
@@ -232,7 +259,7 @@ class _OcclusionCanvasState extends State<OcclusionCanvas> {
               child: Text(
                 widget.boxes.isEmpty
                     ? 'اسحب إصبعك فوق الصورة لرسم مستطيل التغطية.'
-                    : 'اسحب داخل المربّع لتحريكه، ومن زاويته لتكبير‌ه.',
+                    : 'اسحب المربّع لتحريكه، ومن مقابضه لتكبير‌ه.',
                 style: context.texts.bodySmall,
               ),
             ),
@@ -257,7 +284,7 @@ class _BoxOverlay extends StatefulWidget {
     required this.box,
     required this.index,
     required this.onChanged,
-    required this.onRemove,
+    super.key,
   });
 
   final Rect rect;
@@ -265,7 +292,6 @@ class _BoxOverlay extends StatefulWidget {
   final OcclusionBox box;
   final int index;
   final ValueChanged<OcclusionBox> onChanged;
-  final VoidCallback onRemove;
 
   @override
   State<_BoxOverlay> createState() => _BoxOverlayState();
@@ -275,44 +301,32 @@ class _BoxOverlay extends StatefulWidget {
 enum _Grip { move, topLeft, topRight, bottomLeft, bottomRight }
 
 class _BoxOverlayState extends State<_BoxOverlay> {
-  /// How close to a corner a touch has to start to resize from it.
-  static const double _touch = 32;
-
   /// The smallest a box may be dragged down to, in normalised units.
   static const double _min = 0.04;
 
-  _Grip _grip = _Grip.move;
+  /// Below this the four grips would cover the whole box, so the box only
+  /// moves and resizing is left to drawing a new one.
+  static const double _resizeFloor = 56;
 
-  _Grip _gripAt(Offset position) {
-    final Size size = widget.rect.size;
-    final bool left = position.dx <= _touch;
-    final bool right = position.dx >= size.width - _touch;
-    final bool top = position.dy <= _touch;
-    final bool bottom = position.dy >= size.height - _touch;
-    if (top && left) {
-      return _Grip.topLeft;
-    }
-    if (top && right) {
-      return _Grip.topRight;
-    }
-    if (bottom && left) {
-      return _Grip.bottomLeft;
-    }
-    if (bottom && right) {
-      return _Grip.bottomRight;
-    }
-    return _Grip.move;
-  }
+  _Grip? _grip;
+
+  bool get _canResize =>
+      widget.rect.width >= _resizeFloor && widget.rect.height >= _resizeFloor;
 
   void _drag(DragUpdateDetails details) {
+    final _Grip? grip = _grip;
+    if (grip == null) {
+      return;
+    }
     final OcclusionBox box = widget.box;
     final double dx = details.delta.dx / widget.canvas.width;
     final double dy = details.delta.dy / widget.canvas.height;
-    if (_grip == _Grip.move) {
+
+    if (grip == _Grip.move) {
       widget.onChanged(
         box.copyWith(
-          left: (box.left + dx).clamp(0.0, 1 - box.width),
-          top: (box.top + dy).clamp(0.0, 1 - box.height),
+          left: (box.left + dx).clamp(0.0, 1.0 - box.width),
+          top: (box.top + dy).clamp(0.0, 1.0 - box.height),
         ),
       );
       return;
@@ -326,7 +340,7 @@ class _BoxOverlayState extends State<_BoxOverlay> {
     // Each corner moves its own two edges, and never past the opposite edge:
     // the clamp is against the far side of the box, not against the image, so
     // a box can never invert or collapse.
-    switch (_grip) {
+    switch (grip) {
       case _Grip.move:
         break;
       case _Grip.topLeft:
@@ -353,9 +367,57 @@ class _BoxOverlayState extends State<_BoxOverlay> {
     );
   }
 
+  Alignment _corner(_Grip grip) {
+    switch (grip) {
+      case _Grip.move:
+      case _Grip.topLeft:
+        return Alignment.topLeft;
+      case _Grip.topRight:
+        return Alignment.topRight;
+      case _Grip.bottomLeft:
+        return Alignment.bottomLeft;
+      case _Grip.bottomRight:
+        return Alignment.bottomRight;
+    }
+  }
+
+  Widget _handle(_Grip grip) {
+    return Positioned(
+      left: grip == _Grip.topLeft || grip == _Grip.bottomLeft ? 0 : null,
+      right: grip == _Grip.topRight || grip == _Grip.bottomRight ? 0 : null,
+      top: grip == _Grip.topLeft || grip == _Grip.topRight ? 0 : null,
+      bottom: grip == _Grip.bottomLeft || grip == _Grip.bottomRight ? 0 : null,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        dragStartBehavior: DragStartBehavior.down,
+        onPanStart: (DragStartDetails details) => setState(() => _grip = grip),
+        onPanUpdate: _drag,
+        onPanEnd: (DragEndDetails details) => setState(() => _grip = null),
+        onPanCancel: () => setState(() => _grip = null),
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: Align(
+            alignment: _corner(grip),
+            child: Container(
+              width: 13,
+              height: 13,
+              margin: const EdgeInsets.all(1),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 1.4),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bool active = _grip != _Grip.move;
+    final bool active = _grip != null;
     return Positioned.fromRect(
       rect: widget.rect,
       child: Stack(
@@ -364,20 +426,21 @@ class _BoxOverlayState extends State<_BoxOverlay> {
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
+              dragStartBehavior: DragStartBehavior.down,
               onPanStart: (DragStartDetails details) =>
-                  setState(() => _grip = _gripAt(details.localPosition)),
+                  setState(() => _grip = _Grip.move),
               onPanUpdate: _drag,
               onPanEnd: (DragEndDetails details) =>
-                  setState(() => _grip = _Grip.move),
-              onPanCancel: () => setState(() => _grip = _Grip.move),
+                  setState(() => _grip = null),
+              onPanCancel: () => setState(() => _grip = null),
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.78),
+                  color: AppColors.primary.withValues(alpha: 0.72),
                   border: Border.all(
                     color: active
                         ? AppColors.accent
                         : AppColors.accent.withValues(alpha: 0.7),
-                    width: active ? 2.2 : 1.6,
+                    width: active ? 2.4 : 1.6,
                   ),
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -393,61 +456,12 @@ class _BoxOverlayState extends State<_BoxOverlay> {
               ),
             ),
           ),
-          // Four visible grips: a single corner was easy to miss and made
-          // resizing a guess.
-          for (final _Grip grip in <_Grip>[
-            _Grip.topLeft,
-            _Grip.topRight,
-            _Grip.bottomLeft,
-            _Grip.bottomRight,
-          ])
-            Positioned(
-              left: grip == _Grip.topLeft || grip == _Grip.bottomLeft
-                  ? 0
-                  : null,
-              right: grip == _Grip.topRight || grip == _Grip.bottomRight
-                  ? 0
-                  : null,
-              top: grip == _Grip.topLeft || grip == _Grip.topRight ? 0 : null,
-              bottom: grip == _Grip.bottomLeft || grip == _Grip.bottomRight
-                  ? 0
-                  : null,
-              child: IgnorePointer(
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary, width: 1.2),
-                  ),
-                ),
-              ),
-            ),
-          // Floating outside the box so it never covers the region it deletes.
-          Positioned(
-            right: -10,
-            top: -10,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: widget.onRemove,
-              child: Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: AppColors.danger,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.6),
-                ),
-                child: const Icon(
-                  Icons.close_rounded,
-                  size: 14,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
+          if (_canResize) ...<Widget>[
+            _handle(_Grip.topLeft),
+            _handle(_Grip.topRight),
+            _handle(_Grip.bottomLeft),
+            _handle(_Grip.bottomRight),
+          ],
         ],
       ),
     );
