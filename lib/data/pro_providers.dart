@@ -108,9 +108,64 @@ final StreamProvider<ProStatus> proStatusProvider = StreamProvider<ProStatus>((
 });
 
 /// The entitlement, read synchronously, for guards that run inside a tap.
-final Provider<ProStatus> proNowProvider = Provider<ProStatus>((Ref ref) {
-  return ref.watch(proStatusProvider).valueOrNull ?? const ProStatus();
-});
+///
+/// It is a notifier rather than a plain provider because a subscription ends on
+/// a clock, not on a database write: without something that re-reads itself at
+/// the moment the date passes, a phone that has been open all day keeps showing
+/// Pro until the next launch. The timer fires at the expiry (and at most hourly
+/// while waiting), and asks the server once so the stored flag agrees with what
+/// the user is being shown.
+final NotifierProvider<ProNowNotifier, ProStatus> proNowProvider =
+    NotifierProvider<ProNowNotifier, ProStatus>(ProNowNotifier.new);
+
+class ProNowNotifier extends Notifier<ProStatus> {
+  Timer? _timer;
+
+  @override
+  ProStatus build() {
+    ref.onDispose(() {
+      _timer?.cancel();
+      _timer = null;
+    });
+    final ProStatus status =
+        ref.watch(proStatusProvider).valueOrNull ?? const ProStatus();
+    _arm(status);
+    return status;
+  }
+
+  /// Wakes up when the paid period ends, so the UI flips to free on its own.
+  void _arm(ProStatus status) {
+    _timer?.cancel();
+    _timer = null;
+    final DateTime? until = status.expiry;
+    if (!status.isPro || until == null) {
+      return;
+    }
+    final Duration left = until.difference(DateTime.now());
+    if (left.isNegative) {
+      // Already over on paper: settle it with the server once, then let the
+      // stream carry the answer.
+      unawaited(
+        Future<void>.microtask(() => ref.read(proServiceProvider).refresh()),
+      );
+      return;
+    }
+    final Duration wait = left > const Duration(hours: 1)
+        ? const Duration(hours: 1)
+        : left;
+    _timer = Timer(wait, () {
+      // A new instance notifies every listener even when the values are equal,
+      // which is the point: `active` is computed from the clock, so the rebuild
+      // is what turns Pro off.
+      state = ProStatus(isPro: status.isPro, expiry: until);
+      _arm(state);
+      // Fired at the real end of the period, so the server is asked now.
+      if (left <= wait) {
+        unawaited(ref.read(proServiceProvider).refresh());
+      }
+    });
+  }
+}
 
 /// What the activation call produced.
 @immutable

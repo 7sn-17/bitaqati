@@ -2,6 +2,7 @@ package com.bitaqati.app
 
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -95,8 +96,8 @@ class MainActivity : FlutterActivity() {
     private fun currentAlias(): String? {
         var fallback: String? = null
         for (name in aliases) {
-            val declared = component(name) ?: continue
-            when (packageManager.getComponentEnabledSetting(declared)) {
+            val entry = component(name) ?: continue
+            when (packageManager.getComponentEnabledSetting(entry)) {
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED -> return name
                 PackageManager.COMPONENT_ENABLED_STATE_DEFAULT ->
                     if (name == "DEFAULT") {
@@ -107,14 +108,39 @@ class MainActivity : FlutterActivity() {
         return fallback
     }
 
+    /**
+     * The activity names this package declares, enabled or not.
+     *
+     * getActivityInfo() answers only for components that are enabled, and two
+     * of the three aliases are disabled by design. Asking it about them threw
+     * NameNotFoundException, so every lookup failed and the app concluded that
+     * the device could not change icons at all. The package listing is asked
+     * instead, with disabled components included.
+     */
+    private val declared: Set<String> by lazy {
+        try {
+            val flags =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    PackageManager.GET_ACTIVITIES or
+                        PackageManager.MATCH_DISABLED_COMPONENTS
+                } else {
+                    @Suppress("DEPRECATION")
+                    PackageManager.GET_ACTIVITIES
+                }
+            packageManager
+                .getPackageInfo(packageName, flags)
+                .activities
+                ?.map { it.name }
+                ?.toSet()
+                ?: emptySet()
+        } catch (error: Exception) {
+            emptySet()
+        }
+    }
+
     /** The alias as a component, or null when the manifest does not declare it. */
     private fun component(alias: String): ComponentName? {
         val name = ComponentName(this, packageName + "." + alias)
-        return try {
-            packageManager.getActivityInfo(name, 0)
-            name
-        } catch (error: PackageManager.NameNotFoundException) {
-            null
-        }
+        return if (declared.contains(name.className)) name else null
     }
 }

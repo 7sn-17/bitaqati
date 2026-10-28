@@ -83,6 +83,10 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
     // crossed into a new day. Syncing here replaces the old five-minute timer:
     // nothing polls while the app is idle.
     unawaited(ref.read(themeTrialProvider.notifier).check());
+    // The subscription is server state: a code redeemed on another phone, a
+    // refund, or a date that passed overnight all land here, and nothing else
+    // would ask until the next cold start.
+    unawaited(ref.read(proServiceProvider).refresh());
     ref.invalidate(reminderAccessProvider);
     ref.invalidate(exactAlarmProvider);
     unawaited(ref.read(reminderCoordinatorProvider).refresh());

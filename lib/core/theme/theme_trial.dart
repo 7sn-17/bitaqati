@@ -89,7 +89,9 @@ bool paletteAllowed(Ref ref, AppThemeId id) {
   if (!pro.hasValue) {
     return true;
   }
-  if (pro.requireValue.active) {
+  // proNow, not the raw row: it is the one that knows the clock, so a palette
+  // paid for until this evening is released this evening.
+  if (ref.watch(proNowProvider).active) {
     return true;
   }
   return ref.watch(themeTrialProvider).grants(id);
