@@ -49,10 +49,7 @@ class ActiveIconController extends Notifier<AppIconOption> {
     );
     state = option;
     debugPrint('[icon] choosing ${option.alias}');
-    final bool applied = await DynamicIconService.apply(
-      option.alias,
-      restart: true,
-    );
+    final bool applied = await DynamicIconService.apply(option.alias);
     if (!applied) {
       debugPrint('[icon] platform refused ${option.alias}');
       await DynamicIconService.remember(

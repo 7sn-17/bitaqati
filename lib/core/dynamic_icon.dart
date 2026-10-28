@@ -122,25 +122,35 @@ abstract final class DynamicIconService {
     }
   }
 
-  /// Applies [alias] now and reports whether the package manager took it.
+  /// Queues [alias] and reports whether this build can wear it.
   ///
-  /// [restart] hands the screen to the launcher and drops this process once the
-  /// swap is verified. That is what makes the home screen redraw: a launcher
-  /// with a live task for this package keeps the icon it already has, so the
-  /// change stays invisible until the app has no task left to return to. The
-  /// reconcile pass at startup leaves it false — closing the app the user just
-  /// opened would be worse than a stale icon.
-  static Future<bool> apply(String alias, {bool restart = false}) async {
+  /// Nothing changes on the home screen yet, on purpose: the swap runs when the
+  /// app leaves the screen. A launcher resolves a package icon while it is in
+  /// front, so flipping an alias under a launcher that is already showing the
+  /// old artwork leaves it showing the old artwork — and on several devices it
+  /// finishes the task as well, which reads as "the app closed and nothing
+  /// changed". Every icon plugin that works defers the swap the same way.
+  static Future<bool> apply(String alias) async {
     try {
-      final String? applied = await _channel.invokeMethod<String>(
+      final String? queued = await _channel.invokeMethod<String>(
         'setAlias',
-        <String, Object?>{'alias': alias, 'restart': restart},
+        <String, Object?>{'alias': alias},
       );
-      return applied != null;
+      return queued != null;
     } on PlatformException {
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// The alias waiting to be applied, if any.
+  static Future<String?> pending() async {
+    try {
+      final String? name = await _channel.invokeMethod<String>('pendingAlias');
+      return name == null || name.isEmpty ? null : name;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -188,14 +198,17 @@ abstract final class DynamicIconService {
   /// default alias and when it cannot read the component at all, so the only
   /// trustworthy comparison is against what this install remembers.
   ///
-  /// Returns true when the launcher was actually changed.
+  /// Returns true when a swap was queued for the next time the app leaves the
+  /// screen.
   static Future<bool> reconcile(SharedPreferences prefs) async {
     final String wanted = remembered(prefs);
     final String live = await current() ?? AppIconOption.defaultAlias;
     if (live == wanted) {
       return false;
     }
-    debugPrint('[icon] launcher drifted · wanted=$wanted live=$live');
+    debugPrint(
+      '[icon] launcher drifted · wanted=$wanted live=$live · ${await state()}',
+    );
     return apply(wanted);
   }
 }
