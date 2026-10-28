@@ -46,7 +46,10 @@ Future<StudyMode?> showStudyModeSheet(
 /// The two cases share every line of routing below, which is the point — the
 /// global queue is not a second study engine, it is the same one with a wider
 /// scope id.
-@immutable
+///
+/// Not marked @immutable: the deck constructor forwards a live DeckNode's
+/// fields, which cannot appear in a constant initializer, so the annotation
+/// would only buy a lint that cannot be satisfied.
 class StudyTarget {
   const StudyTarget({
     required this.scope,
@@ -55,7 +58,7 @@ class StudyTarget {
     required this.dueCount,
   });
 
-  const StudyTarget.deck(DeckNode deck)
+  StudyTarget.deck(DeckNode deck)
     : this(
         scope: deck.id,
         title: deck.title,
@@ -64,7 +67,7 @@ class StudyTarget {
       );
 
   /// Every deck at once, with the totals the home hero already shows.
-  const StudyTarget.everything({required int cardCount, required int dueCount})
+  StudyTarget.everything({required int cardCount, required int dueCount})
     : this(
         scope: kAllDecksScope,
         title: 'جميع المجموعات',
