@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'theme/theme_palette.dart';
+import 'theme/theme_trial.dart';
 
 final Provider<SharedPreferences> sharedPreferencesProvider =
     Provider<SharedPreferences>(
@@ -137,7 +138,10 @@ class ThemePaletteNotifier extends Notifier<AppThemeId> {
     final String? saved = ref.watch(sharedPreferencesProvider).getString(_key);
     for (final AppThemeId id in AppThemeId.values) {
       if (id.name == saved) {
-        return id;
+        // A palette the account may not wear is not a palette: a lapsed trial
+        // or an expired subscription reads as Forest even when the preference
+        // still names the old theme.
+        return paletteAllowed(ref, id) ? id : AppThemeId.forest;
       }
     }
     return AppThemeId.forest;
@@ -149,6 +153,17 @@ class ThemePaletteNotifier extends Notifier<AppThemeId> {
     }
     state = id;
     await ref.read(sharedPreferencesProvider).setString(_key, id.name);
+  }
+
+  /// Puts the app back on Forest and writes it down.
+  ///
+  /// Used when a trial ends or the clock was moved: [select] would return early
+  /// because the state has already fallen back, leaving the old name on disk.
+  Future<void> reset() async {
+    state = AppThemeId.forest;
+    await ref
+        .read(sharedPreferencesProvider)
+        .setString(_key, AppThemeId.forest.name);
   }
 }
 

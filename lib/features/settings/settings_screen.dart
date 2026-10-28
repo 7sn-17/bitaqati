@@ -18,6 +18,7 @@ import '../../core/notifications/reminder_service.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_palette.dart';
+import '../../core/theme/theme_trial.dart';
 import '../../core/dynamic_icon.dart';
 import '../../core/updates/update_providers.dart';
 import '../../core/updates/update_service.dart';
@@ -1046,13 +1047,30 @@ class _HelpPoint extends StatelessWidget {
 /// choice is made by looking at the colours instead of reading a list of
 /// names. Tapping one rebuilds the theme; MaterialApp cross-fades every token
 /// through [ThemePalette.lerp], which is why the change animates.
+///
+/// A paid palette is not simply locked for a free account: it carries one free
+/// day, marked with a `1`. Starting that day spends it for good, which is why
+/// the badge becomes a padlock once the trial ends.
 class _ThemeSwatches extends ConsumerWidget {
   const _ThemeSwatches();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AppThemeId active = ref.watch(themePaletteProvider);
+    final ThemeTrialState trial = ref.watch(themeTrialProvider);
+    final bool pro = ref.watch(proNowProvider).active;
     final Brightness brightness = Theme.of(context).brightness;
+
+    _SwatchState stateOf(AppThemeId id) {
+      if (pro || id == AppThemeId.forest) {
+        return _SwatchState.free;
+      }
+      if (trial.grants(id)) {
+        return _SwatchState.trial;
+      }
+      return trial.canTry(id) ? _SwatchState.available : _SwatchState.locked;
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       child: Column(
@@ -1083,26 +1101,167 @@ class _ThemeSwatches extends ConsumerWidget {
                     id: id,
                     brightness: brightness,
                     selected: id == active,
-                    locked:
-                        !ref.watch(proNowProvider).active &&
-                        id != AppThemeId.forest,
-                    onTap: () {
-                      final bool locked =
-                          !ref.read(proNowProvider).active &&
-                          id != AppThemeId.forest;
-                      if (locked) {
-                        HapticFeedback.lightImpact();
-                        showThemeLockedDialog(context);
-                        return;
-                      }
-                      HapticFeedback.selectionClick();
-                      ref.read(themePaletteProvider.notifier).select(id);
-                    },
+                    state: stateOf(id),
+                    onTap: () => _tap(context, ref, id, stateOf(id), trial),
                   ),
                 ),
                 if (id != AppThemeId.values.last) const SizedBox(width: 8),
               ],
             ],
+          ),
+          if (!pro) ...<Widget>[
+            const SizedBox(height: 10),
+            _TrialLine(trial: trial),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// A tap means one of four things, and only one of them opens the paywall.
+  void _tap(
+    BuildContext context,
+    WidgetRef ref,
+    AppThemeId id,
+    _SwatchState state,
+    ThemeTrialState trial,
+  ) {
+    switch (state) {
+      case _SwatchState.free:
+        HapticFeedback.selectionClick();
+        ref.read(themePaletteProvider.notifier).select(id);
+        break;
+      case _SwatchState.trial:
+        // Already wearing it: a second tap would restart nothing.
+        HapticFeedback.selectionClick();
+        break;
+      case _SwatchState.available:
+        HapticFeedback.mediumImpact();
+        unawaited(ref.read(themeTrialProvider.notifier).start(id));
+        showAppMessage(
+          context,
+          'بدأت تجربتك المجانية لسمة ${id.label}. تعود السمة الافتراضية '
+          'تلقائياً بعد 24 ساعة.',
+          kind: AppMessageKind.info,
+        );
+        break;
+      case _SwatchState.locked:
+        HapticFeedback.lightImpact();
+        final AppThemeId? running = trial.running ? trial.theme : null;
+        if (running != null) {
+          showAppMessage(
+            context,
+            'لديك تجربة جارية لسمة ${running.label}. بعد انتهائها يمكنك تجربة '
+            'سمة أخرى، مرة واحدة.',
+            kind: AppMessageKind.info,
+          );
+          return;
+        }
+        showThemeLockedDialog(context);
+        break;
+    }
+  }
+}
+
+/// What a swatch is allowed to do right now.
+enum _SwatchState {
+  /// Free for everyone, or the account is Pro.
+  free,
+
+  /// This is the palette the running trial is lending out.
+  trial,
+
+  /// One try left, marked with a `1`.
+  available,
+
+  /// Spent, or another trial is running.
+  locked,
+}
+
+/// The line under the swatches: the countdown while a trial runs, and what the
+/// free tier gets when it does not.
+class _TrialLine extends ConsumerWidget {
+  const _TrialLine({required this.trial});
+
+  final ThemeTrialState trial;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (trial.running) {
+      final Duration left =
+          ref.watch(trialCountdownProvider).valueOrNull ?? trial.remaining;
+      return _TrialNote(
+        icon: CupertinoIcons.time,
+        title: 'تجربة مجانية · ${trial.theme!.label}',
+        body:
+            'يتبقى ${formatTrialLeft(left)} ثم تعود السمة الافتراضية تلقائياً.',
+      );
+    }
+    final bool anyLeft = AppThemeId.values.any(
+      (AppThemeId id) => id != AppThemeId.forest && trial.canTry(id),
+    );
+    if (anyLeft) {
+      return const _TrialNote(
+        icon: CupertinoIcons.gift,
+        title: 'تجربة واحدة لكل سمة',
+        body: 'اضغط أي سمة تحمل رقم 1 لتجربتها 24 ساعة. التجربة لا تتكرر.',
+      );
+    }
+    return const _TrialNote(
+      icon: CupertinoIcons.lock,
+      title: 'انتهت تجاربك المجانية',
+      body: 'Pro يفتح الثيمات الثلاثة دائماً، بلا عدّاد.',
+    );
+  }
+}
+
+class _TrialNote extends StatelessWidget {
+  const _TrialNote({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
+      decoration: BoxDecoration(
+        color: context.selectedFill,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 13, color: context.brandInk),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: context.texts.labelSmall?.copyWith(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: context.brandInk,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  body,
+                  style: context.texts.labelSmall?.copyWith(
+                    fontSize: 9.5,
+                    height: 1.5,
+                    color: context.muted,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1115,7 +1274,7 @@ class _Swatch extends StatelessWidget {
     required this.id,
     required this.brightness,
     required this.selected,
-    required this.locked,
+    required this.state,
     required this.onTap,
   });
 
@@ -1123,8 +1282,8 @@ class _Swatch extends StatelessWidget {
   final Brightness brightness;
   final bool selected;
 
-  /// True when this palette belongs to the paid tier and the account is free.
-  final bool locked;
+  /// What the tap will do, and what the swatch advertises.
+  final _SwatchState state;
   final VoidCallback onTap;
 
   @override
@@ -1134,6 +1293,12 @@ class _Swatch extends StatelessWidget {
       button: true,
       selected: selected,
       label: id.label,
+      hint: switch (state) {
+        _SwatchState.free => null,
+        _SwatchState.trial => 'تجربة جارية',
+        _SwatchState.available => 'تجربة مجانية واحدة',
+        _SwatchState.locked => 'لمشتركي Pro',
+      },
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
@@ -1216,12 +1381,18 @@ class _Swatch extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
-                  if (locked) ...<Widget>[
+                  if (state == _SwatchState.available) ...<Widget>[
+                    const _TryBadge(),
+                    const SizedBox(width: 3),
+                  ] else if (state == _SwatchState.locked) ...<Widget>[
                     Icon(
                       CupertinoIcons.lock_fill,
                       size: 8,
                       color: context.muted,
                     ),
+                    const SizedBox(width: 3),
+                  ] else if (state == _SwatchState.trial) ...<Widget>[
+                    const _TrialPill(),
                     const SizedBox(width: 3),
                   ],
                   Flexible(
@@ -1242,6 +1413,59 @@ class _Swatch extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The one try, as a number: the padlock's replacement while a day is still
+/// owed to the account.
+class _TryBadge extends StatelessWidget {
+  const _TryBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 15,
+      height: 15,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: context.accent, shape: BoxShape.circle),
+      child: Text(
+        '1',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 9,
+          height: 1.1,
+          fontWeight: FontWeight.w800,
+          color: context.onAccent,
+        ),
+      ),
+    );
+  }
+}
+
+/// Marks the swatch whose day is running.
+class _TrialPill extends StatelessWidget {
+  const _TrialPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 1, 4, 2),
+      decoration: BoxDecoration(
+        color: context.accent,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        'تجربة',
+        style: TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 8,
+          height: 1.1,
+          fontWeight: FontWeight.w800,
+          color: context.onAccent,
         ),
       ),
     );

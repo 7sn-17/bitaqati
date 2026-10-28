@@ -1,5 +1,6 @@
 import 'dart:ui' show Color;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_dynamic_icon_plus/flutter_dynamic_icon_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -101,9 +102,28 @@ abstract final class DynamicIconService {
     }
   }
 
+  /// The channel that talks to MainActivity.
+  ///
+  /// The plugin is kept as the fallback, but on Android the native side does
+  /// the work: see MainActivity.kt for why the plugin's timing is wrong here.
+  static const MethodChannel _channel = MethodChannel('com.bitaqati.app/icon');
+
   /// The alias currently enabled, as a bare name, or null when it cannot be
-  /// read. The plugin answers with a fully qualified component name.
+  /// read. The plugin answers with a fully qualified component name; the
+  /// channel answers with the bare one.
   static Future<String?> current() async {
+    try {
+      final String? native = await _channel.invokeMethod<String>(
+        'currentAlias',
+      );
+      if (native != null && native.isNotEmpty) {
+        return native;
+      }
+    } on MissingPluginException {
+      // A build without the native side: ask the plugin below.
+    } catch (_) {
+      return null;
+    }
     try {
       final String? name = await FlutterDynamicIconPlus.alternateIconName;
       if (name == null || name.isEmpty) {
@@ -117,6 +137,20 @@ abstract final class DynamicIconService {
   }
 
   static Future<bool> apply(String alias) async {
+    // The native path applies the swap now, in this call. The plugin only
+    // queues it until the task is removed from recents, which is why the home
+    // screen kept the old icon while the app already drew the new one.
+    try {
+      final String? applied = await _channel.invokeMethod<String>(
+        'setAlias',
+        <String, Object?>{'alias': alias},
+      );
+      return applied != null;
+    } on MissingPluginException {
+      // Fall through to the plugin.
+    } on PlatformException {
+      return false;
+    }
     try {
       await FlutterDynamicIconPlus.setAlternateIconName(
         iconName: alias == AppIconOption.defaultAlias ? null : alias,

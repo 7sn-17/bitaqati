@@ -13,6 +13,7 @@ import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_palette.dart';
+import 'core/theme/theme_trial.dart';
 import 'core/widgets/splash_screen.dart';
 import 'data/icon_providers.dart';
 import 'data/pro_providers.dart';
@@ -43,6 +44,10 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
     // from the one this install is supposed to wear. Re-apply it once per
     // launch: a no-op when the two already agree.
     unawaited(ref.read(activeIconProvider.notifier).sync());
+    // A trial that ran out while the app was closed is already over; this is
+    // what writes the fallback down and, if the clock was moved, ends a trial
+    // that would otherwise outlive its day.
+    unawaited(ref.read(themeTrialProvider.notifier).check());
     // A reminder tapped while the app was closed is delivered as a launch
     // detail rather than a callback, so it is drained once the router exists.
     ReminderService.instance.onOpenDeck = _openReview;
@@ -77,6 +82,7 @@ class _BitaqatiAppState extends ConsumerState<BitaqatiApp>
     // that the user changed the notification switch, granted exact alarms, or
     // crossed into a new day. Syncing here replaces the old five-minute timer:
     // nothing polls while the app is idle.
+    unawaited(ref.read(themeTrialProvider.notifier).check());
     ref.invalidate(reminderAccessProvider);
     ref.invalidate(exactAlarmProvider);
     unawaited(ref.read(reminderCoordinatorProvider).refresh());
