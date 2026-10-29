@@ -781,6 +781,7 @@ class OcclusionView extends StatefulWidget {
     required this.boxes,
     this.masked = true,
     this.height = 220,
+    this.focus,
     this.onOpenImage,
     super.key,
   });
@@ -789,6 +790,11 @@ class OcclusionView extends StatefulWidget {
   final List<OcclusionBox> boxes;
   final bool masked;
   final double height;
+
+  /// Index of the plate a question is asking about, ringed in the accent so a
+  /// test that asks about one mask at a time never shows four identical
+  /// pictures. Null on the review screen, where every plate is in play.
+  final int? focus;
 
   /// Opens the picture full screen. Tapping the picture itself is the only
   /// gesture left that does not belong to a mask, so it is the natural place
@@ -848,6 +854,7 @@ class _OcclusionViewState extends State<OcclusionView> {
                   child: _OcclusionMask(
                     number: index + 1,
                     revealed: !widget.masked,
+                    focused: widget.focus == index,
                   ),
                 ),
               );
@@ -878,13 +885,20 @@ class _OcclusionViewState extends State<OcclusionView> {
 /// the only thing that opens the answers is the answer side. The number is the
 /// key that ties the plate to the numbered list shown there.
 class _OcclusionMask extends StatelessWidget {
-  const _OcclusionMask({required this.number, required this.revealed});
+  const _OcclusionMask({
+    required this.number,
+    required this.revealed,
+    this.focused = false,
+  });
 
   final int number;
 
   /// True on the answer side, where the picture is shown clean and only a
   /// hairline marks where the region was.
   final bool revealed;
+
+  /// True for the one plate a test question is asking about.
+  final bool focused;
 
   @override
   Widget build(BuildContext context) {
@@ -906,10 +920,20 @@ class _OcclusionMask extends StatelessWidget {
         decoration: BoxDecoration(
           color: context.isDark ? context.raisedSurface : context.primary,
           border: Border.all(
-            color: context.brandInk.withValues(alpha: 0.55),
-            width: 1.4,
+            color: focused
+                ? context.accent
+                : context.brandInk.withValues(alpha: 0.55),
+            width: focused ? 2.4 : 1.4,
           ),
           borderRadius: BorderRadius.circular(6),
+          boxShadow: focused
+              ? <BoxShadow>[
+                  BoxShadow(
+                    color: context.accent.withValues(alpha: 0.55),
+                    blurRadius: 10,
+                  ),
+                ]
+              : null,
         ),
         alignment: Alignment.center,
         child: FittedBox(

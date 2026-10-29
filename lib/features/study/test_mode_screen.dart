@@ -46,17 +46,17 @@ class TestModeScreen extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator(color: context.brandInk)),
       );
     }
-    final List<ReviewCard> usable = <ReviewCard>[
-      for (final ReviewCard card in cards)
-        if (plainMarkup(card.back).trim().isNotEmpty) card,
-    ];
-    if (usable.length < 2) {
+    // The queue is built from pieces, not cards: a cloze sentence and an
+    // occlusion picture both split into several questions. Two pieces are the
+    // floor because a single one has no wrong answer to offer.
+    final List<_Fragment> pieces = _buildFragments(cards);
+    if (pieces.length < 2) {
       return _NotEnough(deckTitle: deck?.title ?? 'جميع المجموعات');
     }
     return _TestSession(
       deckId: deckId,
       deckTitle: deck?.title ?? 'جميع المجموعات',
-      cards: usable,
+      pieces: pieces,
     );
   }
 }
@@ -66,13 +66,20 @@ enum _QuestionKind { choice, trueFalse }
 class _Question {
   const _Question({
     required this.card,
+    required this.prompt,
     required this.options,
     required this.correct,
     this.kind = _QuestionKind.choice,
     this.candidate = '',
+    this.maskIndex,
   });
 
   final ReviewCard card;
+
+  /// The question side, already prepared for this piece: a cloze sentence with
+  /// only this blank hidden, or the shared prompt of an occlusion card.
+  final String prompt;
+
   final List<String> options;
   final int correct;
   final _QuestionKind kind;
@@ -80,36 +87,220 @@ class _Question {
   /// For a true/false question: the answer the learner is judging. Empty for a
   /// multiple-choice question.
   final String candidate;
+
+  /// Which plate of an occlusion card this question is about, so the picture
+  /// can ring the region being asked about. Null for every other card type.
+  final int? maskIndex;
 }
 
-List<_Question> _buildQuestions(List<ReviewCard> cards) {
+/// One answerable piece of a card.
+///
+/// A plain card is a single piece. A cloze card is one piece per blank and an
+/// occlusion card is one piece per mask, so a four-mask picture becomes four
+/// questions. Every piece keeps the id of the card it came from: that is what
+/// lets the queue space siblings apart and pick wrong answers from other cards
+/// instead of from the same picture.
+class _Fragment {
+  const _Fragment({
+    required this.card,
+    required this.prompt,
+    required this.answer,
+    required this.key,
+    this.maskIndex,
+  });
+
+  final ReviewCard card;
+  final String prompt;
+  final String answer;
+
+  /// Unique per card and per piece. A piece is only ever added once per
+  /// session, so the same mask can never be asked twice in a row.
+  final String key;
+
+  final int? maskIndex;
+
+  String get cardId => card.id;
+}
+
+/// Rewrites a cloze sentence so only the blank at [target] stays hidden and
+/// every other blank is spelled out. Without this, four questions about one
+/// sentence would all look identical.
+String _clozePrompt(String front, int target) {
+  int index = 0;
+  return front.replaceAllMapped(kClozeRegex, (Match match) {
+    final int slot = index++;
+    final String answer = (match.group(1) ?? '').trim();
+    if (slot != target) {
+      return answer;
+    }
+    return '▁' * (answer.length.clamp(2, 12).toInt());
+  });
+}
+
+/// Every piece the deck can be asked about, in card order.
+///
+/// Pieces with no answer are dropped: an occlusion mask the writer never filled
+/// in cannot be graded, and a blank with nothing inside it is not a question.
+List<_Fragment> _buildFragments(List<ReviewCard> cards) {
+  final List<_Fragment> pieces = <_Fragment>[];
+  final Set<String> seen = <String>{};
+  void add(_Fragment piece) {
+    if (piece.answer.isEmpty) {
+      return;
+    }
+    if (!seen.add(piece.key)) {
+      return;
+    }
+    pieces.add(piece);
+  }
+
+  for (final ReviewCard card in cards) {
+    final int before = pieces.length;
+    if (card.type == 'occlusion') {
+      final List<OcclusionBox> boxes = occlusionBoxes(card.occlusion);
+      final String prompt = occlusionPrompt(card.back);
+      for (int index = 0; index < boxes.length; index++) {
+        add(
+          _Fragment(
+            card: card,
+            prompt: prompt,
+            answer: boxes[index].answer.trim(),
+            key: '${card.id}#mask$index',
+            maskIndex: index,
+          ),
+        );
+      }
+    } else if (card.type == 'cloze') {
+      final List<RegExpMatch> blanks = kClozeRegex
+          .allMatches(card.front)
+          .toList(growable: false);
+      for (int index = 0; index < blanks.length; index++) {
+        add(
+          _Fragment(
+            card: card,
+            prompt: _clozePrompt(card.front, index),
+            answer: (blanks[index].group(1) ?? '').trim(),
+            key: '${card.id}#blank$index',
+          ),
+        );
+      }
+    }
+    if (pieces.length > before) {
+      continue;
+    }
+    // A card that has no usable piece — an occlusion picture whose masks were
+    // never labelled, or a cloze sentence with every blank left empty — still
+    // has two sides worth testing, so it is asked as a whole card instead of
+    // being dropped from the session.
+    add(
+      _Fragment(
+        card: card,
+        prompt: card.front,
+        answer: plainMarkup(card.back).trim(),
+        key: '${card.id}#card',
+      ),
+    );
+  }
+  return pieces;
+}
+
+/// Spreads pieces so two of the same card never sit side by side.
+///
+/// One shuffled bucket per card, then a round-robin pass over the buckets: every
+/// pass takes at most one piece from each card, so a card's pieces end up as far
+/// apart as the deck allows. When one card owns more pieces than the rest of the
+/// deck together, the surplus at the tail cannot be separated and stays as is —
+/// which is the best a single-picture deck can do.
+List<_Fragment> _interleave(
+  List<_Fragment> pool,
+  math.Random random,
+  int limit,
+) {
+  final Map<String, List<_Fragment>> buckets = <String, List<_Fragment>>{};
+  for (final _Fragment piece in pool) {
+    buckets.putIfAbsent(piece.cardId, () => <_Fragment>[]).add(piece);
+  }
+  final List<String> cards = buckets.keys.toList()..shuffle(random);
+  for (final List<_Fragment> group in buckets.values) {
+    group.shuffle(random);
+  }
+  final List<_Fragment> queue = <_Fragment>[];
+  String? previous;
+  while (queue.length < limit) {
+    final List<String> open = <String>[
+      for (final String cardId in cards)
+        if (buckets[cardId]!.isNotEmpty) cardId,
+    ];
+    if (open.isEmpty) {
+      break;
+    }
+    // Never the same card twice in a row while another card still has pieces;
+    // when only one card is left there is nothing else to place.
+    final List<String> allowed = <String>[
+      for (final String cardId in open)
+        if (cardId != previous) cardId,
+    ];
+    final List<String> candidates = allowed.isEmpty ? open : allowed;
+    // The card with the most pieces left goes next, so the surplus is spent
+    // evenly instead of piling up at the end. Ties are broken by a reshuffle,
+    // which keeps the order from being the same every session.
+    candidates.shuffle(random);
+    String pick = candidates.first;
+    for (final String cardId in candidates) {
+      if (buckets[cardId]!.length > buckets[pick]!.length) {
+        pick = cardId;
+      }
+    }
+    queue.add(buckets[pick]!.removeAt(0));
+    previous = pick;
+  }
+  return queue;
+}
+
+List<_Question> _buildQuestions(List<_Fragment> pieces) {
   final math.Random random = math.Random();
-  final List<ReviewCard> pool = List<ReviewCard>.of(cards)..shuffle(random);
-  final List<String> answers = <String>{
-    for (final ReviewCard card in pool) plainMarkup(card.back).trim(),
-  }.toList();
-  final int count = math.min(10, pool.length);
+  final int count = math.min(10, pieces.length);
+  final List<_Fragment> queue = _interleave(
+    List<_Fragment>.of(pieces),
+    random,
+    count,
+  );
   final List<_Question> questions = <_Question>[];
-  for (int index = 0; index < count; index++) {
-    final ReviewCard card = pool[index];
-    final String answer = plainMarkup(card.back).trim();
-    final List<String> others = <String>[
-      for (final String candidate in answers)
-        if (candidate != answer) candidate,
-    ]..shuffle(random);
+  for (final _Fragment piece in queue) {
+    final String answer = piece.answer;
+    // Wrong answers come from other cards first, so a question about one mask
+    // is not answerable by remembering its siblings. A single-card deck has no
+    // other card to borrow from; only then are its own pieces used, which is
+    // what keeps a four-mask picture testable at all.
+    final List<String> foreign = <String>{
+      for (final _Fragment other in pieces)
+        if (other.cardId != piece.cardId && other.answer != answer)
+          other.answer,
+    }.toList()..shuffle(random);
+    final List<String> siblings = <String>{
+      for (final _Fragment other in pieces)
+        if (other.cardId == piece.cardId && other.answer != answer)
+          other.answer,
+    }.toList()..shuffle(random);
+    final List<String> others = <String>[...foreign, ...siblings];
+    if (others.isEmpty) {
+      continue;
+    }
     // Roughly a third of the questions are a statement to judge instead of
     // four options to pick. It breaks the rhythm of a session and it tests the
     // pair in the other direction: the learner has to recognise the answer
     // rather than recall it.
-    if (others.isNotEmpty && random.nextDouble() < 0.35) {
+    if (random.nextDouble() < 0.35) {
       final bool isTrue = random.nextBool();
       questions.add(
         _Question(
-          card: card,
+          card: piece.card,
+          prompt: piece.prompt,
           options: const <String>['صحيح', 'خطأ'],
           correct: isTrue ? 0 : 1,
           kind: _QuestionKind.trueFalse,
           candidate: isTrue ? answer : others.first,
+          maskIndex: piece.maskIndex,
         ),
       );
       continue;
@@ -117,7 +308,13 @@ List<_Question> _buildQuestions(List<ReviewCard> cards) {
     final List<String> options = <String>[answer, ...others.take(3)]
       ..shuffle(random);
     questions.add(
-      _Question(card: card, options: options, correct: options.indexOf(answer)),
+      _Question(
+        card: piece.card,
+        prompt: piece.prompt,
+        options: options,
+        correct: options.indexOf(answer),
+        maskIndex: piece.maskIndex,
+      ),
     );
   }
   return questions;
@@ -127,19 +324,21 @@ class _TestSession extends ConsumerStatefulWidget {
   const _TestSession({
     required this.deckId,
     required this.deckTitle,
-    required this.cards,
+    required this.pieces,
   });
 
   final String deckId;
   final String deckTitle;
-  final List<ReviewCard> cards;
+
+  /// Everything this deck can be asked about, frozen for the session.
+  final List<_Fragment> pieces;
 
   @override
   ConsumerState<_TestSession> createState() => _TestSessionState();
 }
 
 class _TestSessionState extends ConsumerState<_TestSession> {
-  late List<_Question> _questions = _buildQuestions(widget.cards);
+  late List<_Question> _questions = _buildQuestions(widget.pieces);
   Timer? _advance;
   int _index = 0;
   int _correct = 0;
@@ -225,7 +424,7 @@ class _TestSessionState extends ConsumerState<_TestSession> {
   void _restart() {
     _advance?.cancel();
     setState(() {
-      _questions = _buildQuestions(widget.cards);
+      _questions = _buildQuestions(widget.pieces);
       _index = 0;
       _correct = 0;
       _picked = null;
@@ -521,12 +720,17 @@ class _QuestionView extends StatelessWidget {
                       imageUrl: occlusionImageUrl(question.card.front),
                       boxes: occlusionBoxes(question.card.occlusion),
                       masked: true,
+                      // The plate this question asks about is ringed, so four
+                      // questions about one picture never look the same.
+                      focus: question.maskIndex,
                       height: 190,
                     )
                   else
                     CardMarkup(
-                      text: question.card.front,
-                      revealCloze: false,
+                      // The prompt already hides exactly the blank being
+                      // asked about, and spells the other ones out.
+                      text: question.prompt,
+                      revealCloze: true,
                       mediaFirst: true,
                       style: TextStyle(
                         fontFamily: 'ReadexPro',
