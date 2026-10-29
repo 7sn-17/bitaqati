@@ -130,10 +130,11 @@ studyCardsProvider = StreamProvider.autoDispose
 ///
 /// [all] builds a "review everything" session that also pulls in cards
 /// scheduled for later, which is what the empty state offers once the day's
-/// work is done. A null [deckId] is the global queue. A record is used as the
-/// family key because records compare by value, so Riverpod caches the queues
-/// separately.
-typedef StudyQuery = ({String? deckId, bool all});
+/// work is done. [cram] goes one step further and drops the daily caps too, so
+/// a deck finished a minute ago can be studied again from the top.
+/// A null [deckId] is the global queue. A record is used as the family key
+/// because records compare by value, so Riverpod caches the queues separately.
+typedef StudyQuery = ({String? deckId, bool all, bool cram});
 
 /// The cards a review session should show. Loaded once per session.
 final AutoDisposeFutureProviderFamily<List<ReviewCard>, StudyQuery>
@@ -149,7 +150,8 @@ studyQueueProvider = FutureProvider.autoDispose
             query.deckId,
             newLimit: ref.watch(dailyNewLimitProvider),
             reviewLimit: ref.watch(dailyReviewLimitProvider),
-            includeFuture: query.all,
+            includeFuture: query.all || query.cram,
+            cram: query.cram,
           );
       if (query.deckId != null || frozen.isEmpty) {
         return queue;

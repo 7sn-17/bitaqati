@@ -30,10 +30,18 @@ class ReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
-  /// Set once the user asks to see cards that are not due yet. The session
-  /// then also passes `allowEarly` to the scheduler, so answering a card ahead
-  /// of time is recorded instead of being discarded as a duplicate tap.
-  bool _all = false;
+  /// Null until the first frame can tell whether this visit is a cram session;
+  /// then true or false for the rest of the visit.
+  ///
+  /// It has to be decided once and frozen: answering the last due card drops
+  /// the deck's due count to zero mid-session, and re-deciding then would swap
+  /// the queue under the running session and replace its summary with a
+  /// spinner. Raised to true by "راجع مرة أخرى" as well.
+  bool? _cram;
+
+  /// Bumped on every restart so the session widget is rebuilt from scratch
+  /// with the fresh queue, rather than keeping the list it was born with.
+  int _run = 0;
 
   /// True once this visit has been counted against the free tier's daily
   /// session allowance. A rebuild must not spend a second session.
@@ -53,10 +61,36 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       return FrozenDeckScreen(deckTitle: found.title);
     }
     final bool listReady = ref.watch(deckListProvider).hasValue;
+    // How much work the scope holds decides the kind of session. With nothing
+    // due there is no queue to run, and the professional answer is a cram
+    // session over the whole deck rather than a screen that refuses to open.
+    final int scopeCards = global
+        ? ref
+              .watch(allDecksProvider)
+              .fold<int>(0, (int sum, DeckNode d) => sum + d.cardCount)
+        : (found?.cardCount ?? 0);
+    final int scopeDue = global
+        ? ref.watch(dueTotalsProvider).total
+        : (found?.dueCount ?? 0);
+    // The mode is decided only once the library is loaded: counting cards
+    // before that would lock a full library into "nothing to study".
+    if (!listReady) {
+      return Scaffold(
+        backgroundColor: context.primary,
+        body: Center(child: CircularProgressIndicator(color: context.accent)),
+      );
+    }
+    _cram ??= scopeCards > 0 && scopeDue == 0;
+    final bool cram = _cram!;
+    final StudyQuery query = (
+      deckId: global ? null : deckId,
+      all: cram,
+      cram: cram,
+    );
     final List<ReviewCard>? queue = ref
-        .watch(studyQueueProvider((deckId: global ? null : deckId, all: _all)))
+        .watch(studyQueueProvider(query))
         .valueOrNull;
-    if ((!global && found == null && !listReady) || queue == null) {
+    if (queue == null) {
       return Scaffold(
         backgroundColor: context.primary,
         body: Center(child: CircularProgressIndicator(color: context.accent)),
@@ -87,19 +121,28 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
         unawaited(ledger.noteSession(deckId));
       }
     }
-    final bool canStudyAll =
-        !_all &&
-        queue.isEmpty &&
-        (global || (found != null && deck.cardCount > 0));
     return _ReviewSession(
+      // A new key on restart throws the old session away, which is what makes
+      // "راجع مرة أخرى" start from the first card again.
+      key: ValueKey<int>(_run),
       deck: deck,
       cards: (!global && found == null) ? const <ReviewCard>[] : queue,
-      allowEarly: _all,
-      onStudyAll: canStudyAll
-          ? () {
-              setState(() => _all = true);
-            }
-          : null,
+      cram: cram,
+      onReviewAgain: () {
+        // The cards answered just now have new due dates, so the cached queue
+        // is stale; dropping it makes the rebuild fetch a clean list.
+        ref.invalidate(
+          studyQueueProvider((
+            deckId: global ? null : deckId,
+            all: true,
+            cram: true,
+          )),
+        );
+        setState(() {
+          _cram = true;
+          _run++;
+        });
+      },
     );
   }
 }
@@ -108,17 +151,22 @@ class _ReviewSession extends ConsumerStatefulWidget {
   const _ReviewSession({
     required this.deck,
     required this.cards,
-    this.allowEarly = false,
-    this.onStudyAll,
+    this.cram = false,
+    this.onReviewAgain,
+    super.key,
   });
 
   final DeckNode deck;
   final List<ReviewCard> cards;
-  final bool allowEarly;
 
-  /// Offered when nothing is due but the deck has cards: the user can choose
-  /// to study ahead of the schedule.
-  final VoidCallback? onStudyAll;
+  /// True when the queue holds cards that are not due yet. Every answer is
+  /// then written with `allowEarly`, so FSRS books it as an early review
+  /// instead of discarding it as a duplicate of a card that is not due.
+  final bool cram;
+
+  /// Starts the session over with every card in scope. Null when the parent
+  /// cannot rebuild the queue.
+  final VoidCallback? onReviewAgain;
 
   @override
   ConsumerState<_ReviewSession> createState() => _ReviewSessionState();
@@ -145,39 +193,6 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
         if (card.favorite) card.id,
     };
     _resetRemaining();
-  }
-
-  /// Adopts a queue that arrived after the screen was built.
-  ///
-  /// The "راجع الكل الآن" button swaps the queue from empty to "everything in
-  /// this deck"; without this the session would keep the empty list it was
-  /// created with and the button would appear to do nothing. A queue that
-  /// changes mid-session is ignored, because the session owns its own copy.
-  @override
-  void didUpdateWidget(covariant _ReviewSession oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_cards.isNotEmpty || widget.cards.isEmpty) {
-      return;
-    }
-    _cards = List<ReviewCard>.of(widget.cards);
-    _favorites
-      ..clear()
-      ..addAll(<String>{
-        for (final ReviewCard card in _cards)
-          if (card.favorite) card.id,
-      });
-    _resetRemaining();
-    _index = 0;
-    _completed = 0;
-    _revealed = false;
-    _hintVisible = false;
-    _finished = false;
-    _again = 0;
-    _hard = 0;
-    _good = 0;
-    _easy = 0;
-    _startedAt = DateTime.now();
-    _shownAt = DateTime.now();
   }
 
   void _resetRemaining() {
@@ -231,7 +246,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
               cardId: answered.id,
               rating: rating,
               elapsedMs: DateTime.now().difference(_shownAt).inMilliseconds,
-              allowEarly: widget.allowEarly,
+              allowEarly: widget.cram,
             )
             .catchError((Object error) {
               if (!mounted) {
@@ -405,6 +420,10 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
   @override
   Widget build(BuildContext context) {
     if (_cards.isEmpty) {
+      // Only reachable when the scope truly holds nothing to answer: no cards
+      // at all, or every one of them suspended. A deck whose cards are merely
+      // scheduled for later opens a cram session instead, so this screen is
+      // never the answer to "I just finished and want to go again".
       return Scaffold(
         backgroundColor: context.primary,
         body: SafeArea(
@@ -417,7 +436,8 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                   Icon(CupertinoIcons.tray, size: 44, color: context.accent),
                   const SizedBox(height: 14),
                   const Text(
-                    'لا توجد بطاقات للمراجعة',
+                    'لا توجد بطاقات جاهزة للمراجعة',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'ReadexPro',
                       color: Colors.white,
@@ -427,45 +447,12 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'لا توجد بطاقات مستحقة الآن. عد لاحقاً أو أضف بطاقات جديدة.',
+                    'أضف بطاقة جديدة، أو أعد تفعيل البطاقات الموقوفة من قائمة البطاقات.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.65),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  if (widget.onStudyAll != null) ...<Widget>[
-                    Semantics(
-                      button: true,
-                      label: 'راجع كل بطاقات المجموعة الآن',
-                      child: FilledButton.icon(
-                        onPressed: widget.onStudyAll,
-                        icon: const Icon(CupertinoIcons.forward_end, size: 17),
-                        label: const Text('راجع الكل الآن'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: context.accent,
-                          foregroundColor: context.onAccent,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 13,
-                          ),
-                          textStyle: const TextStyle(
-                            fontFamily: 'ReadexPro',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'ستُراجع بطاقات مجدولة لوقت لاحق، وسيُعاد ترتيبها حسب إجاباتك.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Colors.white.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () {
@@ -500,6 +487,7 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
         duration: (_finishedAt ?? DateTime.now()).difference(_startedAt),
         hardCount: _hardCards.length,
         onRestart: _restart,
+        onReviewAgain: widget.onReviewAgain,
         onClose: () {
           if (context.canPop()) {
             context.pop();
@@ -560,6 +548,10 @@ class _ReviewSessionState extends ConsumerState<_ReviewSession> {
                 ],
               ),
               const SizedBox(height: 12),
+              if (widget.cram) ...<Widget>[
+                const _CramBanner(),
+                const SizedBox(height: 9),
+              ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
@@ -1231,6 +1223,7 @@ class _Summary extends ConsumerWidget {
     required this.duration,
     required this.hardCount,
     required this.onRestart,
+    required this.onReviewAgain,
     required this.onClose,
   });
 
@@ -1244,6 +1237,10 @@ class _Summary extends ConsumerWidget {
   final Duration duration;
   final int hardCount;
   final VoidCallback onRestart;
+
+  /// Starts the whole deck again from the first card. The headline action,
+  /// because finishing a deck is a reason to keep going, not a dead end.
+  final VoidCallback? onReviewAgain;
   final VoidCallback onClose;
 
   @override
@@ -1399,15 +1396,36 @@ class _Summary extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 18),
-            FilledButton(
-              onPressed: onClose,
-              style: FilledButton.styleFrom(
-                backgroundColor: context.accent,
-                foregroundColor: context.onAccent,
+            if (onReviewAgain != null) ...<Widget>[
+              FilledButton.icon(
+                onPressed: onReviewAgain,
+                icon: const Icon(CupertinoIcons.arrow_2_circlepath, size: 18),
+                label: const Text('راجع مرة أخرى'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.accent,
+                  foregroundColor: context.onAccent,
+                  minimumSize: const Size(0, 50),
+                  textStyle: const TextStyle(
+                    fontFamily: 'ReadexPro',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
+              const SizedBox(height: 4),
+              Text(
+                'يعيد الجلسة على كل بطاقات المجموعة، حتى ما جُدول لوقت لاحق.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.muted, fontSize: 10.5),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextButton(
+              onPressed: onClose,
+              style: TextButton.styleFrom(foregroundColor: context.muted),
               child: const Text('العودة إلى المجموعات'),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             TextButton(
               onPressed: onRestart,
               child: Text(
@@ -1490,6 +1508,41 @@ class _Legend extends StatelessWidget {
           fontSize: 11,
           fontWeight: active ? FontWeight.w600 : FontWeight.w400,
         ),
+      ),
+    );
+  }
+}
+
+/// Says, once and quietly, that this session is studying cards ahead of the
+/// schedule. It sits above the phase legend and below the progress bar so it
+/// reads as context rather than as an alert.
+class _CramBanner extends StatelessWidget {
+  const _CramBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: context.accent.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: context.accent.withValues(alpha: 0.38)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(CupertinoIcons.bolt, size: 12, color: context.accent),
+          const SizedBox(width: 6),
+          Text(
+            'مراجعة سريعة (بدون تأثير على الجدول)',
+            style: TextStyle(
+              fontFamily: 'ReadexPro',
+              color: context.accent,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

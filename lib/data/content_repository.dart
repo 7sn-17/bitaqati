@@ -934,11 +934,17 @@ ORDER BY d.position, d.created_at
   /// are scheduled for later are pulled in too, most overdue first. A normal
   /// session leaves it false so a card answered ahead of schedule never
   /// distorts its own memory state.
+  ///
+  /// Set [cram] for a cram session: every live card in scope, ignoring both
+  /// the daily caps and the due date, so a deck finished a minute ago can be
+  /// studied again. The caller must then answer with allowEarly, or the
+  /// reviews would be dropped as duplicates of a card that is not due yet.
   Future<List<ReviewCard>> studyQueue(
     String? deckId, {
     int newLimit = 10,
     int reviewLimit = 200,
     bool includeFuture = false,
+    bool cram = false,
   }) async {
     // The deck join exists for the global queue: without it the cards of
     // five decks interleave by their own position and the session jumps from
@@ -976,16 +982,23 @@ ORDER BY d.position, d.created_at
         case CardPhase.newCard:
           fresh.add(item);
         case CardPhase.learning:
-          if (state != null && (includeFuture || !state.due.isAfter(now))) {
+          if (state != null &&
+              (includeFuture || cram || !state.due.isAfter(now))) {
             learning.add(item);
           }
         case CardPhase.review:
-          if (state != null && (includeFuture || !state.due.isAfter(now))) {
+          if (state != null &&
+              (includeFuture || cram || !state.due.isAfter(now))) {
             review.add(item);
           }
         case CardPhase.paused:
           break;
       }
+    }
+    if (cram) {
+      // A cram session is explicitly unbounded: the user asked to study the
+      // deck again, so the daily caps would only reproduce the dead end.
+      return <ReviewCard>[...learning, ...review, ...fresh];
     }
     return <ReviewCard>[
       ...learning.take(reviewLimit),

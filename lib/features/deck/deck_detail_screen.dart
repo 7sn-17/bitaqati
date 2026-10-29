@@ -291,7 +291,7 @@ class _DeckDetailScreenState extends ConsumerState<DeckDetailScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Text(
-                  'كل البطاقات مجدولة الآن. عد لاحقاً أو أضف بطاقات جديدة.',
+                  'لا بطاقات مستحقة الآن — الدراسة تبدأ مراجعة سريعة لكل البطاقات.',
                   textAlign: TextAlign.center,
                   style: context.texts.bodySmall,
                 ),

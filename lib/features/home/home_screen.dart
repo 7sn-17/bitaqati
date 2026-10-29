@@ -366,7 +366,9 @@ class _DailyReviewHero extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: due.total == 0
+              // With nothing due the button still works: it opens a cram
+              // session over the whole library instead of going dead.
+              onPressed: totalCards == 0
                   ? null
                   : () => openGlobalStudy(
                       context,
@@ -382,8 +384,10 @@ class _DailyReviewHero extends StatelessWidget {
                 ),
               ),
               child: Text(
-                due.total == 0
+                totalCards == 0
                     ? 'لا توجد بطاقات مستحقة'
+                    : due.total == 0
+                    ? 'مراجعة سريعة لكل البطاقات'
                     : 'مراجعة جميع البطاقات المستحقة',
               ),
             ),

@@ -136,17 +136,21 @@ class _StudyModeSheet extends StatelessWidget {
   final int cardCount;
   final int dueCount;
 
-  bool get _canReview => dueCount > 0;
+  // Review is available whenever the scope holds a card, not only when one is
+  // due: with nothing due the session becomes a cram run over the whole deck,
+  // which is the difference between "study again" and a dead end.
+  bool get _canReview => cardCount > 0;
   bool get _canPlay => cardCount >= 2;
   bool get _canWrite => cardCount >= 1;
 
   String _reviewSubtitle() {
-    if (_canReview) {
+    if (cardCount == 0) {
+      return 'أضف بطاقات إلى هذه المجموعة أولًا.';
+    }
+    if (dueCount > 0) {
       return 'راجع بطاقاتك واحدة تلو الأخرى وقيّم مستواك.';
     }
-    return cardCount == 0
-        ? 'أضف بطاقات إلى هذه المجموعة أولًا.'
-        : 'لا بطاقات مستحقة الآن، عد لاحقًا أو جرّب نمطًا آخر.';
+    return 'لا بطاقات مستحقة الآن — نبدأ مراجعة سريعة لكل بطاقات المجموعة.';
   }
 
   String _playSubtitle(String fallback) {
@@ -198,7 +202,11 @@ class _StudyModeSheet extends StatelessWidget {
                   tint: context.primary,
                   accent: context.accent,
                   enabled: _canReview,
-                  badge: _canReview ? '$dueCount مستحقة' : null,
+                  badge: dueCount > 0
+                      ? '$dueCount مستحقة'
+                      : cardCount > 0
+                      ? 'مراجعة سريعة'
+                      : null,
                   delay: 60,
                   onTap: () => Navigator.of(context).pop(StudyMode.review),
                 ),
